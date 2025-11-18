@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 
 export default function LoginPage() {
@@ -12,7 +13,6 @@ export default function LoginPage() {
   const [darkMode, setDarkMode] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  const [imageError, setImageError] = useState(false)
 
   useEffect(() => {
     // Check system preference or saved preference
@@ -96,20 +96,13 @@ export default function LoginPage() {
           {/* Logo and Title */}
           <div className="text-center">
             <div className="mx-auto w-16 h-16 mb-4 flex items-center justify-center">
-              {!imageError ? (
-                <img 
-                  src={darkMode ? "/PROXE Icon.svg" : "/PROXE Icon Black.svg"}
-                  alt="PROXe HQ" 
-                  className="w-full h-full object-contain"
-                  onError={() => setImageError(true)}
-                />
-              ) : (
-                <div className={`w-16 h-16 rounded-full flex items-center justify-center border-2 ${
-                  darkMode ? 'bg-[#0D0D0D] border-[#262626]' : 'bg-gray-900 border-gray-700'
-                }`}>
-                  <span className="text-2xl font-bold text-white">P</span>
-                </div>
-              )}
+              <Image 
+                src={darkMode ? "/PROXE Icon.svg" : "/PROXE Icon Black.svg"}
+                alt="PROXe HQ" 
+                width={64}
+                height={64}
+                className="w-full h-full object-contain"
+              />
             </div>
             <h2 className={`text-3xl font-normal font-exo-2 ${
               darkMode ? 'text-white' : 'text-black'

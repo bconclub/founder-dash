@@ -20,7 +20,7 @@ export default async function DashboardPage() {
       <div>
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Dashboard Overview</h1>
         <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-          Welcome back! Here's what's happening with your leads and bookings.
+          Welcome back! Here&apos;s what&apos;s happening with your leads and bookings.
         </p>
       </div>
 
@@ -34,7 +34,9 @@ export default async function DashboardPage() {
             <div>
               <h3 className="text-lg font-medium text-gray-900 dark:text-white">Web PROXe</h3>
             </div>
-            <MdLanguage className="w-12 h-12 text-gray-600 dark:text-gray-400" />
+            <div className="w-12 h-12 flex items-center justify-center text-gray-600 dark:text-gray-400">
+              <MdLanguage size={48} color="currentColor" />
+            </div>
           </div>
         </a>
         <a href="/dashboard/channels/whatsapp" className="bg-white dark:bg-[#1A1A1A] border border-gray-200 dark:border-[#262626] shadow rounded-lg p-6 hover:shadow-lg transition-shadow">
@@ -42,7 +44,9 @@ export default async function DashboardPage() {
             <div>
               <h3 className="text-lg font-medium text-gray-900 dark:text-white">WhatsApp PROXe</h3>
             </div>
-            <MdWhatsapp className="w-12 h-12 text-gray-600 dark:text-gray-400" />
+            <div className="w-12 h-12 flex items-center justify-center text-gray-600 dark:text-gray-400">
+              <MdWhatsapp size={48} color="currentColor" />
+            </div>
           </div>
         </a>
         <a href="/dashboard/channels/voice" className="bg-white dark:bg-[#1A1A1A] border border-gray-200 dark:border-[#262626] shadow rounded-lg p-6 hover:shadow-lg transition-shadow">
@@ -50,7 +54,9 @@ export default async function DashboardPage() {
             <div>
               <h3 className="text-lg font-medium text-gray-900 dark:text-white">Voice PROXe</h3>
             </div>
-            <MdPhone className="w-12 h-12 text-gray-600 dark:text-gray-400" />
+            <div className="w-12 h-12 flex items-center justify-center text-gray-600 dark:text-gray-400">
+              <MdPhone size={48} color="currentColor" />
+            </div>
           </div>
         </a>
         <a href="/dashboard/channels/social" className="bg-white dark:bg-[#1A1A1A] border border-gray-200 dark:border-[#262626] shadow rounded-lg p-6 hover:shadow-lg transition-shadow">
@@ -58,7 +64,9 @@ export default async function DashboardPage() {
             <div>
               <h3 className="text-lg font-medium text-gray-900 dark:text-white">Social PROXe</h3>
             </div>
-            <MdVideoLibrary className="w-12 h-12 text-gray-600 dark:text-gray-400" />
+            <div className="w-12 h-12 flex items-center justify-center text-gray-600 dark:text-gray-400">
+              <MdVideoLibrary size={48} color="currentColor" />
+            </div>
           </div>
         </a>
       </div>
