@@ -42,10 +42,10 @@ jobs:
           npm install --production
           pm2 stop dashboard || true
           pm2 delete dashboard || true
-          PORT=3000 pm2 start npm --name dashboard -- start
+          PORT=3001 pm2 start npm --name dashboard -- start
           pm2 save
           sleep 3
           pm2 status
-          echo "Checking if app is listening on port 3000..."
-          netstat -tlnp | grep :3000 || ss -tlnp | grep :3000 || echo "Port 3000 not found - check PM2 logs"
+          echo "Checking if app is listening on port 3001..."
+          netstat -tlnp | grep :3001 || ss -tlnp | grep :3001 || echo "Port 3001 not found - check PM2 logs"
           pm2 logs dashboard --lines 30 --nostream
