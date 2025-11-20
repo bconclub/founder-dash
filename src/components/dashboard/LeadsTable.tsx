@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { formatDateTime } from '@/lib/utils'
 import { useRealtimeLeads } from '@/hooks/useRealtimeLeads'
 import LeadDetailsModal from './LeadDetailsModal'
+import type { Lead } from '@/types'
 
 const STATUS_OPTIONS = [
   'New Lead',
@@ -28,21 +29,13 @@ const getStatusColor = (status: string | null) => {
   return statusColors[status || 'New Lead'] || statusColors['New Lead']
 }
 
-interface Lead {
-  id: string
-  name: string | null
-  email: string | null
-  phone: string | null
-  source: string | null
-  first_touchpoint: string | null
-  last_touchpoint: string | null
-  brand: string | null
-  timestamp: string
-  last_interaction_at: string | null
-  status?: string | null
-  booking_date?: string | null
-  booking_time?: string | null
-  metadata?: any
+// Using Lead type from @/types to match LeadDetailsModal expectations
+// Extending it with additional properties from useRealtimeLeads
+type ExtendedLead = Lead & {
+  first_touchpoint?: string | null
+  last_touchpoint?: string | null
+  brand?: string | null
+  last_interaction_at?: string | null
 }
 
 interface LeadsTableProps {
@@ -52,7 +45,7 @@ interface LeadsTableProps {
 
 export default function LeadsTable({ limit, sourceFilter: initialSourceFilter }: LeadsTableProps) {
   const { leads, loading, error } = useRealtimeLeads()
-  const [filteredLeads, setFilteredLeads] = useState<Lead[]>([])
+  const [filteredLeads, setFilteredLeads] = useState<ExtendedLead[]>([])
   const [dateFilter, setDateFilter] = useState<string>('all')
   const [sourceFilter, setSourceFilter] = useState<string>(initialSourceFilter || 'all')
   const [statusFilter, setStatusFilter] = useState<string>('all')
@@ -109,8 +102,21 @@ export default function LeadsTable({ limit, sourceFilter: initialSourceFilter }:
     setFilteredLeads(filtered)
   }, [leads, dateFilter, sourceFilter, statusFilter, limit])
 
-  const handleRowClick = (lead: Lead) => {
-    setSelectedLead(lead)
+  const handleRowClick = (lead: ExtendedLead) => {
+    // Convert ExtendedLead to Lead type expected by LeadDetailsModal
+    const modalLead: Lead = {
+      id: lead.id,
+      name: lead.name,
+      email: lead.email,
+      phone: lead.phone,
+      source: lead.source || null,
+      timestamp: lead.timestamp,
+      status: lead.status || null,
+      booking_date: lead.booking_date || null,
+      booking_time: lead.booking_time || null,
+      metadata: lead.metadata,
+    }
+    setSelectedLead(modalLead)
     setIsModalOpen(true)
   }
 
@@ -143,7 +149,7 @@ export default function LeadsTable({ limit, sourceFilter: initialSourceFilter }:
       
       // Update selected lead if modal is open
       if (selectedLead && selectedLead.id === leadId) {
-        setSelectedLead({ ...selectedLead, status: newStatus } as Lead)
+        setSelectedLead({ ...selectedLead, status: newStatus || null })
       }
     } catch (err) {
       console.error('Error updating status:', err)
