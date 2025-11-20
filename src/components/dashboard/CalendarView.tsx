@@ -385,8 +385,8 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
             <div className="grid grid-cols-8 min-w-full">
               {/* Time column */}
               <div className="border-r border-gray-200 dark:border-[#262626] sticky left-0 bg-white dark:bg-[#1A1A1A] z-10">
-                {/* Empty header to align with day headers */}
-                <div className="border-b border-gray-200 dark:border-[#262626] h-[73px]"></div>
+                {/* Empty header to align with day headers - matches day header height */}
+                <div className="border-b border-gray-200 dark:border-[#262626] p-2 text-center" style={{ minHeight: '73px' }}></div>
                 {HOURS.map((hour) => (
                   <div
                     key={hour}
