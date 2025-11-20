@@ -444,7 +444,7 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
                               const style = getBookingStyle(booking, hour)
                               // Handle overlapping bookings by offsetting horizontally
                               const leftOffset = idx * 50 // Offset for overlapping bookings
-                              const bookingTitle = booking.metadata?.conversation_summary 
+                              const callTitle = booking.metadata?.conversation_summary 
                                 || booking.metadata?.title 
                                 || booking.metadata?.summary 
                                 || 'Call'
@@ -464,19 +464,16 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
                                     right: `${4 + (hourBookings.length > 1 ? leftOffset + 4 : 0)}px`,
                                     width: hourBookings.length > 1 ? `calc(50% - ${leftOffset}px)` : undefined,
                                   }}
-                                  title={`${booking.name || 'Unnamed'} - ${booking.booking_time} - ${bookingTitle}`}
+                                  title={`${booking.booking_time} - ${callTitle} - ${booking.name || 'Unnamed'}`}
                                 >
                                   <div className="font-semibold truncate mb-0.5">
                                     {booking.booking_time}
                                   </div>
-                                  <div className="font-medium truncate mb-0.5">
-                                    {booking.name || 'Unnamed Lead'}
+                                  <div className="text-[9px] opacity-90 truncate italic mb-0.5">
+                                    {callTitle.length > 25 ? callTitle.substring(0, 25) + '...' : callTitle}
                                   </div>
-                                  <div className="text-[9px] opacity-90 truncate">
-                                    {booking.booking_date ? format(new Date(booking.booking_date), 'MMM d') : ''}
-                                  </div>
-                                  <div className="text-[9px] opacity-80 truncate italic">
-                                    {bookingTitle.length > 20 ? bookingTitle.substring(0, 20) + '...' : bookingTitle}
+                                  <div className="font-medium truncate">
+                                    {booking.name || 'Unnamed Customer'}
                                   </div>
                                 </div>
                               )
