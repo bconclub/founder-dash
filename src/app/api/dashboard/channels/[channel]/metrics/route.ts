@@ -28,27 +28,49 @@ export async function GET(
       )
     }
 
-    // Get sessions for this specific channel from the sessions table
-    // Channel session tables (web_sessions, etc.) are JOIN tables that reference sessions
-    // We query sessions directly filtered by channel column
+    // Get sessions for this specific channel from channel-specific table
+    // Each channel has its own table: web_sessions, whatsapp_sessions, etc.
+    const tableName =
+      channel === 'web'
+        ? 'web_sessions'
+        : channel === 'whatsapp'
+        ? 'whatsapp_sessions'
+        : channel === 'voice'
+        ? 'voice_sessions'
+        : 'social_sessions'
+
     const { data: sessions, error: sessionsError } = await supabase
-      .from('sessions')
+      .from(tableName)
       .select('*')
-      .eq('channel', channel)
 
     if (sessionsError) throw sessionsError
 
     // Map session data to unified_leads format
+    // For web_sessions, use customer_name, customer_email, customer_phone
     const leads = sessions?.map((session: any) => ({
-      id: session.id,
-      name: session.user_name || null,
-      email: session.email || null,
-      phone: session.phone || null,
+      id: session.lead_id || session.id,
+      name:
+        session.customer_name ||
+        session.user_name ||
+        null,
+      email:
+        session.customer_email ||
+        session.email ||
+        null,
+      phone:
+        session.customer_phone ||
+        session.phone ||
+        null,
       source: channel,
       timestamp: session.created_at || new Date().toISOString(),
-      status: session.booking_status === 'confirmed' ? 'booked' : 
-              session.booking_status === 'pending' ? 'pending' :
-              session.booking_status === 'cancelled' ? 'cancelled' : null,
+      status:
+        session.booking_status === 'confirmed'
+          ? 'booked'
+          : session.booking_status === 'pending'
+          ? 'pending'
+          : session.booking_status === 'cancelled'
+          ? 'cancelled'
+          : null,
       booking_date: session.booking_date || null,
       booking_time: session.booking_time || null,
       metadata: {

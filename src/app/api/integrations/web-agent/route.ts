@@ -1,9 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient } from '@supabase/supabase-js'
+import { createClient as createServerClient } from '@/lib/supabase/server'
+
+// Service role client for webhooks (bypasses RLS)
+const getServiceClient = () => {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+}
+
+const normalizePhone = (phone: string): string => {
+  return phone.replace(/\D/g, '')
+}
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient()
+    const supabase = await createServerClient()
     const {
       data: { user },
     } = await supabase.auth.getUser()
@@ -12,11 +25,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Fetch leads from unified_leads view (includes chat_sessions and dashboard_leads)
+    // Fetch leads from unified_leads view
     const { data: leads, error } = await supabase
       .from('unified_leads')
       .select('*')
-      .order('timestamp', { ascending: false })
+      .order('last_interaction_at', { ascending: false })
       .limit(100)
 
     if (error) throw error
@@ -27,11 +40,12 @@ export async function GET(request: NextRequest) {
       name: lead.name,
       email: lead.email,
       phone: lead.phone,
-      source: lead.source || 'web',
+      source: lead.first_touchpoint || 'web',
+      first_touchpoint: lead.first_touchpoint,
+      last_touchpoint: lead.last_touchpoint,
       timestamp: lead.timestamp,
-      status: lead.status,
-      booking_date: lead.booking_date,
-      booking_time: lead.booking_time,
+      last_interaction_at: lead.last_interaction_at,
+      brand: lead.brand,
       metadata: lead.metadata,
     }))
 
@@ -47,66 +61,143 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
+    const supabase = getServiceClient()
     const body = await request.json()
 
-    // Generate external_session_id if not provided
-    const externalSessionId = body.external_session_id || body.chat_session_id || `web_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    const {
+      name,
+      email,
+      phone,
+      booking_status,
+      booking_date,
+      booking_time,
+      brand = 'proxe',
+      external_session_id,
+      chat_session_id,
+      website_url,
+      conversation_summary,
+      user_inputs_summary,
+      message_count,
+      last_message_at,
+      metadata,
+    } = body
 
-    // Set initial status based on booking_status
-    // If booking is confirmed, set to "Call Booked", otherwise "New Lead"
-    const initialStatus = body.booking_status === 'confirmed' ? 'Call Booked' : 'New Lead'
-
-    // Store session in sessions table
-    const { data, error } = await supabase
-      .from('sessions')
-      .insert({
-        external_session_id: externalSessionId,
-        user_name: body.name,
-        email: body.email,
-        phone: body.phone,
-        channel: 'web',
-        status: initialStatus,
-        booking_status: body.booking_status || null,
-        booking_date: body.booking_date || null,
-        booking_time: body.booking_time || null,
-        channel_data: {
-          chat_session_id: body.chat_session_id || null,
-          ...(body.metadata || {}),
-        },
-      })
-      .select()
-      .single()
-
-    if (error) throw error
-
-    // Map session to lead format for backward compatibility
-    const lead = {
-      id: data.id,
-      name: data.user_name,
-      email: data.email,
-      phone: data.phone,
-      source: data.channel,
-      timestamp: data.created_at,
-      status: data.status || initialStatus,
-      booking_date: data.booking_date,
-      booking_time: data.booking_time,
-      metadata: data.channel_data,
+    if (!phone || !name) {
+      return NextResponse.json(
+        { error: 'Missing required fields: phone and name' },
+        { status: 400 }
+      )
     }
 
-    return NextResponse.json({ lead })
+    const normalizedPhone = normalizePhone(phone)
+
+    // Generate external_session_id if not provided
+    const externalSessionId =
+      external_session_id ||
+      chat_session_id ||
+      `web_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+
+    // Check if lead already exists
+    const { data: existingLead, error: checkError } = await supabase
+      .from('all_leads')
+      .select('id')
+      .eq('customer_phone_normalized', normalizedPhone)
+      .eq('brand', brand)
+      .maybeSingle()
+
+    if (checkError) throw checkError
+
+    let leadId: string
+
+    if (!existingLead?.id) {
+      // NEW LEAD - Create in all_leads
+      const { data: newLead, error: insertError } = await supabase
+        .from('all_leads')
+        .insert({
+          customer_name: name,
+          email: email,
+          phone: phone,
+          customer_phone_normalized: normalizedPhone,
+          first_touchpoint: 'web',
+          last_touchpoint: 'web',
+          last_interaction_at: new Date().toISOString(),
+          brand: brand,
+        })
+        .select('id')
+        .single()
+
+      if (insertError) throw insertError
+      leadId = newLead.id
+    } else {
+      // EXISTING LEAD - Update last_touchpoint
+      leadId = existingLead.id
+
+      const { error: updateError } = await supabase
+        .from('all_leads')
+        .update({
+          last_touchpoint: 'web',
+          last_interaction_at: new Date().toISOString(),
+        })
+        .eq('id', leadId)
+
+      if (updateError) throw updateError
+    }
+
+    // Create web_sessions record
+    const { data: webSession, error: webSessionError } = await supabase
+      .from('web_sessions')
+      .insert({
+        lead_id: leadId,
+        brand: brand,
+        customer_name: name,
+        customer_email: email,
+        customer_phone: phone,
+        customer_phone_normalized: normalizedPhone,
+        external_session_id: externalSessionId,
+        chat_session_id: chat_session_id || null,
+        website_url: website_url || null,
+        booking_status: booking_status || null,
+        booking_date: booking_date || null,
+        booking_time: booking_time || null,
+        conversation_summary: conversation_summary || null,
+        user_inputs_summary: user_inputs_summary || null,
+        message_count: message_count || 0,
+        last_message_at: last_message_at || null,
+        session_status: 'active',
+        channel_data: metadata || {},
+      })
+      .select('id')
+      .single()
+
+    if (webSessionError) throw webSessionError
+
+    // Insert message
+    const { error: messageError } = await supabase.from('messages').insert({
+      lead_id: leadId,
+      channel: 'web',
+      sender: 'system',
+      content: `Web inquiry from ${name}`,
+      message_type: 'text',
+      metadata: {
+        booking_requested: !!booking_date,
+        booking_date: booking_date,
+        external_session_id: externalSessionId,
+      },
+    })
+
+    if (messageError) throw messageError
+
+    return NextResponse.json({
+      success: true,
+      lead_id: leadId,
+      message: 'Lead created successfully',
+    })
   } catch (error) {
     console.error('Error creating web agent lead:', error)
     return NextResponse.json(
-      { error: 'Failed to create lead' },
+      {
+        error: error instanceof Error ? error.message : 'Unknown error',
+      },
       { status: 500 }
     )
   }

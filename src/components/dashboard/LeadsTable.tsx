@@ -34,10 +34,11 @@ interface Lead {
   email: string | null
   phone: string | null
   source: string | null
+  first_touchpoint: string | null
+  last_touchpoint: string | null
+  brand: string | null
   timestamp: string
-  status: string | null
-  booking_date: string | null
-  booking_time: string | null
+  last_interaction_at: string | null
   metadata?: any
 }
 
@@ -58,31 +59,38 @@ export default function LeadsTable({ limit, sourceFilter: initialSourceFilter }:
   useEffect(() => {
     let filtered = [...leads]
 
-    // Apply date filter
+    // Apply date filter (use last_interaction_at if available, fallback to timestamp)
     if (dateFilter !== 'all') {
       const now = new Date()
       const filterDate = new Date()
       if (dateFilter === 'today') {
         filterDate.setHours(0, 0, 0, 0)
-        filtered = filtered.filter(
-          (lead) => new Date(lead.timestamp) >= filterDate
-        )
+        filtered = filtered.filter((lead) => {
+          const dateToCheck = lead.last_interaction_at || lead.timestamp
+          return new Date(dateToCheck) >= filterDate
+        })
       } else if (dateFilter === 'week') {
         filterDate.setDate(now.getDate() - 7)
-        filtered = filtered.filter(
-          (lead) => new Date(lead.timestamp) >= filterDate
-        )
+        filtered = filtered.filter((lead) => {
+          const dateToCheck = lead.last_interaction_at || lead.timestamp
+          return new Date(dateToCheck) >= filterDate
+        })
       } else if (dateFilter === 'month') {
         filterDate.setMonth(now.getMonth() - 1)
-        filtered = filtered.filter(
-          (lead) => new Date(lead.timestamp) >= filterDate
-        )
+        filtered = filtered.filter((lead) => {
+          const dateToCheck = lead.last_interaction_at || lead.timestamp
+          return new Date(dateToCheck) >= filterDate
+        })
       }
     }
 
-    // Apply source filter
+    // Apply source filter (use first_touchpoint or last_touchpoint)
     if (sourceFilter !== 'all') {
-      filtered = filtered.filter((lead) => lead.source === sourceFilter)
+      filtered = filtered.filter(
+        (lead) =>
+          lead.first_touchpoint === sourceFilter ||
+          lead.last_touchpoint === sourceFilter
+      )
     }
 
     // Apply status filter

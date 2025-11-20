@@ -27,13 +27,18 @@ export async function GET() {
     // Calculate metrics
     const totalConversations = leads?.length || 0
     const activeConversations =
-      leads?.filter((lead) => new Date(lead.timestamp) >= last24Hours).length ||
-      0
+      leads?.filter(
+        (lead) =>
+          new Date(lead.last_interaction_at || lead.timestamp) >= last24Hours
+      ).length || 0
 
     // Calculate conversion rate (leads with booking / total leads)
+    // Booking data is in metadata.web_data.booking_date
     const bookedLeads =
-      leads?.filter((lead) => lead.booking_date && lead.booking_time).length ||
-      0
+      leads?.filter((lead) => {
+        const webData = lead.metadata?.web_data
+        return webData?.booking_date && webData?.booking_time
+      }).length || 0
     const conversionRate =
       totalConversations > 0
         ? Math.round((bookedLeads / totalConversations) * 100)
@@ -42,10 +47,10 @@ export async function GET() {
     // Average response time (mock data - replace with actual calculation)
     const avgResponseTime = 5 // minutes
 
-    // Leads by channel
+    // Leads by channel (use first_touchpoint to show origin channel)
     const channelCounts: Record<string, number> = {}
     leads?.forEach((lead) => {
-      const channel = lead.source || 'unknown'
+      const channel = lead.first_touchpoint || lead.last_touchpoint || 'unknown'
       channelCounts[channel] = (channelCounts[channel] || 0) + 1
     })
 
@@ -54,14 +59,17 @@ export async function GET() {
       value,
     }))
 
-    // Conversations over time (last 7 days)
+    // Conversations over time (last 7 days) - use last_interaction_at
     const conversationsOverTime = []
     for (let i = 6; i >= 0; i--) {
       const date = new Date(now)
       date.setDate(date.getDate() - i)
       const dateStr = date.toISOString().split('T')[0]
       const count =
-        leads?.filter((lead) => lead.timestamp.startsWith(dateStr)).length || 0
+        leads?.filter(
+          (lead) =>
+            (lead.last_interaction_at || lead.timestamp).startsWith(dateStr)
+        ).length || 0
       conversationsOverTime.push({
         date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
         count,

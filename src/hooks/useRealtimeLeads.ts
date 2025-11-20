@@ -10,10 +10,11 @@ interface Lead {
   email: string | null
   phone: string | null
   source: string | null
+  first_touchpoint: string | null
+  last_touchpoint: string | null
+  brand: string | null
   timestamp: string
-  status: string | null
-  booking_date: string | null
-  booking_time: string | null
+  last_interaction_at: string | null
   metadata?: any
 }
 
@@ -31,7 +32,7 @@ export function useRealtimeLeads() {
         const { data, error } = await supabase
           .from('unified_leads')
           .select('*')
-          .order('timestamp', { ascending: false })
+          .order('last_interaction_at', { ascending: false })
           .limit(1000)
 
         if (error) {
@@ -64,7 +65,7 @@ export function useRealtimeLeads() {
 
     fetchLeads()
 
-    // Subscribe to real-time changes from sessions table (master table)
+    // Subscribe to real-time changes from all_leads table
     const channel = supabase
       .channel('leads-changes')
       .on(
@@ -72,40 +73,22 @@ export function useRealtimeLeads() {
         {
           event: '*',
           schema: 'public',
-          table: 'sessions',
+          table: 'all_leads',
         },
-        (payload: RealtimePostgresChangesPayload<any>) => {
-          // Map session data to unified_leads format
-          const mapSessionToLead = (session: any) => ({
-            id: session.id,
-            name: session.user_name || null,
-            email: session.email || null,
-            phone: session.phone || null,
-            source: session.channel || 'web',
-            timestamp: session.created_at || new Date().toISOString(),
-            status: session.booking_status === 'confirmed' ? 'booked' : 
-                    session.booking_status === 'pending' ? 'pending' :
-                    session.booking_status === 'cancelled' ? 'cancelled' : null,
-            booking_date: session.booking_date || null,
-            booking_time: session.booking_time || null,
-          })
+        async (payload: RealtimePostgresChangesPayload<any>) => {
+          // On change, refetch from unified_leads view to get complete data
+          try {
+            const { data, error } = await supabase
+              .from('unified_leads')
+              .select('*')
+              .order('last_interaction_at', { ascending: false })
+              .limit(1000)
 
-          if (payload.eventType === 'INSERT') {
-            const newSession = payload.new
-            const mappedLead = mapSessionToLead(newSession)
-            if (mappedLead.name || mappedLead.email || mappedLead.phone) {
-              setLeads((prev) => [mappedLead, ...prev].slice(0, 1000))
+            if (!error && data) {
+              setLeads(data)
             }
-          } else if (payload.eventType === 'UPDATE') {
-            const updatedSession = payload.new
-            const mappedLead = mapSessionToLead(updatedSession)
-            setLeads((prev) =>
-              prev.map((lead) =>
-                lead.id === mappedLead.id ? mappedLead : lead
-              )
-            )
-          } else if (payload.eventType === 'DELETE') {
-            setLeads((prev) => prev.filter((lead) => lead.id !== payload.old.id))
+          } catch (err) {
+            console.error('Error refetching leads after realtime update:', err)
           }
         }
       )

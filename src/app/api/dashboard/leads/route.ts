@@ -26,10 +26,11 @@ export async function GET(request: NextRequest) {
     let query = supabase
       .from('unified_leads')
       .select('*', { count: 'exact' })
-      .order('timestamp', { ascending: false })
+      .order('last_interaction_at', { ascending: false })
 
     if (source) {
-      query = query.eq('source', source)
+      // Filter by first_touchpoint or last_touchpoint
+      query = query.or(`first_touchpoint.eq.${source},last_touchpoint.eq.${source}`)
     }
 
     if (status) {
@@ -37,11 +38,12 @@ export async function GET(request: NextRequest) {
     }
 
     if (startDate) {
-      query = query.gte('timestamp', startDate)
+      // Use last_interaction_at for date filtering (more accurate than timestamp)
+      query = query.gte('last_interaction_at', startDate)
     }
 
     if (endDate) {
-      query = query.lte('timestamp', endDate)
+      query = query.lte('last_interaction_at', endDate)
     }
 
     const { data, error, count } = await query.range(offset, offset + limit - 1)
