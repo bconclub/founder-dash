@@ -1,8 +1,9 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, addMonths, subMonths, addWeeks, subWeeks } from 'date-fns'
-import { MdChevronLeft, MdChevronRight, MdViewWeek, MdViewModule } from 'react-icons/md'
+import { MdChevronLeft, MdChevronRight, MdViewWeek, MdViewModule, MdClose, MdPerson, MdEmail, MdPhone, MdCalendarToday, MdAccessTime } from 'react-icons/md'
 
 interface Booking {
   id: string
@@ -12,6 +13,8 @@ interface Booking {
   booking_date: string | null
   booking_time: string | null
   source: string | null
+  first_touchpoint?: string | null
+  last_touchpoint?: string | null
   metadata?: any
 }
 
@@ -35,9 +38,31 @@ const getSourceColor = (source: string | null) => {
 }
 
 export default function CalendarView({ bookings, onDateSelect }: CalendarViewProps) {
+  const router = useRouter()
   const [currentDate, setCurrentDate] = useState(new Date())
   const [viewMode, setViewMode] = useState<'week' | 'month'>('week')
   const [selectedDate, setSelectedDate] = useState(new Date())
+  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null)
+  const [isModalOpen, setIsModalOpen] = useState(false)
+
+  // Check for date query parameter on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search)
+      const dateParam = params.get('date')
+      if (dateParam) {
+        const date = new Date(dateParam)
+        if (!isNaN(date.getTime())) {
+          setSelectedDate(date)
+          setCurrentDate(date)
+          if (viewMode === 'week') {
+            // Switch to week view to show the selected date
+            setViewMode('week')
+          }
+        }
+      }
+    }
+  }, [])
 
   // Get bookings for a specific date
   const getBookingsForDate = (date: Date) => {
@@ -98,6 +123,22 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
       setCurrentDate(date)
     }
     onDateSelect?.(date)
+    // Navigate to bookings page with date filter
+    const dateStr = format(date, 'yyyy-MM-dd')
+    router.push(`/dashboard/bookings?date=${dateStr}`)
+  }
+
+  const handleBookingClick = (booking: Booking, e: React.MouseEvent) => {
+    e.stopPropagation() // Prevent date click
+    setSelectedBooking(booking)
+    setIsModalOpen(true)
+  }
+
+  const handleViewClientDetails = () => {
+    if (selectedBooking) {
+      router.push(`/dashboard/leads?id=${selectedBooking.id}`)
+      setIsModalOpen(false)
+    }
   }
 
   return (
@@ -145,7 +186,7 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
             return (
               <button
                 key={idx}
-                onClick={() => handleDateClick(day)}
+                onClick={() => handleDateClick(day, true)}
                 className={`
                   aspect-square text-xs p-1 rounded
                   ${!isCurrentMonth ? 'text-gray-300 dark:text-gray-600' : 'text-gray-900 dark:text-gray-100'}
@@ -303,11 +344,12 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
                             {hourBookings.map((booking) => (
                               <div
                                 key={booking.id}
+                                onClick={(e) => handleBookingClick(booking, e)}
                                 className={`
                                   absolute left-1 right-1 rounded px-2 py-1 text-xs
                                   ${getSourceColor(booking.source)}
-                                  text-white cursor-pointer hover:opacity-90
-                                  z-10
+                                  text-white cursor-pointer hover:opacity-90 hover:shadow-lg
+                                  z-10 transition-all
                                 `}
                                 style={getBookingStyle(booking)}
                                 title={`${booking.name || 'Unnamed'} - ${booking.booking_time}`}
@@ -352,7 +394,7 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
                   return (
                     <div
                       key={idx}
-                      onClick={() => handleDateClick(day)}
+                      onClick={() => handleDateClick(day, false)}
                       className={`
                         min-h-24 p-2 border border-gray-200 dark:border-[#262626] rounded
                         ${!isCurrentMonth ? 'bg-gray-50 dark:bg-[#0D0D0D] opacity-50' : 'bg-white dark:bg-[#1A1A1A]'}
@@ -373,10 +415,12 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
                         {dayBookings.slice(0, 3).map((booking) => (
                           <div
                             key={booking.id}
+                            onClick={(e) => handleBookingClick(booking, e)}
                             className={`
                               text-xs px-2 py-1 rounded truncate
                               ${getSourceColor(booking.source)}
-                              text-white
+                              text-white cursor-pointer hover:opacity-90 hover:shadow-md
+                              transition-all
                             `}
                             title={`${booking.name || 'Unnamed'} - ${booking.booking_time}`}
                           >
@@ -397,6 +441,112 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
           )}
         </div>
       </div>
+
+      {/* Booking Details Modal */}
+      {isModalOpen && selectedBooking && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-[#1A1A1A] rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              {/* Header */}
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
+                  Booking Details
+                </h3>
+                <button
+                  onClick={() => setIsModalOpen(false)}
+                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                >
+                  <MdClose className="w-6 h-6" />
+                </button>
+              </div>
+
+              {/* Booking Info */}
+              <div className="space-y-4">
+                <div className="flex items-start gap-3">
+                  <MdPerson className="w-5 h-5 text-gray-400 mt-0.5" />
+                  <div>
+                    <div className="text-sm text-gray-500 dark:text-gray-400">Name</div>
+                    <div className="text-base font-medium text-gray-900 dark:text-white">
+                      {selectedBooking.name || 'Unnamed Lead'}
+                    </div>
+                  </div>
+                </div>
+
+                {selectedBooking.email && (
+                  <div className="flex items-start gap-3">
+                    <MdEmail className="w-5 h-5 text-gray-400 mt-0.5" />
+                    <div>
+                      <div className="text-sm text-gray-500 dark:text-gray-400">Email</div>
+                      <div className="text-base text-gray-900 dark:text-white">
+                        {selectedBooking.email}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {selectedBooking.phone && (
+                  <div className="flex items-start gap-3">
+                    <MdPhone className="w-5 h-5 text-gray-400 mt-0.5" />
+                    <div>
+                      <div className="text-sm text-gray-500 dark:text-gray-400">Phone</div>
+                      <div className="text-base text-gray-900 dark:text-white">
+                        {selectedBooking.phone}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex items-start gap-3">
+                  <MdCalendarToday className="w-5 h-5 text-gray-400 mt-0.5" />
+                  <div>
+                    <div className="text-sm text-gray-500 dark:text-gray-400">Date</div>
+                    <div className="text-base text-gray-900 dark:text-white">
+                      {selectedBooking.booking_date && format(new Date(selectedBooking.booking_date), 'MMMM d, yyyy')}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3">
+                  <MdAccessTime className="w-5 h-5 text-gray-400 mt-0.5" />
+                  <div>
+                    <div className="text-sm text-gray-500 dark:text-gray-400">Time</div>
+                    <div className="text-base text-gray-900 dark:text-white">
+                      {selectedBooking.booking_time}
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Source</div>
+                  <span className={`
+                    px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full
+                    ${getSourceColor(selectedBooking.source)}
+                    text-white
+                  `}>
+                    {selectedBooking.source || selectedBooking.first_touchpoint || selectedBooking.last_touchpoint || 'web'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="mt-6 pt-4 border-t border-gray-200 dark:border-[#262626] flex gap-3">
+                <button
+                  onClick={handleViewClientDetails}
+                  className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors text-sm font-medium"
+                >
+                  View Client Details
+                </button>
+                <button
+                  onClick={() => setIsModalOpen(false)}
+                  className="px-4 py-2 border border-gray-300 dark:border-[#262626] text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-50 dark:hover:bg-[#262626] transition-colors text-sm"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

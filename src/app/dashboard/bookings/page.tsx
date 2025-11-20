@@ -1,6 +1,9 @@
+'use client'
+
+import { Suspense } from 'react'
 import BookingsCalendar from '@/components/dashboard/BookingsCalendar'
 
-export default function BookingsPage() {
+function BookingsPageContent() {
   return (
     <div className="space-y-6">
       <div>
@@ -16,6 +19,14 @@ export default function BookingsPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function BookingsPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <BookingsPageContent />
+    </Suspense>
   )
 }
 
