@@ -385,12 +385,13 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
             <div className="grid grid-cols-8 min-w-full">
               {/* Time column */}
               <div className="border-r border-gray-200 dark:border-[#262626] sticky left-0 bg-white dark:bg-[#1A1A1A] z-10">
-                {/* Empty header to align with day headers - matches day header height */}
-                <div className="border-b border-gray-200 dark:border-[#262626] p-2 text-center" style={{ minHeight: '73px' }}></div>
+                {/* Empty header to align with day headers - exact match */}
+                <div className="border-b border-gray-200 dark:border-[#262626] p-2 text-center flex flex-col justify-center" style={{ height: '73px' }}></div>
                 {HOURS.map((hour) => (
                   <div
                     key={hour}
-                    className="h-12 border-b border-gray-100 dark:border-[#262626] px-2 py-1 flex items-center"
+                    className="h-12 border-b border-gray-100 dark:border-[#262626] px-2 flex items-center"
+                    style={{ height: '48px' }}
                   >
                     <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">
                       {hour === 0 ? '12 AM' : hour < 12 ? `${hour} AM` : hour === 12 ? '12 PM' : `${hour - 12} PM`}
@@ -417,6 +418,7 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
                         ${isToday ? 'bg-primary-50 dark:bg-primary-900/20' : ''}
                         ${isSelected ? 'bg-primary-100 dark:bg-primary-900/40' : ''}
                       `}
+                      style={{ height: '73px' }}
                     >
                       <div className="text-xs text-gray-500 dark:text-gray-400">
                         {DAYS_OF_WEEK[dayIdx]}
@@ -438,7 +440,8 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
                         return (
                           <div
                             key={hour}
-                            className="h-12 border-b border-gray-100 dark:border-[#262626] relative"
+                            className="border-b border-gray-100 dark:border-[#262626] relative"
+                            style={{ height: '48px' }}
                           >
                             {hourBookings.map((booking, idx) => {
                               const style = getBookingStyle(booking, hour)
