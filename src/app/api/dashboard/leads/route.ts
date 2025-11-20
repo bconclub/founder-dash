@@ -48,7 +48,15 @@ export async function GET(request: NextRequest) {
 
     const { data, error, count } = await query.range(offset, offset + limit - 1)
 
-    if (error) throw error
+    if (error) {
+      console.error('Database error details:', {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint
+      })
+      throw error
+    }
 
     return NextResponse.json({
       leads: data || [],
@@ -61,8 +69,12 @@ export async function GET(request: NextRequest) {
     })
   } catch (error) {
     console.error('Error fetching leads:', error)
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
     return NextResponse.json(
-      { error: 'Failed to fetch leads' },
+      { 
+        error: 'Failed to fetch leads',
+        details: process.env.NODE_ENV === 'development' ? errorMessage : undefined
+      },
       { status: 500 }
     )
   }

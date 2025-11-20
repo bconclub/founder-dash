@@ -33,24 +33,54 @@ jobs:
         timeout: 60s
         script: |
           cd /var/www/dashboard
+          
+          # Create/update .env.local file with environment variables
+          cat > .env.local << EOF
+          NEXT_PUBLIC_SUPABASE_URL=https://zboanatspldypfrtrkfp.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpib2FuYXRzcGxkeXBmcnRya2ZwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAwOTU3MjgsImV4cCI6MjA3NTY3MTcyOH0.iQpWKmGAb7ELVXUNatcMTK2jprAxRSdkAVQdNMlzcZc
+          PORT=3001
+          EOF
+          
+          # Export for build process
           export NEXT_PUBLIC_SUPABASE_URL=https://zboanatspldypfrtrkfp.supabase.co
           export NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpib2FuYXRzcGxkeXBmcnRya2ZwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAwOTU3MjgsImV4cCI6MjA3NTY3MTcyOH0.iQpWKmGAb7ELVXUNatcMTK2jprAxRSdkAVQdNMlzcZc
+          
+          echo "Installing dependencies..."
           npm install
+          
           echo "Building application..."
           npm run build
+          
           if [ $? -ne 0 ]; then
             echo "Build failed! Check errors above."
             exit 1
           fi
-          echo "Build successful. Restarting PM2..."
+          
+          # Verify .next directory exists
+          if [ ! -d ".next" ]; then
+            echo "ERROR: .next directory not found after build!"
+            exit 1
+          fi
+          
+          echo "Build successful. .next directory exists."
+          ls -la .next | head -10
+          
+          echo "Stopping old PM2 processes..."
           pm2 stop dashboard || true
           pm2 delete dashboard || true
+          
+          echo "Starting application with PM2 on port 3001..."
           PORT=3001 pm2 start npm --name dashboard -- start
           pm2 save
-          sleep 5
+          
+          echo "Waiting for app to start..."
+          sleep 10
+          
           echo "Checking PM2 status..."
           pm2 status
+          
           echo "Checking if app is listening on port 3001..."
           netstat -tlnp | grep :3001 || ss -tlnp | grep :3001 || echo "Port 3001 not found"
-          echo "Recent PM2 logs:"
-          pm2 logs dashboard --lines 50 --nostream || echo "Could not fetch logs"
+          
+          echo "Recent PM2 logs (last 100 lines):"
+          pm2 logs dashboard --lines 100 --nostream || echo "Could not fetch logs"

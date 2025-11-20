@@ -107,8 +107,13 @@ export async function GET() {
     })
   } catch (error) {
     console.error('Error fetching metrics:', error)
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    console.error('Full error:', error)
     return NextResponse.json(
-      { error: 'Failed to fetch metrics' },
+      { 
+        error: 'Failed to fetch metrics',
+        details: process.env.NODE_ENV === 'development' ? errorMessage : undefined
+      },
       { status: 500 }
     )
   }

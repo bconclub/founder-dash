@@ -15,6 +15,9 @@ interface Lead {
   brand: string | null
   timestamp: string
   last_interaction_at: string | null
+  booking_date: string | null
+  booking_time: string | null
+  status: string | null
   metadata?: any
 }
 
@@ -53,7 +56,14 @@ export function useRealtimeLeads() {
           }
           throw new Error(error.message || 'Failed to fetch leads')
         }
-        setLeads(data || [])
+        
+        // Map unified_leads data to include source field
+        const mappedLeads = (data || []).map((lead: any) => ({
+          ...lead,
+          source: lead.first_touchpoint || lead.last_touchpoint || 'web',
+        }))
+        
+        setLeads(mappedLeads)
         setLoading(false)
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to fetch leads'
@@ -85,7 +95,12 @@ export function useRealtimeLeads() {
               .limit(1000)
 
             if (!error && data) {
-              setLeads(data)
+              // Map unified_leads data to include source field
+              const mappedLeads = data.map((lead: any) => ({
+                ...lead,
+                source: lead.first_touchpoint || lead.last_touchpoint || 'web',
+              }))
+              setLeads(mappedLeads)
             }
           } catch (err) {
             console.error('Error refetching leads after realtime update:', err)

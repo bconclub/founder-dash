@@ -10,12 +10,18 @@ import {
 } from 'react-icons/md'
 
 export default async function DashboardPage() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  try {
+    const supabase = await createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
 
-  return (
+    if (!user) {
+      // Redirect handled by middleware, but just in case
+      return null
+    }
+
+    return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Dashboard Overview</h1>
@@ -79,14 +85,42 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      {/* Upcoming Bookings */}
+      {/* Bookings Calendar */}
       <div className="bg-white dark:bg-[#1A1A1A] border border-gray-200 dark:border-[#262626] shadow rounded-lg">
         <div className="px-4 py-5 sm:p-6">
-          <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Upcoming Bookings</h2>
-          <BookingsCalendar view="upcoming" />
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-medium text-gray-900 dark:text-white">Bookings Calendar</h2>
+            <a
+              href="/dashboard/bookings"
+              className="text-sm text-primary-600 dark:text-primary-400 hover:underline"
+            >
+              View Full Calendar →
+            </a>
+          </div>
+          <div className="h-[700px]">
+            <BookingsCalendar view="calendar" />
+          </div>
         </div>
       </div>
     </div>
-  )
+    )
+  } catch (error) {
+    console.error('Dashboard page error:', error)
+    return (
+      <div className="space-y-6">
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-6">
+          <h2 className="text-lg font-semibold text-red-900 dark:text-red-200 mb-2">
+            Dashboard Error
+          </h2>
+          <p className="text-red-700 dark:text-red-300">
+            {error instanceof Error ? error.message : 'An error occurred loading the dashboard.'}
+          </p>
+          <p className="text-sm text-red-600 dark:text-red-400 mt-2">
+            Please check that the unified_leads view exists in your Supabase database.
+          </p>
+        </div>
+      </div>
+    )
+  }
 }
 

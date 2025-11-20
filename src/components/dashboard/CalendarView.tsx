@@ -1,0 +1,403 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, addMonths, subMonths, addWeeks, subWeeks } from 'date-fns'
+import { MdChevronLeft, MdChevronRight, MdViewWeek, MdViewModule } from 'react-icons/md'
+
+interface Booking {
+  id: string
+  name: string | null
+  email: string | null
+  phone: string | null
+  booking_date: string | null
+  booking_time: string | null
+  source: string | null
+  metadata?: any
+}
+
+interface CalendarViewProps {
+  bookings: Booking[]
+  onDateSelect?: (date: Date) => void
+}
+
+const HOURS = Array.from({ length: 24 }, (_, i) => i) // 0-23 hours
+const DAYS_OF_WEEK = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
+
+// Color mapping for sources
+const getSourceColor = (source: string | null) => {
+  const colors: Record<string, string> = {
+    web: 'bg-blue-500',
+    whatsapp: 'bg-green-500',
+    voice: 'bg-primary-600',
+    social: 'bg-orange-500',
+  }
+  return colors[source || 'web'] || 'bg-primary-600'
+}
+
+export default function CalendarView({ bookings, onDateSelect }: CalendarViewProps) {
+  const [currentDate, setCurrentDate] = useState(new Date())
+  const [viewMode, setViewMode] = useState<'week' | 'month'>('week')
+  const [selectedDate, setSelectedDate] = useState(new Date())
+
+  // Get bookings for a specific date
+  const getBookingsForDate = (date: Date) => {
+    const dateStr = format(date, 'yyyy-MM-dd')
+    return bookings.filter(
+      (b) => b.booking_date === dateStr && b.booking_time
+    )
+  }
+
+  // Get bookings for a specific date and time slot
+  const getBookingsForTimeSlot = (date: Date, hour: number) => {
+    const dateBookings = getBookingsForDate(date)
+    return dateBookings.filter((b) => {
+      if (!b.booking_time) return false
+      const [hours] = b.booking_time.split(':').map(Number)
+      return hours === hour
+    })
+  }
+
+  // Calculate position and height for booking block
+  const getBookingStyle = (booking: Booking) => {
+    if (!booking.booking_time) return {}
+    const [hours, minutes] = booking.booking_time.split(':').map(Number)
+    const top = hours * 60 + minutes // Position in minutes from midnight
+    const height = 60 // Default 1 hour block
+    return {
+      top: `${(top / 60) * 80}px`, // 80px per hour
+      height: `${(height / 60) * 80}px`,
+    }
+  }
+
+  // Week view
+  const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 })
+  const weekEnd = endOfWeek(currentDate, { weekStartsOn: 0 })
+  const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd })
+
+  // Month view
+  const monthStart = startOfMonth(currentDate)
+  const monthEnd = endOfMonth(currentDate)
+  const monthDays = eachDayOfInterval({ start: monthStart, end: monthEnd })
+
+  // Calendar grid for month view (including previous/next month days)
+  const calendarStart = startOfWeek(monthStart, { weekStartsOn: 0 })
+  const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 0 })
+  const calendarDays = eachDayOfInterval({ start: calendarStart, end: calendarEnd })
+
+  const navigateDate = (direction: 'prev' | 'next') => {
+    if (viewMode === 'week') {
+      setCurrentDate(direction === 'next' ? addWeeks(currentDate, 1) : subWeeks(currentDate, 1))
+    } else {
+      setCurrentDate(direction === 'next' ? addMonths(currentDate, 1) : subMonths(currentDate, 1))
+    }
+  }
+
+  const handleDateClick = (date: Date) => {
+    setSelectedDate(date)
+    if (viewMode === 'week') {
+      setCurrentDate(date)
+    }
+    onDateSelect?.(date)
+  }
+
+  return (
+    <div className="flex gap-6 h-[calc(100vh-200px)]">
+      {/* Left Sidebar - Mini Calendar */}
+      <div className="w-64 flex-shrink-0 bg-white dark:bg-[#1A1A1A] border border-gray-200 dark:border-[#262626] rounded-lg p-4">
+        <div className="mb-4">
+          <div className="flex items-center justify-between mb-2">
+            <button
+              onClick={() => setCurrentDate(subMonths(currentDate, 1))}
+              className="p-1 hover:bg-gray-100 dark:hover:bg-[#262626] rounded"
+            >
+              <MdChevronLeft className="w-5 h-5" />
+            </button>
+            <span className="text-sm font-medium text-gray-900 dark:text-white">
+              {format(currentDate, 'MMMM yyyy')}
+            </span>
+            <button
+              onClick={() => setCurrentDate(addMonths(currentDate, 1))}
+              className="p-1 hover:bg-gray-100 dark:hover:bg-[#262626] rounded"
+            >
+              <MdChevronRight className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
+        {/* Mini Calendar Grid */}
+        <div className="grid grid-cols-7 gap-1 mb-2">
+          {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day) => (
+            <div
+              key={day}
+              className="text-xs text-center text-gray-500 dark:text-gray-400 font-medium py-1"
+            >
+              {day}
+            </div>
+          ))}
+        </div>
+        <div className="grid grid-cols-7 gap-1">
+          {calendarDays.map((day, idx) => {
+            const isCurrentMonth = isSameMonth(day, currentDate)
+            const isSelected = isSameDay(day, selectedDate)
+            const isToday = isSameDay(day, new Date())
+            const dayBookings = getBookingsForDate(day)
+
+            return (
+              <button
+                key={idx}
+                onClick={() => handleDateClick(day)}
+                className={`
+                  aspect-square text-xs p-1 rounded
+                  ${!isCurrentMonth ? 'text-gray-300 dark:text-gray-600' : 'text-gray-900 dark:text-gray-100'}
+                  ${isSelected ? 'bg-primary-600 text-white font-semibold' : ''}
+                  ${isToday && !isSelected ? 'bg-primary-100 dark:bg-primary-900 text-primary-800 dark:text-primary-200 font-semibold' : ''}
+                  hover:bg-gray-100 dark:hover:bg-[#262626]
+                  relative
+                `}
+              >
+                {format(day, 'd')}
+                {dayBookings.length > 0 && (
+                  <div className="absolute bottom-0 left-0 right-0 flex justify-center gap-0.5 pb-0.5">
+                    {dayBookings.slice(0, 3).map((_, i) => (
+                      <div
+                        key={i}
+                        className="w-1 h-1 rounded-full bg-primary-600"
+                      />
+                    ))}
+                  </div>
+                )}
+              </button>
+            )
+          })}
+        </div>
+
+        {/* View Mode Toggle */}
+        <div className="mt-4 pt-4 border-t border-gray-200 dark:border-[#262626]">
+          <div className="flex gap-2">
+            <button
+              onClick={() => setViewMode('week')}
+              className={`
+                flex-1 px-3 py-2 text-sm rounded-md transition-colors
+                ${viewMode === 'week' 
+                  ? 'bg-primary-600 text-white' 
+                  : 'bg-gray-100 dark:bg-[#262626] text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-[#333]'
+                }
+              `}
+            >
+              <MdViewWeek className="inline w-4 h-4 mr-1" />
+              Week
+            </button>
+            <button
+              onClick={() => setViewMode('month')}
+              className={`
+                flex-1 px-3 py-2 text-sm rounded-md transition-colors
+                ${viewMode === 'month' 
+                  ? 'bg-primary-600 text-white' 
+                  : 'bg-gray-100 dark:bg-[#262626] text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-[#333]'
+                }
+              `}
+            >
+              <MdViewModule className="inline w-4 h-4 mr-1" />
+              Month
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Calendar View */}
+      <div className="flex-1 bg-white dark:bg-[#1A1A1A] border border-gray-200 dark:border-[#262626] rounded-lg overflow-hidden">
+        {/* Header */}
+        <div className="border-b border-gray-200 dark:border-[#262626] p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => navigateDate('prev')}
+                className="p-2 hover:bg-gray-100 dark:hover:bg-[#262626] rounded"
+              >
+                <MdChevronLeft className="w-5 h-5" />
+              </button>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                {viewMode === 'week'
+                  ? `${format(weekStart, 'MMM d')} - ${format(weekEnd, 'MMM d, yyyy')}`
+                  : format(currentDate, 'MMMM yyyy')}
+              </h2>
+              <button
+                onClick={() => navigateDate('next')}
+                className="p-2 hover:bg-gray-100 dark:hover:bg-[#262626] rounded"
+              >
+                <MdChevronRight className="w-5 h-5" />
+              </button>
+            </div>
+            <button
+              onClick={() => {
+                setCurrentDate(new Date())
+                setSelectedDate(new Date())
+              }}
+              className="px-4 py-2 text-sm bg-primary-600 text-white rounded-md hover:bg-primary-700"
+            >
+              Today
+            </button>
+          </div>
+        </div>
+
+        {/* Calendar Grid */}
+        <div className="overflow-auto h-[calc(100%-80px)]">
+          {viewMode === 'week' ? (
+            /* Week View */
+            <div className="grid grid-cols-8 min-w-full">
+              {/* Time column */}
+              <div className="border-r border-gray-200 dark:border-[#262626]">
+                {HOURS.map((hour) => (
+                  <div
+                    key={hour}
+                    className="h-20 border-b border-gray-100 dark:border-[#262626] px-2 py-1"
+                  >
+                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                      {hour === 0 ? '12 AM' : hour < 12 ? `${hour} AM` : hour === 12 ? '12 PM' : `${hour - 12} PM`}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Day columns */}
+              {weekDays.map((day, dayIdx) => {
+                const dayBookings = getBookingsForDate(day)
+                const isSelected = isSameDay(day, selectedDate)
+                const isToday = isSameDay(day, new Date())
+
+                return (
+                  <div
+                    key={dayIdx}
+                    className="border-r border-gray-200 dark:border-[#262626] last:border-r-0 relative"
+                  >
+                    {/* Day header */}
+                    <div
+                      className={`
+                        border-b border-gray-200 dark:border-[#262626] p-2 text-center
+                        ${isToday ? 'bg-primary-50 dark:bg-primary-900/20' : ''}
+                        ${isSelected ? 'bg-primary-100 dark:bg-primary-900/40' : ''}
+                      `}
+                    >
+                      <div className="text-xs text-gray-500 dark:text-gray-400">
+                        {DAYS_OF_WEEK[dayIdx]}
+                      </div>
+                      <div
+                        className={`
+                          text-sm font-semibold mt-1
+                          ${isToday ? 'text-primary-600 dark:text-primary-400' : 'text-gray-900 dark:text-white'}
+                        `}
+                      >
+                        {format(day, 'd')}
+                      </div>
+                    </div>
+
+                    {/* Time slots */}
+                    <div className="relative">
+                      {HOURS.map((hour) => {
+                        const hourBookings = getBookingsForTimeSlot(day, hour)
+                        return (
+                          <div
+                            key={hour}
+                            className="h-20 border-b border-gray-100 dark:border-[#262626] relative"
+                          >
+                            {hourBookings.map((booking) => (
+                              <div
+                                key={booking.id}
+                                className={`
+                                  absolute left-1 right-1 rounded px-2 py-1 text-xs
+                                  ${getSourceColor(booking.source)}
+                                  text-white cursor-pointer hover:opacity-90
+                                  z-10
+                                `}
+                                style={getBookingStyle(booking)}
+                                title={`${booking.name || 'Unnamed'} - ${booking.booking_time}`}
+                              >
+                                <div className="font-medium truncate">
+                                  {booking.name || 'Unnamed Lead'}
+                                </div>
+                                <div className="text-xs opacity-90">
+                                  {booking.booking_time}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+            /* Month View */
+            <div className="p-4">
+              <div className="grid grid-cols-7 gap-2">
+                {/* Day headers */}
+                {DAYS_OF_WEEK.map((day) => (
+                  <div
+                    key={day}
+                    className="text-center text-xs font-medium text-gray-500 dark:text-gray-400 py-2"
+                  >
+                    {day}
+                  </div>
+                ))}
+
+                {/* Calendar days */}
+                {calendarDays.map((day, idx) => {
+                  const isCurrentMonth = isSameMonth(day, currentDate)
+                  const isSelected = isSameDay(day, selectedDate)
+                  const isToday = isSameDay(day, new Date())
+                  const dayBookings = getBookingsForDate(day)
+
+                  return (
+                    <div
+                      key={idx}
+                      onClick={() => handleDateClick(day)}
+                      className={`
+                        min-h-24 p-2 border border-gray-200 dark:border-[#262626] rounded
+                        ${!isCurrentMonth ? 'bg-gray-50 dark:bg-[#0D0D0D] opacity-50' : 'bg-white dark:bg-[#1A1A1A]'}
+                        ${isSelected ? 'ring-2 ring-primary-600' : ''}
+                        ${isToday ? 'bg-primary-50 dark:bg-primary-900/20' : ''}
+                        cursor-pointer hover:bg-gray-50 dark:hover:bg-[#262626]
+                      `}
+                    >
+                      <div
+                        className={`
+                          text-sm font-semibold mb-1
+                          ${isToday ? 'text-primary-600 dark:text-primary-400' : 'text-gray-900 dark:text-white'}
+                        `}
+                      >
+                        {format(day, 'd')}
+                      </div>
+                      <div className="space-y-1">
+                        {dayBookings.slice(0, 3).map((booking) => (
+                          <div
+                            key={booking.id}
+                            className={`
+                              text-xs px-2 py-1 rounded truncate
+                              ${getSourceColor(booking.source)}
+                              text-white
+                            `}
+                            title={`${booking.name || 'Unnamed'} - ${booking.booking_time}`}
+                          >
+                            {booking.booking_time} {booking.name || 'Unnamed'}
+                          </div>
+                        ))}
+                        {dayBookings.length > 3 && (
+                          <div className="text-xs text-gray-500 dark:text-gray-400">
+                            +{dayBookings.length - 3} more
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+

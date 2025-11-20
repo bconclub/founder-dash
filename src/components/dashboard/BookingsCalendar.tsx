@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { formatDate, formatTime } from '@/lib/utils'
 import { useRealtimeLeads } from '@/hooks/useRealtimeLeads'
+import CalendarView from './CalendarView'
 
 interface Booking {
   id: string
@@ -12,18 +13,16 @@ interface Booking {
   booking_date: string | null
   booking_time: string | null
   source: string | null
+  metadata?: any
 }
 
 interface BookingsCalendarProps {
-  view?: 'full' | 'upcoming'
+  view?: 'full' | 'upcoming' | 'calendar'
 }
 
 export default function BookingsCalendar({ view = 'full' }: BookingsCalendarProps) {
   const { leads } = useRealtimeLeads()
   const [bookings, setBookings] = useState<Booking[]>([])
-  const [selectedDate, setSelectedDate] = useState<string>(
-    new Date().toISOString().split('T')[0]
-  )
 
   useEffect(() => {
     const bookingsWithDates = leads.filter(
@@ -52,40 +51,27 @@ export default function BookingsCalendar({ view = 'full' }: BookingsCalendarProp
     }
   }, [leads, view])
 
-  const filteredBookings =
-    view === 'full'
-      ? bookings.filter((booking) => booking.booking_date === selectedDate)
-      : bookings.slice(0, 10)
+  // Calendar view
+  if (view === 'calendar' || view === 'full') {
+    return <CalendarView bookings={bookings} />
+  }
+
+  // Upcoming list view
+  const upcomingBookings = bookings.slice(0, 10)
 
   return (
     <div>
-      {view === 'full' && (
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            Select Date
-          </label>
-          <input
-            type="date"
-            value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
-            className="px-3 py-2 border border-gray-300 dark:border-[#262626] bg-white dark:bg-[#0D0D0D] text-gray-900 dark:text-white rounded-md text-sm"
-          />
-        </div>
-      )}
-
-      {view === 'upcoming' && (
-        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
-          Next 10 Upcoming Bookings
-        </h3>
-      )}
+      <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
+        Next 10 Upcoming Bookings
+      </h3>
 
       <div className="space-y-4">
-        {filteredBookings.length === 0 ? (
+        {upcomingBookings.length === 0 ? (
           <div className="text-center py-8 text-gray-500 dark:text-gray-400">
             No bookings found
           </div>
         ) : (
-          filteredBookings.map((booking) => (
+          upcomingBookings.map((booking) => (
             <div
               key={booking.id}
               className="border border-gray-200 dark:border-[#262626] bg-white dark:bg-[#1A1A1A] rounded-lg p-4 hover:shadow-md transition-shadow"
@@ -108,7 +94,7 @@ export default function BookingsCalendar({ view = 'full' }: BookingsCalendarProp
                 </div>
                 <div className="text-right">
                   <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200">
-                    {booking.source || 'unknown'}
+                    {booking.source || booking.first_touchpoint || booking.last_touchpoint || 'web'}
                   </span>
                 </div>
               </div>
