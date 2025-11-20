@@ -117,9 +117,9 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
     }
   }
 
-  const handleDateClick = (date: Date) => {
+  const handleDateClick = (date: Date, fromMiniCalendar?: boolean) => {
     setSelectedDate(date)
-    if (viewMode === 'week') {
+    if (viewMode === 'week' || fromMiniCalendar) {
       setCurrentDate(date)
     }
     onDateSelect?.(date)
