@@ -19,6 +19,7 @@ interface Lead {
   booking_time: string | null
   status: string | null
   metadata?: any
+  unified_context?: any
 }
 
 export function useRealtimeLeads() {

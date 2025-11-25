@@ -87,12 +87,18 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
     }
   }
 
-  const conversationSummary = lead.metadata?.conversation_summary || lead.metadata?.summary || 'No summary available'
+  // Extract conversation summary from various possible locations
+  const conversationSummary = 
+    lead.metadata?.web_data?.conversation_summary ||
+    lead.metadata?.unified_context?.web?.conversation_summary ||
+    lead.metadata?.conversation_summary ||
+    lead.metadata?.summary ||
+    'No summary available'
 
   return (
     <>
-      {/* Backdrop */}
-      <div className="fixed inset-0 bg-black bg-opacity-50 z-40" onClick={onClose}></div>
+      {/* Backdrop with blur */}
+      <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm z-40" onClick={onClose}></div>
       
       {/* Modal */}
       <div className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center p-4" onClick={onClose}>

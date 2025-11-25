@@ -36,6 +36,7 @@ type ExtendedLead = Lead & {
   last_touchpoint?: string | null
   brand?: string | null
   last_interaction_at?: string | null
+  unified_context?: any
 }
 
 interface LeadsTableProps {
@@ -115,6 +116,13 @@ export default function LeadsTable({ limit, sourceFilter: initialSourceFilter }:
       booking_date: lead.booking_date || null,
       booking_time: lead.booking_time || null,
       metadata: lead.metadata,
+    }
+    // Include unified_context in metadata for modal access
+    if (lead.unified_context) {
+      modalLead.metadata = {
+        ...modalLead.metadata,
+        unified_context: lead.unified_context,
+      }
     }
     setSelectedLead(modalLead)
     setIsModalOpen(true)
