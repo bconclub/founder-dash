@@ -4,6 +4,8 @@ import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import PageTransitionLoader from '@/components/PageTransitionLoader'
+import { getBuildDate } from '@/lib/buildInfo'
 import { 
   MdInbox,
   MdDashboard,
@@ -133,26 +135,11 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
   const [isDarkMode, setIsDarkMode] = useState(true)
   const [unreadCount] = useState(0) // TODO: Implement unread count logic
-  const [currentDate, setCurrentDate] = useState<string>('')
-
-  // Set current date and time on mount
+  const [buildDate, setBuildDate] = useState<string>('')
+  
+  // Get build/deployment date (only on client to avoid hydration mismatch)
   useEffect(() => {
-    const updateDateTime = () => {
-      const now = new Date()
-      const formattedDateTime = now.toLocaleString('en-US', { 
-        year: 'numeric', 
-        month: 'short', 
-        day: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: true
-      })
-      setCurrentDate(formattedDateTime)
-    }
-    updateDateTime()
-    // Update every minute
-    const interval = setInterval(updateDateTime, 60000)
-    return () => clearInterval(interval)
+    setBuildDate(getBuildDate())
   }, [])
 
   // Load collapsed state and theme from localStorage
@@ -639,8 +626,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               <p 
                 className="text-xs mt-1"
                 style={{ color: 'var(--text-secondary)' }}
+                suppressHydrationWarning
               >
-                Updated: {currentDate || 'Loading...'}
+                Updated: {buildDate || 'Loading...'}
               </p>
             </div>
           )}
@@ -652,7 +640,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                   backgroundColor: 'var(--accent-primary)',
                   color: 'white',
                 }}
-                title={currentDate ? `v1.0.0 - Updated: ${currentDate}` : 'v1.0.0'}
+                title={buildDate ? `v1.0.0 - Updated: ${buildDate}` : 'v1.0.0'}
               >
                 v1.0
               </div>
@@ -687,6 +675,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           width: isMobile ? '100%' : `calc(100% - ${sidebarWidth})`,
         }}
       >
+        {/* Page Transition Loader */}
+        <PageTransitionLoader />
+        
         {/* Page content */}
         <main className="flex-1" style={{ backgroundColor: 'var(--bg-primary)', minHeight: '100vh' }}>
           <div className="py-6" style={{ backgroundColor: 'var(--bg-primary)' }}>

@@ -11,6 +11,7 @@ import {
   MdSend, 
   MdSearch 
 } from 'react-icons/md'
+import LoadingOverlay from '@/components/dashboard/LoadingOverlay'
 
 // Types
 interface Conversation {
@@ -86,127 +87,104 @@ export default function InboxPage() {
   async function fetchConversations() {
     setLoading(true)
     try {
-      // Get unique conversations with last message
-      // Try to get from messages table with join to all_leads
+      // Fetch all messages ordered by most recent
       let query = supabase
         .from('messages')
-        .select(`
-          lead_id,
-          channel,
-          content,
-          created_at,
-          all_leads!inner(customer_name, email, phone)
-        `)
+        .select('lead_id, channel, content, sender, created_at')
         .order('created_at', { ascending: false })
-        .limit(1000) // Limit to prevent too much data
 
+      // Apply channel filter if not "all"
       if (channelFilter !== 'all') {
         query = query.eq('channel', channelFilter)
       }
 
-      const { data, error } = await query
+      const { data: messagesData, error: messagesError } = await query
 
-      if (error) {
-        console.error('Error fetching conversations:', error)
-        // If join fails, try without join
-        try {
-          const { data: fallbackData, error: fallbackError } = await supabase
-            .from('messages')
-            .select('lead_id, channel, content, created_at')
-            .order('created_at', { ascending: false })
-            .limit(1000)
-
-          if (fallbackError) {
-            console.error('Fallback query also failed:', fallbackError)
-            setConversations([])
-            setLoading(false)
-            return
-          }
-
-          if (fallbackData && fallbackData.length > 0) {
-            // Get unique lead IDs
-            const leadIds = [...new Set(fallbackData.map(m => m.lead_id))]
-            
-            // Fetch lead details separately
-            const { data: leadsData } = await supabase
-              .from('all_leads')
-              .select('id, customer_name, email, phone')
-              .in('id', leadIds)
-
-            const leadsMap = new Map(leadsData?.map(l => [l.id, l]) || [])
-
-            // Group by lead_id
-            const grouped = fallbackData.reduce((acc: any, msg: any) => {
-              const leadId = msg.lead_id
-              const lead = leadsMap.get(leadId)
-              
-              if (!acc[leadId]) {
-                acc[leadId] = {
-                  lead_id: leadId,
-                  lead_name: lead?.customer_name || 'Unknown',
-                  lead_email: lead?.email || '',
-                  lead_phone: lead?.phone || '',
-                  channel: msg.channel,
-                  last_message: msg.content,
-                  last_message_at: msg.created_at,
-                  unread_count: 0
-                }
-              } else {
-                // Update if this message is more recent
-                if (new Date(msg.created_at) > new Date(acc[leadId].last_message_at)) {
-                  acc[leadId].last_message = msg.content
-                  acc[leadId].last_message_at = msg.created_at
-                  acc[leadId].channel = msg.channel
-                }
-              }
-              return acc
-            }, {})
-
-            setConversations(Object.values(grouped))
-          } else {
-            setConversations([])
-          }
-        } catch (fallbackErr) {
-          console.error('Fallback query error:', fallbackErr)
-          setConversations([])
-        }
+      if (messagesError) {
+        console.error('Error fetching messages:', messagesError)
         setLoading(false)
         return
       }
 
-      if (data && data.length > 0) {
-        // Group by lead_id and get last message
-        const grouped = data.reduce((acc: any, msg: any) => {
-          const leadId = msg.lead_id
-          if (!acc[leadId]) {
-            acc[leadId] = {
-              lead_id: leadId,
-              lead_name: msg.all_leads?.customer_name || 'Unknown',
-              lead_email: msg.all_leads?.email || '',
-              lead_phone: msg.all_leads?.phone || '',
-              channel: msg.channel,
-              last_message: msg.content,
-              last_message_at: msg.created_at,
-              unread_count: 0
-            }
-          } else {
-            // Update if this message is more recent
-            if (new Date(msg.created_at) > new Date(acc[leadId].last_message_at)) {
-              acc[leadId].last_message = msg.content
-              acc[leadId].last_message_at = msg.created_at
-              acc[leadId].channel = msg.channel
-            }
-          }
-          return acc
-        }, {})
-
-        setConversations(Object.values(grouped))
-      } else {
+      if (!messagesData || messagesData.length === 0) {
+        console.log('No messages found')
         setConversations([])
+        setLoading(false)
+        return
       }
+
+      console.log('Fetched messages:', messagesData.length)
+
+      // Group messages by lead_id - keep only the latest message per lead
+      const conversationMap = new Map<string, any>()
+
+      for (const msg of messagesData) {
+        if (!msg.lead_id) continue
+
+        if (!conversationMap.has(msg.lead_id)) {
+          conversationMap.set(msg.lead_id, {
+            lead_id: msg.lead_id,
+            channel: msg.channel,
+            last_message: msg.content || '(No content)',
+            last_message_at: msg.created_at,
+            message_count: 1
+          })
+        } else {
+          // Increment message count for existing conversation
+          conversationMap.get(msg.lead_id).message_count++
+        }
+      }
+
+      console.log('Unique conversations:', conversationMap.size)
+
+      // Get lead details for all conversations
+      const leadIds = Array.from(conversationMap.keys())
+
+      if (leadIds.length === 0) {
+        setConversations([])
+        setLoading(false)
+        return
+      }
+
+      const { data: leadsData, error: leadsError } = await supabase
+        .from('all_leads')
+        .select('id, customer_name, email, phone')
+        .in('id', leadIds)
+
+      if (leadsError) {
+        console.error('Error fetching leads:', leadsError)
+      }
+
+      console.log('Fetched leads:', leadsData?.length)
+
+      // Build final conversations array
+      const conversationsArray: Conversation[] = []
+
+      for (const [leadId, convData] of conversationMap) {
+        const lead = leadsData?.find((l: any) => l.id === leadId)
+
+        conversationsArray.push({
+          lead_id: leadId,
+          lead_name: lead?.customer_name || 'Unknown',
+          lead_email: lead?.email || '',
+          lead_phone: lead?.phone || '',
+          channel: convData.channel,
+          last_message: convData.last_message,
+          last_message_at: convData.last_message_at,
+          unread_count: 0
+        })
+      }
+
+      // Sort by most recent message first
+      conversationsArray.sort((a, b) =>
+        new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime()
+      )
+
+      console.log('Final conversations:', conversationsArray)
+      setConversations(conversationsArray)
+
     } catch (err) {
-      console.error('Error fetching conversations:', err)
-      setConversations([])
+      console.error('Error in fetchConversations:', err)
     }
     setLoading(false)
   }
@@ -278,7 +256,13 @@ export default function InboxPage() {
   const selectedConversation = conversations.find(c => c.lead_id === selectedLeadId)
 
   return (
-    <div className="h-[calc(100vh-32px)] flex" style={{ background: 'var(--bg-primary)' }}>
+    <div className="h-[calc(100vh-32px)] flex relative" style={{ background: 'var(--bg-primary)' }}>
+      {/* Loading Overlay */}
+      <LoadingOverlay 
+        isLoading={loading || messagesLoading} 
+        message={loading ? "Loading conversations..." : "Loading messages..."} 
+      />
+      
       {/* Left Panel - Conversations List */}
       <div 
         className="w-[350px] flex flex-col border-r"

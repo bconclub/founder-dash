@@ -1,14 +1,8 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import MetricsDashboard from '@/components/dashboard/MetricsDashboard'
+import InsightsCharts from '@/components/dashboard/InsightsCharts'
 import LeadsTable from '@/components/dashboard/LeadsTable'
-import BookingsCalendar from '@/components/dashboard/BookingsCalendar'
-import { 
-  MdLanguage,
-  MdWhatsapp,
-  MdPhone,
-  MdVideoLibrary,
-} from 'react-icons/md'
+import RecentBookings from '@/components/dashboard/RecentBookings'
 
 export default async function DashboardPage() {
   try {
@@ -31,76 +25,43 @@ export default async function DashboardPage() {
         </p>
       </div>
 
-      {/* Metrics Cards */}
-      <MetricsDashboard />
-
-      {/* Channel Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <a href="/dashboard/channels/web" className="bg-white dark:bg-[#1A1A1A] border border-gray-200 dark:border-[#262626] shadow rounded-lg p-6 hover:shadow-lg transition-shadow">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white">Web PROXe</h3>
-            </div>
-            <div className="w-12 h-12 flex items-center justify-center text-gray-600 dark:text-gray-400">
-              <MdLanguage size={48} color="currentColor" />
-            </div>
-          </div>
-        </a>
-        <a href="/dashboard/channels/whatsapp" className="bg-white dark:bg-[#1A1A1A] border border-gray-200 dark:border-[#262626] shadow rounded-lg p-6 hover:shadow-lg transition-shadow">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white">WhatsApp PROXe</h3>
-            </div>
-            <div className="w-12 h-12 flex items-center justify-center text-gray-600 dark:text-gray-400">
-              <MdWhatsapp size={48} color="currentColor" />
-            </div>
-          </div>
-        </a>
-        <a href="/dashboard/channels/voice" className="bg-white dark:bg-[#1A1A1A] border border-gray-200 dark:border-[#262626] shadow rounded-lg p-6 hover:shadow-lg transition-shadow">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white">Voice PROXe</h3>
-            </div>
-            <div className="w-12 h-12 flex items-center justify-center text-gray-600 dark:text-gray-400">
-              <MdPhone size={48} color="currentColor" />
-            </div>
-          </div>
-        </a>
-        <a href="/dashboard/channels/social" className="bg-white dark:bg-[#1A1A1A] border border-gray-200 dark:border-[#262626] shadow rounded-lg p-6 hover:shadow-lg transition-shadow">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white">Social PROXe</h3>
-            </div>
-            <div className="w-12 h-12 flex items-center justify-center text-gray-600 dark:text-gray-400">
-              <MdVideoLibrary size={48} color="currentColor" />
-            </div>
-          </div>
-        </a>
+      {/* Insights Charts */}
+      <div className="bg-white dark:bg-[#1A1A1A] border border-gray-200 dark:border-[#262626] shadow rounded-lg p-6">
+        <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Insights</h2>
+        <InsightsCharts />
       </div>
 
-      {/* Recent Conversations */}
+      {/* Recent Leads - Row 1 */}
       <div className="bg-white dark:bg-[#1A1A1A] border border-gray-200 dark:border-[#262626] shadow rounded-lg">
         <div className="px-4 py-5 sm:p-6">
-          <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Recent Conversations</h2>
-          <LeadsTable limit={10} />
+          <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Recent Leads</h2>
+          <LeadsTable 
+            limit={10} 
+            hideFilters={true}
+            showLimitSelector={true}
+            showViewAll={true}
+          />
         </div>
       </div>
 
-      {/* Bookings Calendar */}
+      {/* Recent Conversations - Row 2 */}
       <div className="bg-white dark:bg-[#1A1A1A] border border-gray-200 dark:border-[#262626] shadow rounded-lg">
         <div className="px-4 py-5 sm:p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-medium text-gray-900 dark:text-white">Bookings Calendar</h2>
-            <a
-              href="/dashboard/bookings"
-              className="text-sm text-primary-600 dark:text-primary-400 hover:underline"
-            >
-              View Full Calendar →
-            </a>
-          </div>
-          <div className="h-[700px]">
-            <BookingsCalendar view="calendar" />
-          </div>
+          <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Recent Conversations</h2>
+          <LeadsTable 
+            limit={10} 
+            hideFilters={true}
+            showLimitSelector={true}
+            showViewAll={true}
+          />
+        </div>
+      </div>
+
+      {/* Recent Bookings - Row 3 */}
+      <div className="bg-white dark:bg-[#1A1A1A] border border-gray-200 dark:border-[#262626] shadow rounded-lg">
+        <div className="px-4 py-5 sm:p-6">
+          <h2 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Recent Bookings</h2>
+          <RecentBookings />
         </div>
       </div>
     </div>

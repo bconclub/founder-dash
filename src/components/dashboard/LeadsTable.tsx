@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { formatDateTime } from '@/lib/utils'
 import { useRealtimeLeads } from '@/hooks/useRealtimeLeads'
 import LeadDetailsModal from './LeadDetailsModal'
@@ -42,9 +43,18 @@ type ExtendedLead = Lead & {
 interface LeadsTableProps {
   limit?: number
   sourceFilter?: string
+  hideFilters?: boolean
+  showLimitSelector?: boolean
+  showViewAll?: boolean
 }
 
-export default function LeadsTable({ limit, sourceFilter: initialSourceFilter }: LeadsTableProps) {
+export default function LeadsTable({ 
+  limit: initialLimit, 
+  sourceFilter: initialSourceFilter,
+  hideFilters = false,
+  showLimitSelector = false,
+  showViewAll = false,
+}: LeadsTableProps) {
   const { leads, loading, error } = useRealtimeLeads()
   const [filteredLeads, setFilteredLeads] = useState<ExtendedLead[]>([])
   const [dateFilter, setDateFilter] = useState<string>('all')
@@ -52,6 +62,14 @@ export default function LeadsTable({ limit, sourceFilter: initialSourceFilter }:
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [limit, setLimit] = useState<number>(initialLimit || 10)
+  
+  // Update limit when initialLimit prop changes
+  useEffect(() => {
+    if (initialLimit) {
+      setLimit(initialLimit)
+    }
+  }, [initialLimit])
 
   useEffect(() => {
     let filtered = [...leads]
@@ -193,56 +211,93 @@ export default function LeadsTable({ limit, sourceFilter: initialSourceFilter }:
 
   return (
     <div>
-      {/* Filters */}
-      <div className="mb-4 flex flex-wrap gap-4">
-        <select
-          value={dateFilter}
-          onChange={(e) => setDateFilter(e.target.value)}
-          className="px-3 py-2 border border-gray-300 dark:border-[#262626] bg-white dark:bg-[#0D0D0D] text-gray-900 dark:text-white rounded-md text-sm"
-        >
-          <option value="all">All Dates</option>
-          <option value="today">Today</option>
-          <option value="week">Last 7 Days</option>
-          <option value="month">Last 30 Days</option>
-        </select>
+      {/* Header with Limit Selector and View All */}
+      {(showLimitSelector || showViewAll) && (
+        <div className="mb-4 flex items-center justify-between">
+          {showLimitSelector && (
+            <div className="flex items-center gap-2">
+              <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                Show:
+              </span>
+              <select
+                value={limit}
+                onChange={(e) => setLimit(Number(e.target.value))}
+                className="px-3 py-1.5 border rounded-md text-sm"
+                style={{
+                  borderColor: 'var(--border-primary)',
+                  backgroundColor: 'var(--bg-secondary)',
+                  color: 'var(--text-primary)',
+                }}
+              >
+                <option value={5}>5</option>
+                <option value={10}>10</option>
+              </select>
+            </div>
+          )}
+          {showViewAll && (
+            <Link
+              href="/dashboard/leads"
+              className="text-sm font-medium hover:underline"
+              style={{ color: 'var(--accent-primary)' }}
+            >
+              View All →
+            </Link>
+          )}
+        </div>
+      )}
 
-        {!initialSourceFilter && (
+      {/* Filters - Only show if not hidden */}
+      {!hideFilters && (
+        <div className="mb-4 flex flex-wrap gap-4">
           <select
-            value={sourceFilter}
-            onChange={(e) => setSourceFilter(e.target.value)}
+            value={dateFilter}
+            onChange={(e) => setDateFilter(e.target.value)}
             className="px-3 py-2 border border-gray-300 dark:border-[#262626] bg-white dark:bg-[#0D0D0D] text-gray-900 dark:text-white rounded-md text-sm"
           >
-            <option value="all">All Sources</option>
-            <option value="web">Web</option>
-            <option value="whatsapp">WhatsApp</option>
-            <option value="voice">Voice</option>
-            <option value="social">Social</option>
+            <option value="all">All Dates</option>
+            <option value="today">Today</option>
+            <option value="week">Last 7 Days</option>
+            <option value="month">Last 30 Days</option>
           </select>
-        )}
 
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-3 py-2 border border-gray-300 dark:border-[#262626] bg-white dark:bg-[#0D0D0D] text-gray-900 dark:text-white rounded-md text-sm"
-        >
-          <option value="all">All Statuses</option>
-          {STATUS_OPTIONS.map((status) => (
-            <option key={status} value={status}>
-              {status}
-            </option>
-          ))}
-        </select>
+          {!initialSourceFilter && (
+            <select
+              value={sourceFilter}
+              onChange={(e) => setSourceFilter(e.target.value)}
+              className="px-3 py-2 border border-gray-300 dark:border-[#262626] bg-white dark:bg-[#0D0D0D] text-gray-900 dark:text-white rounded-md text-sm"
+            >
+              <option value="all">All Sources</option>
+              <option value="web">Web</option>
+              <option value="whatsapp">WhatsApp</option>
+              <option value="voice">Voice</option>
+              <option value="social">Social</option>
+            </select>
+          )}
 
-        <button
-          onClick={exportToCSV}
-          className="ml-auto px-4 py-2 text-white rounded-md text-sm transition-colors"
-          style={{ backgroundColor: '#5B1A8C' }}
-          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#4a1573'}
-          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#5B1A8C'}
-        >
-          Export CSV
-        </button>
-      </div>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="px-3 py-2 border border-gray-300 dark:border-[#262626] bg-white dark:bg-[#0D0D0D] text-gray-900 dark:text-white rounded-md text-sm"
+          >
+            <option value="all">All Statuses</option>
+            {STATUS_OPTIONS.map((status) => (
+              <option key={status} value={status}>
+                {status}
+              </option>
+            ))}
+          </select>
+
+          <button
+            onClick={exportToCSV}
+            className="ml-auto px-4 py-2 text-white rounded-md text-sm transition-colors"
+            style={{ backgroundColor: '#5B1A8C' }}
+            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#4a1573'}
+            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#5B1A8C'}
+          >
+            Export CSV
+          </button>
+        </div>
+      )}
 
       {/* Table */}
       <div className="overflow-x-auto overflow-y-visible">

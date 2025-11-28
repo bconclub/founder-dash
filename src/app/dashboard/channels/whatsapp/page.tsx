@@ -1,4 +1,4 @@
-import ChannelMetrics from '@/components/dashboard/ChannelMetrics'
+import WhatsAppMetrics from '@/components/dashboard/WhatsAppMetrics'
 import LeadsTable from '@/components/dashboard/LeadsTable'
 
 export default function WhatsAppPROXePage() {
@@ -11,8 +11,8 @@ export default function WhatsAppPROXePage() {
         </p>
       </div>
 
-      {/* Channel-specific metrics */}
-      <ChannelMetrics channel="whatsapp" />
+      {/* WhatsApp Metrics */}
+      <WhatsAppMetrics />
 
       {/* Channel-specific leads */}
       <div className="bg-white dark:bg-[#1A1A1A] border border-gray-200 dark:border-[#262626] shadow rounded-lg">

@@ -1,10 +1,7 @@
-import { createClient } from '@/lib/supabase/server'
-import ChannelMetrics from '@/components/dashboard/ChannelMetrics'
+import WebMetrics from '@/components/dashboard/WebMetrics'
 import LeadsTable from '@/components/dashboard/LeadsTable'
 
 export default async function WebPROXePage() {
-  const supabase = await createClient()
-  
   return (
     <div className="space-y-6">
       <div>
@@ -14,8 +11,8 @@ export default async function WebPROXePage() {
         </p>
       </div>
 
-      {/* Channel-specific metrics */}
-      <ChannelMetrics channel="web" />
+      {/* Web Metrics */}
+      <WebMetrics />
 
       {/* Channel-specific leads */}
       <div className="bg-white dark:bg-[#1A1A1A] border border-gray-200 dark:border-[#262626] shadow rounded-lg">

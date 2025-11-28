@@ -134,7 +134,9 @@ Command Center/
 │   │   │   │   ├── web-agent/       # Web PROXe webhook
 │   │   │   │   │   └── route.ts     # POST/GET web-agent
 │   │   │   │   ├── whatsapp/        # WhatsApp webhook
-│   │   │   │   │   └── route.ts     # POST whatsapp
+│   │   │   │   │   ├── route.ts     # POST whatsapp
+│   │   │   │   │   └── system-prompt/
+│   │   │   │   │       └── route.ts # GET context-aware system prompt
 │   │   │   │   └── voice/           # Voice webhook
 │   │   │   │       └── route.ts     # POST voice
 │   │   │   └── auth/                # Authentication APIs
@@ -143,6 +145,8 @@ Command Center/
 │   │   ├── dashboard/               # Dashboard pages
 │   │   │   ├── page.tsx             # Overview page
 │   │   │   ├── layout.tsx           # Dashboard layout wrapper
+│   │   │   ├── inbox/                # Unified inbox page
+│   │   │   │   └── page.tsx         # Inbox with conversations
 │   │   │   ├── leads/               # Leads page
 │   │   │   │   └── page.tsx
 │   │   │   ├── bookings/            # Bookings page
@@ -158,7 +162,9 @@ Command Center/
 │   │   │   │   │   └── page.tsx    # Voice channel
 │   │   │   │   └── social/
 │   │   │   │       └── page.tsx    # Social channel
-│   │   │   └── settings/            # Settings page
+│   │   │   ├── marketing/           # Marketing page
+│   │   │   │   └── page.tsx
+│   │   │   └── settings/            # Settings/Configure page
 │   │   │       └── page.tsx
 │   │   ├── auth/                    # Authentication pages
 │   │   │   ├── login/
@@ -192,6 +198,8 @@ Command Center/
 │   │   │   ├── server.ts           # Server-side Supabase
 │   │   │   └── middleware.ts       # Auth middleware
 │   │   └── utils.ts                 # Utility functions
+│   ├── services/                    # Service layer
+│   │   └── claudeService.js         # Context-aware system prompt builder
 │   └── types/                       # TypeScript types
 │       ├── database.types.ts      # Database schema types
 │       └── index.ts                # Common types
@@ -203,7 +211,11 @@ Command Center/
 │       └── 009_fix_unified_leads_view_rls.sql # RLS policies
 ├── public/                          # Static assets
 │   ├── PROXE Icon.svg
-│   └── PROXE Icon Black.svg
+│   ├── PROXE Icon Black.svg
+│   ├── browser-stroke-rounded.svg   # Website channel icon
+│   ├── whatsapp-business-stroke-rounded.svg  # WhatsApp channel icon
+│   ├── ai-voice-stroke-rounded.svg  # Voice channel icon
+│   └── video-ai-stroke-rounded.svg  # Social channel icon
 ├── .github/
 │   └── workflows/
 │       └── deploy-dashboard.yml     # CI/CD deployment
@@ -860,6 +872,47 @@ All tables have RLS enabled with policies:
 
 ---
 
+#### `GET /api/integrations/whatsapp/system-prompt`
+**File**: `src/app/api/integrations/whatsapp/system-prompt/route.ts`
+
+**Purpose**: Get context-aware system prompt for WhatsApp AI agent
+
+**Authentication**: API key verification (`x-api-key` header)
+
+**Query Parameters**:
+- `phone` (required) - Customer phone number
+- `name` (optional) - Customer name
+
+**Response**:
+```json
+{
+  "success": true,
+  "systemPrompt": "You are PROXe, an AI sales agent...",
+  "hasContext": true,
+  "context": {
+    "hasWebHistory": true,
+    "hasWhatsAppHistory": false,
+    "hasBooking": false,
+    "unifiedSummary": "...",
+    "webSummary": { "summary": "...", "timestamp": "..." }
+  }
+}
+```
+
+**Features**:
+- Fetches customer context from `all_leads` table
+- Checks `unified_context` for conversation history
+- Falls back to individual channel tables if needed
+- Builds personalized system prompt based on:
+  - Previous conversation history (web, WhatsApp, voice, social)
+  - Upcoming bookings
+  - Customer name and touchpoint history
+- Returns context-aware greeting instructions for AI agent
+
+**Service**: `src/services/claudeService.js` - Contains `getWhatsAppSystemPrompt()` function
+
+---
+
 ### Authentication APIs
 
 #### `POST /api/auth/invite`
@@ -898,26 +951,48 @@ All tables have RLS enabled with policies:
 **File**: `src/components/dashboard/DashboardLayout.tsx`
 **Type**: Client Component
 
-**Purpose**: Main layout wrapper with sidebar navigation
+**Purpose**: Main layout wrapper with collapsible sidebar navigation
 
 **Features**:
-- Collapsible sidebar (mobile & desktop)
-- Navigation menu with Channels submenu
-- User menu with profile and logout
-- Dark mode toggle
-- Responsive design
+- Collapsible sidebar (240px expanded, 64px collapsed - icons only)
+- Toggle button to expand/collapse sidebar
+- State persistence via localStorage (`sidebar-collapsed`)
+- Dark/light mode toggle with theme persistence
+- Custom SVG icons for channels (Website, WhatsApp, Voice, Social)
+- Active state highlighting with accent colors
+- Smooth hover transitions
+- Mobile responsive (overlay sidebar on mobile)
+- Version badge (v1.0.0) and dynamic last updated date/time
+- User menu with logout
+- Custom scrollbar styling with brand colors
 
-**Navigation Items**:
-- Dashboard (overview)
-- Leads
-- Bookings
-- Metrics
-- Channels (collapsible)
-  - Web PROXe
-  - WhatsApp PROXe
-  - Voice PROXe
-  - Social PROXe
-- Settings
+**Navigation Items** (in order):
+1. **Inbox** (`/dashboard/inbox`) - Unified inbox for all conversations
+2. **Dashboard** (`/dashboard`) - Overview page
+3. **All Leads** (`/dashboard/leads`) - Leads management
+4. **Bookings** (`/dashboard/bookings`) - Calendar view
+5. **[Divider]**
+6. **Website** (`/dashboard/channels/web`) - Web PROXe channel
+7. **WhatsApp** (`/dashboard/channels/whatsapp`) - WhatsApp channel
+8. **Voice** (`/dashboard/channels/voice`) - Voice channel
+9. **Social** (`/dashboard/channels/social`) - Social channel
+10. **[Divider]**
+11. **Marketing** (`/dashboard/marketing`) - Marketing tools
+12. **Configure** (`/dashboard/settings`) - Settings (renamed from "Settings")
+13. **[Divider]**
+14. **Billing** (`/dashboard/billing`) - Billing management
+15. **Docs** (external) - https://docs.goproxe.com
+16. **Support** (external) - https://support.goproxe.com
+
+**Design Specs**:
+- Sidebar background: `var(--bg-secondary)` (#111111 dark, #F5F5F5 light)
+- Border right: 1px solid `var(--border-primary)`
+- Nav items: padding 10px 16px, border-radius 6px
+- Hover state: background `var(--bg-hover)`
+- Active state: background `var(--accent-subtle)`, text `var(--accent-light)`, left border 2px solid `var(--accent-primary)`
+- Text: 14px, font-weight 500
+- Icons: 20px, margin-right 12px (when expanded), centered (when collapsed)
+- Transition: all 0.2s ease for smooth collapse animation
 
 ---
 
@@ -971,10 +1046,12 @@ All tables have RLS enabled with policies:
 - Name
 - Email
 - Phone
-- Source (first_touchpoint)
+- **First Source** (displays `first_touchpoint` or `source` fallback)
 - Timestamp
 - Status
 - Actions
+
+**Note**: "Source" column renamed to "First Source" to indicate the first touchpoint where the lead originated.
 
 ---
 
@@ -1041,18 +1118,33 @@ All tables have RLS enabled with policies:
 **File**: `src/components/dashboard/LeadDetailsModal.tsx`
 **Type**: Client Component
 
-**Purpose**: Modal showing detailed lead information
+**Purpose**: Modal showing detailed lead information with multi-channel conversation summaries
 
 **Props**:
-- `lead: Lead` - Lead data
+- `lead: Lead` - Lead data (includes `unified_context`)
 - `isOpen: boolean` - Modal open state
 - `onClose: () => void` - Close handler
 
 **Features**:
 - Lead details display
-- Status update
-- Booking information
-- Metadata display
+- Status update functionality
+- Booking information display
+- **Multi-Channel Conversation Summaries**:
+  - Fetches summaries from `unified_context` or individual channel tables
+  - Displays summaries organized by channel:
+    - 🌐 **Web** - Blue accent (#3B82F6)
+    - 💬 **WhatsApp** - Green accent (#22C55E)
+    - 📞 **Voice** - Purple accent (#8B5CF6)
+    - 📱 **Social** - Pink accent (#EC4899)
+  - Each channel card shows:
+    - Channel icon and name
+    - Conversation summary text
+    - Timestamp of last interaction
+  - **Unified Summary** section at bottom (highlighted box)
+    - Shows `unified_context.unified_summary` if available
+    - Falls back to most recent channel summary
+- Backdrop blur effect when modal opens
+- Channel-specific styling with left border colors
 
 ---
 
@@ -1327,11 +1419,15 @@ CMD ["npm", "start"]
 - **Includes**: All visible columns
 - **Filtered**: Respects current filters
 
-### Dark Mode
-- **Implementation**: Tailwind CSS dark mode
-- **Storage**: localStorage
-- **Default**: System preference
-- **Toggle**: User menu
+### Dark/Light Mode
+- **Implementation**: CSS variables with theme switching
+- **Storage**: localStorage (`theme-preference`)
+- **Default**: System preference (detected on mount)
+- **Toggle**: Theme toggle button in sidebar
+- **Theme Variables**:
+  - Light mode: `--bg-primary` (#FFFFFF), `--bg-secondary` (#F5F5F5), `--accent-primary` (#5B1A8C)
+  - Dark mode: `--bg-primary` (#0D0D0D), `--bg-secondary` (#111111), `--accent-primary` (#8B5CF6)
+- **Initialization**: Blocking script in `layout.tsx` sets theme before React hydrates (prevents white flash)
 
 ### Responsive Design
 - **Mobile**: Collapsible sidebar, stacked layout, horizontal scrolling for calendar
@@ -1346,6 +1442,26 @@ CMD ["npm", "start"]
 - **Interactive**: Clickable booking blocks
 - **Modals**: Booking details → Client details
 - **Mobile**: Horizontal scrolling, compact layout
+
+### Unified Inbox
+- **Page**: `/dashboard/inbox`
+- **Layout**: Two-panel design (30% conversations list, 70% messages)
+- **Features**:
+  - Real-time conversation updates via Supabase Realtime
+  - Search conversations by name, phone, or message content
+  - Channel filters (All, Web, WhatsApp, Voice, Social)
+  - Message history display with timestamps
+  - Channel-specific icons and styling
+  - Unread count badges (structure ready, count logic pending)
+  - Read-only message input (reply feature pending)
+
+### Custom Scrollbar Styling
+- **Implementation**: CSS custom scrollbar using CSS variables
+- **Colors**: Brand purple accent (`var(--accent-primary)`)
+- **Styling**: 
+  - Webkit browsers: Custom scrollbar track and thumb
+  - Firefox: `scrollbar-color` property
+  - Matches theme (dark/light mode aware)
 
 ---
 
@@ -1404,6 +1520,11 @@ CMD ["npm", "start"]
 
 ### Icons
 - **Library**: `react-icons/md` (Material Design icons)
+- **Custom SVG Icons**: Channel navigation uses custom SVG files:
+  - `public/browser-stroke-rounded.svg` - Website channel
+  - `public/whatsapp-business-stroke-rounded.svg` - WhatsApp channel
+  - `public/ai-voice-stroke-rounded.svg` - Voice channel
+  - `public/video-ai-stroke-rounded.svg` - Social channel
 - **Usage**: Navigation, metrics cards, channel cards
 
 ### Typography
@@ -1443,6 +1564,16 @@ CMD ["npm", "start"]
 - Verify all dependencies installed (`npm install`)
 - Check for TypeScript errors (`npm run type-check`)
 - Verify environment variables are set
+- Clear `.next` cache: `rm -rf .next && npm run build`
+- Check for module resolution errors (e.g., "Cannot find module './682.js'")
+
+### "White screen on dashboard load"
+- Verify theme initialization script in `layout.tsx` is present
+- Check browser console for hydration errors
+- Ensure `suppressHydrationWarning` is set on `<html>` and `<body>` tags
+- Verify CSS variables are defined in `globals.css`
+- Check that `DashboardLayout` has proper background colors set
+- Ensure `dynamic = 'force-dynamic'` is set in `dashboard/layout.tsx`
 
 ### "502 Bad Gateway" (VPS)
 - Check PM2 process is running (`pm2 status`)
@@ -1501,6 +1632,111 @@ CMD ["npm", "start"]
 
 ---
 
-**Last Updated**: 2024
+---
+
+## Latest Build Details
+
+### Build Information
+- **Last Build Date**: December 15, 2024
+- **Commit**: `55b30a9`
+- **Version**: 1.0.0
+- **Build Status**: ✅ Successful
+
+### Recent Changes (Latest Build)
+
+#### UI/UX Improvements
+1. **Custom Scrollbar Styling**
+   - Brand purple accent colors
+   - Theme-aware (dark/light mode)
+   - Webkit and Firefox support
+
+2. **Navigation Updates**
+   - Renamed "Settings" to "Configure"
+   - Added "Inbox" as first navigation item
+   - Reordered navigation: Dashboard → Inbox → All Leads → Bookings
+   - Custom SVG icons for channel navigation
+
+3. **Sidebar Enhancements**
+   - Version badge (v1.0.0) display
+   - Dynamic "Last Updated" date/time (updates every minute)
+   - Improved collapse/expand animations
+   - Better mobile responsiveness
+
+#### Feature Additions
+1. **Unified Inbox** (`/dashboard/inbox`)
+   - Two-panel conversation view
+   - Real-time message updates
+   - Channel filtering and search
+   - Message history display
+
+2. **Multi-Channel Conversation Summaries**
+   - LeadDetailsModal now shows summaries from all touchpoints
+   - Channel-specific cards with icons and timestamps
+   - Unified summary section at bottom
+   - Fetches from `unified_context` or individual tables
+
+3. **Context-Aware WhatsApp System Prompt**
+   - New API endpoint: `/api/integrations/whatsapp/system-prompt`
+   - Service: `src/services/claudeService.js`
+   - Builds personalized prompts based on:
+     - Previous conversation history
+     - Upcoming bookings
+     - Customer touchpoint journey
+
+#### Data Model Updates
+1. **Leads Table**
+   - Column renamed: "Source" → "First Source"
+   - Displays `first_touchpoint` with fallback to `source`
+   - Updated CSV export headers
+
+2. **Lead Interface**
+   - Added `unified_context?: any` to Lead type
+   - Supports multi-channel conversation data
+
+#### Bug Fixes
+1. **White Screen Issues**
+   - Fixed theme initialization timing
+   - Added blocking script in `layout.tsx`
+   - Improved hydration handling
+   - Added `suppressHydrationWarning` attributes
+
+2. **Build Errors**
+   - Added `dynamic = 'force-dynamic'` to API routes
+   - Fixed TypeScript import errors
+   - Resolved module resolution issues
+
+3. **Navigation Issues**
+   - Fixed redirect imports
+   - Improved error handling in dashboard layout
+   - Added `prefetch={false}` to prevent prefetching issues
+
+### Build Truths
+
+#### Verified Working Features
+- ✅ Dark/light mode toggle with persistence
+- ✅ Collapsible sidebar with state persistence
+- ✅ Real-time leads updates via Supabase Realtime
+- ✅ Multi-channel conversation summaries in LeadDetailsModal
+- ✅ Unified inbox with real-time updates
+- ✅ Context-aware WhatsApp system prompt API
+- ✅ Custom scrollbar styling
+- ✅ Responsive mobile design
+- ✅ CSV export functionality
+- ✅ Calendar booking views
+
+#### Known Limitations
+- ⚠️ Inbox unread count badge structure ready, count logic pending
+- ⚠️ Inbox reply functionality pending (input is read-only)
+- ⚠️ Some TypeScript strict mode warnings may exist (non-blocking)
+
+#### Performance Optimizations
+- Theme initialization before React hydration (prevents white flash)
+- Dynamic imports for better code splitting
+- Real-time subscriptions optimized with proper cleanup
+- LocalStorage access wrapped in try-catch for SSR safety
+
+---
+
+**Last Updated**: December 15, 2024
 **Version**: 1.0.0
 **Maintained By**: PROXe Team
