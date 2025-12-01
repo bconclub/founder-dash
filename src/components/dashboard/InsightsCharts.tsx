@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import {
   LineChart,
   Line,
@@ -34,11 +34,7 @@ export default function InsightsCharts({}: InsightsChartsProps) {
   const [conversionRatio, setConversionRatio] = useState<ChartData[]>([])
   const [avgResponseTime, setAvgResponseTime] = useState<ChartData[]>([])
 
-  useEffect(() => {
-    fetchInsightsData()
-  }, [selectedRange])
-
-  const fetchInsightsData = async () => {
+  const fetchInsightsData = useCallback(async () => {
     setLoading(true)
     try {
       const days = dateRanges.find(r => r.days === selectedRange)?.days || 7
@@ -61,7 +57,11 @@ export default function InsightsCharts({}: InsightsChartsProps) {
       setAvgResponseTime([])
     }
     setLoading(false)
-  }
+  }, [selectedRange])
+
+  useEffect(() => {
+    fetchInsightsData()
+  }, [fetchInsightsData])
 
   const ChartCard = ({
     title,

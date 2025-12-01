@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import {
   LineChart,
   Line,
@@ -32,11 +32,7 @@ export default function WhatsAppMetrics() {
   const [conversionRatio, setConversionRatio] = useState<ChartData[]>([])
   const [avgResponseTime, setAvgResponseTime] = useState<ChartData[]>([])
 
-  useEffect(() => {
-    fetchWhatsAppMetrics()
-  }, [selectedRange])
-
-  const fetchWhatsAppMetrics = async () => {
+  const fetchWhatsAppMetrics = useCallback(async () => {
     setLoading(true)
     try {
       const days = dateRanges.find(r => r.days === selectedRange)?.days || 7
@@ -174,7 +170,11 @@ export default function WhatsAppMetrics() {
       setAvgResponseTime([])
     }
     setLoading(false)
-  }
+  }, [selectedRange])
+
+  useEffect(() => {
+    fetchWhatsAppMetrics()
+  }, [fetchWhatsAppMetrics])
 
   const ChartCard = ({
     title,

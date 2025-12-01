@@ -4,6 +4,8 @@ export interface Lead {
   email: string | null
   phone: string | null
   source: string | null
+  first_touchpoint?: string | null
+  last_touchpoint?: string | null
   timestamp: string
   status: string | null
   booking_date: string | null

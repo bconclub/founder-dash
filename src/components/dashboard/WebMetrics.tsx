@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import {
   LineChart,
   Line,
@@ -32,11 +32,7 @@ export default function WebMetrics() {
   const [conversionRatio, setConversionRatio] = useState<ChartData[]>([])
   const [avgResponseTime, setAvgResponseTime] = useState<ChartData[]>([])
 
-  useEffect(() => {
-    fetchWebMetrics()
-  }, [selectedRange])
-
-  const fetchWebMetrics = async () => {
+  const fetchWebMetrics = useCallback(async () => {
     setLoading(true)
     try {
       const days = dateRanges.find(r => r.days === selectedRange)?.days || 7
@@ -188,7 +184,11 @@ export default function WebMetrics() {
       setAvgResponseTime([])
     }
     setLoading(false)
-  }
+  }, [selectedRange])
+
+  useEffect(() => {
+    fetchWebMetrics()
+  }, [fetchWebMetrics])
 
   const ChartCard = ({
     title,
