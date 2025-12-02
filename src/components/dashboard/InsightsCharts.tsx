@@ -33,6 +33,12 @@ export default function InsightsCharts({}: InsightsChartsProps) {
   const [totalConversations, setTotalConversations] = useState<ChartData[]>([])
   const [conversionRatio, setConversionRatio] = useState<ChartData[]>([])
   const [avgResponseTime, setAvgResponseTime] = useState<ChartData[]>([])
+  const [summary, setSummary] = useState({
+    totalLeads: 0,
+    totalConversations: 0,
+    conversionRatio: 0,
+    avgResponseTime: 0,
+  })
 
   const fetchInsightsData = useCallback(async () => {
     setLoading(true)
@@ -48,6 +54,12 @@ export default function InsightsCharts({}: InsightsChartsProps) {
       setTotalConversations(data.totalConversations || [])
       setConversionRatio(data.conversionRatio || [])
       setAvgResponseTime(data.avgResponseTime || [])
+      setSummary(data.summary || {
+        totalLeads: 0,
+        totalConversations: 0,
+        conversionRatio: 0,
+        avgResponseTime: 0,
+      })
     } catch (error) {
       console.error('Error fetching insights:', error)
       // Fallback to empty arrays on error
@@ -55,6 +67,12 @@ export default function InsightsCharts({}: InsightsChartsProps) {
       setTotalConversations([])
       setConversionRatio([])
       setAvgResponseTime([])
+      setSummary({
+        totalLeads: 0,
+        totalConversations: 0,
+        conversionRatio: 0,
+        avgResponseTime: 0,
+      })
     }
     setLoading(false)
   }, [selectedRange])
@@ -165,26 +183,26 @@ export default function InsightsCharts({}: InsightsChartsProps) {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <ChartCard
           title="Total Leads"
-          value={totalLeads[totalLeads.length - 1]?.value || 0}
+          value={summary.totalLeads}
           data={totalLeads}
           formatValue={(v) => v.toLocaleString()}
         />
         <ChartCard
           title="Total Conversations"
-          value={totalConversations[totalConversations.length - 1]?.value || 0}
+          value={summary.totalConversations}
           data={totalConversations}
           formatValue={(v) => v.toLocaleString()}
         />
         <ChartCard
           title="Conversion Ratio"
-          value={conversionRatio[conversionRatio.length - 1]?.value || 0}
+          value={summary.conversionRatio}
           data={conversionRatio}
           suffix="%"
           formatValue={(v) => v.toFixed(1)}
         />
         <ChartCard
           title="Avg Response Time"
-          value={avgResponseTime[avgResponseTime.length - 1]?.value || 0}
+          value={summary.avgResponseTime}
           data={avgResponseTime}
           suffix="ms"
           formatValue={(v) => v.toLocaleString()}

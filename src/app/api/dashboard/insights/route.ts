@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
 
     // Get all leads
     const { data: leads, error: leadsError } = await supabase
-      .from('unified_leads')
+      .from('all_leads')
       .select('*')
       .gte('created_at', startDate.toISOString())
       .lte('created_at', endDate.toISOString())
@@ -138,11 +138,40 @@ export async function GET(request: NextRequest) {
       })
     }
 
+    // Calculate summary totals for overview cards
+    const totalLeadsCount = totalLeads.reduce((sum, item) => sum + item.value, 0)
+    
+    // Total unique conversations across entire period (not sum of daily counts)
+    const allUniqueConversations = new Set<string>()
+    messages?.forEach((msg) => {
+      if (msg.lead_id) {
+        allUniqueConversations.add(msg.lead_id)
+      }
+    })
+    const totalConversationsCount = allUniqueConversations.size
+    
+    // Average conversion ratio
+    const avgConversionRatio = conversionRatio.length > 0
+      ? conversionRatio.reduce((sum, item) => sum + item.value, 0) / conversionRatio.length
+      : 0
+    
+    // Average response time
+    const avgResponseTimeValue = avgResponseTime.length > 0
+      ? Math.round(avgResponseTime.reduce((sum, item) => sum + item.value, 0) / avgResponseTime.length)
+      : 0
+
     return NextResponse.json({
       totalLeads,
       totalConversations,
       conversionRatio,
       avgResponseTime,
+      // Summary totals for overview cards
+      summary: {
+        totalLeads: totalLeadsCount,
+        totalConversations: totalConversationsCount,
+        conversionRatio: avgConversionRatio,
+        avgResponseTime: avgResponseTimeValue,
+      },
     })
   } catch (error) {
     console.error('Error fetching insights:', error)
