@@ -8,6 +8,7 @@ on:
     paths:
       - 'brand/windchasers/build/**'
       - '.github/workflows/deploy-windchasers-dashboard.yml'
+  workflow_dispatch:
 
 jobs:
   deploy:
