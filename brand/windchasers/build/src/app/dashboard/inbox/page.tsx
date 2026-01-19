@@ -211,9 +211,6 @@ export default function InboxPage() {
       }
 
       const { data: messagesData, error: messagesError } = await query
-      // #region agent log
-      fetch('http://127.0.0.1:7244/ingest/ccc34e9d-10fc-4755-9d86-188049e8d67e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'inbox/page.tsx:214',message:'messages query result',data:{hasError:!!messagesError,hasData:Array.isArray(messagesData),dataLength:Array.isArray(messagesData)?messagesData.length:0},timestamp:Date.now(),sessionId:'debug-session',runId:'inbox-msg',hypothesisId:'H1'})}).catch(()=>{});
-      // #endregion agent log
 
       if (messagesError) {
         console.error('Error fetching messages:', messagesError)
@@ -226,9 +223,6 @@ export default function InboxPage() {
       console.log('Fetched messages:', messagesData?.length || 0)
       
       if (!messagesData || messagesData.length === 0) {
-        // #region agent log
-        fetch('http://127.0.0.1:7244/ingest/ccc34e9d-10fc-4755-9d86-188049e8d67e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'inbox/page.tsx:225',message:'no messages fallback path',data:{hasData:!!messagesData,dataLength:messagesData?.length ?? 0},timestamp:Date.now(),sessionId:'debug-session',runId:'inbox-msg',hypothesisId:'H2'})}).catch(()=>{});
-        // #endregion agent log
         console.log('No messages found - checking if this is a data issue or query issue')
         // Try fetching without filters to see if any messages exist
         const { data: allMessages, error: allError } = await supabase
@@ -287,17 +281,11 @@ export default function InboxPage() {
         created_at?: string | null
         sender?: string | null
       }>
-      // #region agent log
-      fetch('http://127.0.0.1:7244/ingest/ccc34e9d-10fc-4755-9d86-188049e8d67e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'inbox/page.tsx:279',message:'messages sample keys',data:{count:messages.length,hasFirst:!!messages[0],firstKeys:messages[0]?Object.keys(messages[0]).slice(0,5):[]},timestamp:Date.now(),sessionId:'debug-session',runId:'inbox-msg',hypothesisId:'H1'})}).catch(()=>{});
-      // #endregion agent log
       console.log('Sample message:', messages[0])
 
       // Group by lead_id and collect ALL channels per lead
       const conversationMap = new Map<string, any>()
       
-      // #region agent log
-      fetch('http://127.0.0.1:7244/ingest/ccc34e9d-10fc-4755-9d86-188049e8d67e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'inbox/page.tsx:282',message:'building conversationMap',data:{messageCount:messages.length},timestamp:Date.now(),sessionId:'debug-session',runId:'inbox-msg',hypothesisId:'H3'})}).catch(()=>{});
-      // #endregion agent log
       for (const msg of messages) {
         if (!msg.lead_id) continue
         
@@ -315,23 +303,14 @@ export default function InboxPage() {
           // Update to most recent message
           const msgCreatedAt = msg.created_at ? new Date(msg.created_at) : null
           const convLastAt = conv.last_message_at ? new Date(conv.last_message_at) : null
-          // #region agent log
-          fetch('http://127.0.0.1:7244/ingest/ccc34e9d-10fc-4755-9d86-188049e8d67e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'inbox/page.tsx:316',message:'compare message timestamps',data:{leadId:msg.lead_id,hasMsgCreatedAt:!!msg.created_at,hasConvLastAt:!!conv.last_message_at},timestamp:Date.now(),sessionId:'debug-session',runId:'inbox-msg',hypothesisId:'H5'})}).catch(()=>{});
-          // #endregion agent log
           if (!convLastAt || (msgCreatedAt && msgCreatedAt > convLastAt)) {
             conv.last_message = msg.content || '(No content)'
             conv.last_message_at = msg.created_at || conv.last_message_at
-            // #region agent log
-            fetch('http://127.0.0.1:7244/ingest/ccc34e9d-10fc-4755-9d86-188049e8d67e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'inbox/page.tsx:322',message:'updated last_message_at',data:{leadId:msg.lead_id,updated:!!msg.created_at},timestamp:Date.now(),sessionId:'debug-session',runId:'inbox-msg',hypothesisId:'H5'})}).catch(()=>{});
-            // #endregion agent log
           }
           conv.message_count++
         }
       }
 
-      // #region agent log
-      fetch('http://127.0.0.1:7244/ingest/ccc34e9d-10fc-4755-9d86-188049e8d67e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'inbox/page.tsx:305',message:'conversationMap size',data:{conversationCount:conversationMap.size},timestamp:Date.now(),sessionId:'debug-session',runId:'inbox-msg',hypothesisId:'H3'})}).catch(()=>{});
-      // #endregion agent log
       console.log('Unique conversations:', conversationMap.size)
 
       // Get lead details for all conversations
@@ -349,9 +328,6 @@ export default function InboxPage() {
         .from('all_leads')
         .select('id, customer_name, email, phone')
         .in('id', leadIds)
-      // #region agent log
-      fetch('http://127.0.0.1:7244/ingest/ccc34e9d-10fc-4755-9d86-188049e8d67e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'inbox/page.tsx:322',message:'lead lookup result',data:{leadIdsCount:leadIds.length,hasError:!!leadsError,leadsCount:Array.isArray(leadsData)?leadsData.length:0},timestamp:Date.now(),sessionId:'debug-session',runId:'inbox-msg',hypothesisId:'H4'})}).catch(()=>{});
-      // #endregion agent log
 
       if (leadsError) {
         console.error('Error fetching leads:', leadsError)
@@ -372,9 +348,6 @@ export default function InboxPage() {
         } else {
           console.log('🔍 Diagnostic: Messages for sample leads:', diagnosticMessages?.length || 0)
           const diagMessages = (diagnosticMessages ?? []) as Array<{ lead_id?: string | null; id?: string | null }>
-          // #region agent log
-          fetch('http://127.0.0.1:7244/ingest/ccc34e9d-10fc-4755-9d86-188049e8d67e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'inbox/page.tsx:373',message:'diagnostic messages shape',data:{count:diagMessages.length,hasFirst:!!diagMessages[0],firstKeys:diagMessages[0]?Object.keys(diagMessages[0]).slice(0,5):[]},timestamp:Date.now(),sessionId:'debug-session',runId:'inbox-msg',hypothesisId:'H8'})}).catch(()=>{});
-          // #endregion agent log
           if (diagMessages.length > 0) {
             console.log('   Sample message lead_ids:', diagMessages.map(m => m.lead_id))
           }
@@ -390,9 +363,6 @@ export default function InboxPage() {
         email?: string | null
         phone?: string | null
       }>
-      // #region agent log
-      fetch('http://127.0.0.1:7244/ingest/ccc34e9d-10fc-4755-9d86-188049e8d67e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'inbox/page.tsx:387',message:'typed leads prepared',data:{leadCount:typedLeads.length,hasFirst:!!typedLeads[0],firstKeys:typedLeads[0]?Object.keys(typedLeads[0]).slice(0,5):[]},timestamp:Date.now(),sessionId:'debug-session',runId:'inbox-msg',hypothesisId:'H9'})}).catch(()=>{});
-      // #endregion agent log
 
       for (const [leadId, convData] of conversationMap) {
         // Find matching lead - ensure we're comparing strings
@@ -488,9 +458,6 @@ export default function InboxPage() {
         metadata: msg?.metadata ?? null,
         created_at: String(msg?.created_at ?? ''),
       }))
-      // #region agent log
-      fetch('http://127.0.0.1:7244/ingest/ccc34e9d-10fc-4755-9d86-188049e8d67e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'inbox/page.tsx:481',message:'fetchMessages result',data:{count:messagesData.length,hasFirst:!!messagesData[0],firstKeys:messagesData[0]?Object.keys(messagesData[0]).slice(0,5):[],firstValues:messagesData[0]?{lead_id:messagesData[0].lead_id,channel:messagesData[0].channel,created_at:messagesData[0].created_at}:{}},timestamp:Date.now(),sessionId:'debug-session',runId:'inbox-msg',hypothesisId:'H10'})}).catch(()=>{});
-      // #endregion agent log
       console.log('Fetched messages:', messagesData.length, 'messages')
       if (messagesData.length > 0) {
         console.log('Sample message:', messagesData[0])
@@ -542,9 +509,6 @@ export default function InboxPage() {
           whatsapp?: { booking_date?: any; booking_time?: any }
         }
       }
-      // #region agent log
-      fetch('http://127.0.0.1:7244/ingest/ccc34e9d-10fc-4755-9d86-188049e8d67e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'inbox/page.tsx:533',message:'lead fetch shape',data:{hasLead:!!lead,leadKeys:typedLead?Object.keys(typedLead).slice(0,6):[]},timestamp:Date.now(),sessionId:'debug-session',runId:'inbox-msg',hypothesisId:'H11'})}).catch(()=>{});
-      // #endregion agent log
       
       // Fetch booking data from web_sessions (most recent booking)
       const { data: webSession } = await supabase
@@ -560,9 +524,6 @@ export default function InboxPage() {
         booking_time?: string | number | null
         booking_status?: string | null
       }
-      // #region agent log
-      fetch('http://127.0.0.1:7244/ingest/ccc34e9d-10fc-4755-9d86-188049e8d67e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'inbox/page.tsx:551',message:'webSession shape',data:{hasSession:!!webSession,keys:typedWebSession?Object.keys(typedWebSession).slice(0,5):[]},timestamp:Date.now(),sessionId:'debug-session',runId:'inbox-msg',hypothesisId:'H13'})}).catch(()=>{});
-      // #endregion agent log
       
       // Also check unified_context for booking data
       const bookingFromContext = typedLead.unified_context?.web?.booking_date || typedLead.unified_context?.whatsapp?.booking_date;

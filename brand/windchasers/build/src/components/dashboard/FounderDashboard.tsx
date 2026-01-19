@@ -156,9 +156,6 @@ export default function FounderDashboard() {
             whatsapp?: { booking?: any; booking_date?: any; booking_time?: any }
           }
         }
-        // #region agent log
-        fetch('http://127.0.0.1:7244/ingest/ccc34e9d-10fc-4755-9d86-188049e8d67e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'FounderDashboard.tsx:139',message:'lead fetch shape',data:{hasLead:!!lead,leadKeys:typedLead?Object.keys(typedLead).slice(0,6):[]},timestamp:Date.now(),sessionId:'debug-session',runId:'founder-lead',hypothesisId:'H16'})}).catch(()=>{});
-        // #endregion agent log
         console.log('✅ Lead fetched:', typedLead.customer_name || 'Unknown')
         // Get booking data from unified_context
         const unifiedContext = typedLead.unified_context || {}
