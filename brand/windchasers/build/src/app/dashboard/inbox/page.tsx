@@ -313,9 +313,17 @@ export default function InboxPage() {
           const conv = conversationMap.get(msg.lead_id)
           conv.channels.add(msg.channel)
           // Update to most recent message
-          if (new Date(msg.created_at) > new Date(conv.last_message_at)) {
+          const msgCreatedAt = msg.created_at ? new Date(msg.created_at) : null
+          const convLastAt = conv.last_message_at ? new Date(conv.last_message_at) : null
+          // #region agent log
+          fetch('http://127.0.0.1:7244/ingest/ccc34e9d-10fc-4755-9d86-188049e8d67e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'inbox/page.tsx:316',message:'compare message timestamps',data:{leadId:msg.lead_id,hasMsgCreatedAt:!!msg.created_at,hasConvLastAt:!!conv.last_message_at},timestamp:Date.now(),sessionId:'debug-session',runId:'inbox-msg',hypothesisId:'H5'})}).catch(()=>{});
+          // #endregion agent log
+          if (!convLastAt || (msgCreatedAt && msgCreatedAt > convLastAt)) {
             conv.last_message = msg.content || '(No content)'
-            conv.last_message_at = msg.created_at
+            conv.last_message_at = msg.created_at || conv.last_message_at
+            // #region agent log
+            fetch('http://127.0.0.1:7244/ingest/ccc34e9d-10fc-4755-9d86-188049e8d67e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'inbox/page.tsx:322',message:'updated last_message_at',data:{leadId:msg.lead_id,updated:!!msg.created_at},timestamp:Date.now(),sessionId:'debug-session',runId:'inbox-msg',hypothesisId:'H5'})}).catch(()=>{});
+            // #endregion agent log
           }
           conv.message_count++
         }
