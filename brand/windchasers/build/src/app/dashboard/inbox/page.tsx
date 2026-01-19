@@ -531,6 +531,12 @@ export default function InboxPage() {
         customer_name?: string | null
         email?: string | null
         phone?: string | null
+        first_touchpoint?: string | null
+        last_touchpoint?: string | null
+        created_at?: string | null
+        timestamp?: string | null
+        status?: string | null
+        metadata?: any
         unified_context?: {
           web?: { booking_date?: any; booking_time?: any }
           whatsapp?: { booking_date?: any; booking_time?: any }
@@ -549,16 +555,25 @@ export default function InboxPage() {
         .limit(1)
         .maybeSingle();
       
+      const typedWebSession = (webSession ?? {}) as {
+        booking_date?: string | null
+        booking_time?: string | number | null
+        booking_status?: string | null
+      }
+      // #region agent log
+      fetch('http://127.0.0.1:7244/ingest/ccc34e9d-10fc-4755-9d86-188049e8d67e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'inbox/page.tsx:551',message:'webSession shape',data:{hasSession:!!webSession,keys:typedWebSession?Object.keys(typedWebSession).slice(0,5):[]},timestamp:Date.now(),sessionId:'debug-session',runId:'inbox-msg',hypothesisId:'H13'})}).catch(()=>{});
+      // #endregion agent log
+      
       // Also check unified_context for booking data
       const bookingFromContext = typedLead.unified_context?.web?.booking_date || typedLead.unified_context?.whatsapp?.booking_date;
       const bookingTimeFromContext = typedLead.unified_context?.web?.booking_time || typedLead.unified_context?.whatsapp?.booking_time;
       
       // Convert booking_time to string if it's a Time object
       let bookingTime = null;
-      if (webSession?.booking_time) {
-        bookingTime = typeof webSession.booking_time === 'string' 
-          ? webSession.booking_time 
-          : String(webSession.booking_time);
+      if (typedWebSession.booking_time) {
+        bookingTime = typeof typedWebSession.booking_time === 'string' 
+          ? typedWebSession.booking_time 
+          : String(typedWebSession.booking_time);
       } else if (bookingTimeFromContext) {
         bookingTime = typeof bookingTimeFromContext === 'string'
           ? bookingTimeFromContext
@@ -571,22 +586,22 @@ export default function InboxPage() {
         name: typedLead.customer_name || 'Unknown',
         email: typedLead.email || '',
         phone: typedLead.phone || '',
-        source: lead.first_touchpoint || lead.last_touchpoint || 'web',
-        first_touchpoint: lead.first_touchpoint || null,
-        last_touchpoint: lead.last_touchpoint || null,
-        timestamp: lead.created_at || lead.timestamp,
-        status: lead.status || webSession?.booking_status || 'New Lead',
-        booking_date: webSession?.booking_date || bookingFromContext || null,
+        source: typedLead.first_touchpoint || typedLead.last_touchpoint || 'web',
+        first_touchpoint: typedLead.first_touchpoint || null,
+        last_touchpoint: typedLead.last_touchpoint || null,
+        timestamp: typedLead.created_at || typedLead.timestamp,
+        status: typedLead.status || typedWebSession.booking_status || 'New Lead',
+        booking_date: typedWebSession.booking_date || bookingFromContext || null,
         booking_time: bookingTime,
-        unified_context: lead.unified_context || null,
-        metadata: lead.metadata || {}
+        unified_context: typedLead.unified_context || null,
+        metadata: typedLead.metadata || {}
       };
       
       console.log('Lead modal data:', {
         booking_date: leadData.booking_date,
         booking_time: leadData.booking_time,
-        webSession,
-        unified_context: lead.unified_context
+        webSession: typedWebSession,
+        unified_context: typedLead.unified_context
       });
       
       setSelectedLead(leadData);

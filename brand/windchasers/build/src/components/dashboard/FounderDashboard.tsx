@@ -137,9 +137,31 @@ export default function FounderDashboard() {
       }
 
       if (lead) {
-        console.log('✅ Lead fetched:', lead.customer_name || 'Unknown')
+        const typedLead = lead as {
+          id?: string
+          customer_name?: string | null
+          email?: string | null
+          phone?: string | null
+          created_at?: string | null
+          last_interaction_at?: string | null
+          lead_score?: number | null
+          lead_stage?: string | null
+          sub_stage?: string | null
+          status?: string | null
+          first_touchpoint?: string | null
+          last_touchpoint?: string | null
+          metadata?: any
+          unified_context?: {
+            web?: { booking?: any; booking_date?: any; booking_time?: any }
+            whatsapp?: { booking?: any; booking_date?: any; booking_time?: any }
+          }
+        }
+        // #region agent log
+        fetch('http://127.0.0.1:7244/ingest/ccc34e9d-10fc-4755-9d86-188049e8d67e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'FounderDashboard.tsx:139',message:'lead fetch shape',data:{hasLead:!!lead,leadKeys:typedLead?Object.keys(typedLead).slice(0,6):[]},timestamp:Date.now(),sessionId:'debug-session',runId:'founder-lead',hypothesisId:'H16'})}).catch(()=>{});
+        // #endregion agent log
+        console.log('✅ Lead fetched:', typedLead.customer_name || 'Unknown')
         // Get booking data from unified_context
-        const unifiedContext = lead.unified_context || {}
+        const unifiedContext = typedLead.unified_context || {}
         const webBooking = unifiedContext?.web?.booking || {}
         const whatsappBooking = unifiedContext?.whatsapp?.booking || {}
         
@@ -159,19 +181,19 @@ export default function FounderDashboard() {
 
         // Convert to Lead type expected by LeadDetailsModal
         const modalLead: Lead = {
-          id: lead.id,
-          name: lead.customer_name || 'Unknown',
-          email: lead.email || '',
-          phone: lead.phone || '',
-          source: lead.first_touchpoint || lead.last_touchpoint || 'web',
-          first_touchpoint: lead.first_touchpoint || null,
-          last_touchpoint: lead.last_touchpoint || null,
-          timestamp: lead.created_at || new Date().toISOString(),
-          status: lead.status || null,
+          id: typedLead.id || '',
+          name: typedLead.customer_name || 'Unknown',
+          email: typedLead.email || '',
+          phone: typedLead.phone || '',
+          source: typedLead.first_touchpoint || typedLead.last_touchpoint || 'web',
+          first_touchpoint: typedLead.first_touchpoint || null,
+          last_touchpoint: typedLead.last_touchpoint || null,
+          timestamp: typedLead.created_at || new Date().toISOString(),
+          status: typedLead.status || null,
           booking_date: bookingDate,
           booking_time: bookingTime,
-          unified_context: lead.unified_context || null,
-          metadata: {},
+          unified_context: typedLead.unified_context || null,
+          metadata: typedLead.metadata || {},
         }
 
         console.log('✅ Setting selected lead and opening modal')

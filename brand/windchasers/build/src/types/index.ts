@@ -31,6 +31,7 @@ export interface Lead {
   sub_stage?: string | null
   stage_override?: boolean | null
   last_scored_at?: string | null
+  last_interaction_at?: string | null
   is_active_chat?: boolean | null
 }
 

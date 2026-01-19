@@ -9,6 +9,7 @@ import { useRouter } from 'next/navigation'
 import LeadStageSelector from './LeadStageSelector'
 import ActivityLoggerModal from './ActivityLoggerModal'
 import { LeadStage } from '@/types'
+import type { Lead as ScoreLead } from '@/types'
 import { calculateLeadScore as calculateLeadScoreUtil } from '@/lib/leadScoreCalculator'
 
 // Helper functions for IST date/time formatting
@@ -105,6 +106,7 @@ interface Lead {
   stage_override?: boolean | null
   last_scored_at?: string | null
   last_interaction_at?: string | null
+  created_at?: string | null
 }
 
 interface LeadDetailsModalProps {
@@ -155,7 +157,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
   const [activeTab, setActiveTab] = useState<'activity' | 'summary' | 'breakdown' | 'interaction'>('activity')
   const [showStageDropdown, setShowStageDropdown] = useState(false)
   const [showActivityModal, setShowActivityModal] = useState(false)
-  const stageButtonRef = useRef<HTMLDivElement>(null)
+  const stageButtonRef = useRef<HTMLButtonElement>(null)
   const [dropdownPosition, setDropdownPosition] = useState<'below' | 'above'>('below')
   const [pendingStageChange, setPendingStageChange] = useState<{
     oldStage: string | null
@@ -214,7 +216,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
   const calculateAndSetScore = async () => {
     if (!lead) return
     const leadData = freshLeadData || lead
-    const result = await calculateLeadScoreUtil(leadData)
+    const result = await calculateLeadScoreUtil(leadData as ScoreLead)
     setCalculatedScore(result)
   }
 
@@ -235,10 +237,27 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
       }
 
       if (data) {
+        const typedData = data as {
+          booking_date?: string | null
+          booking_time?: string | null
+          unified_context?: any
+          lead_stage?: string | null
+          sub_stage?: string | null
+          stage_override?: boolean | null
+          lead_score?: number | null
+          first_touchpoint?: string | null
+          last_touchpoint?: string | null
+          status?: string | null
+          created_at?: string | null
+          last_interaction_at?: string | null
+          customer_name?: string | null
+          email?: string | null
+          phone?: string | null
+        }
         // Get booking from multiple sources (same logic as loadQuickStats)
-        const unifiedContext = data.unified_context || lead.unified_context
+        const unifiedContext = typedData.unified_context || lead.unified_context
         const bookingDate = 
-          data.booking_date || 
+          typedData.booking_date || 
           lead.booking_date || 
           unifiedContext?.web?.booking_date || 
           unifiedContext?.web?.booking?.date ||
@@ -251,7 +270,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
           null
         
         const bookingTime = 
-          data.booking_time || 
+          typedData.booking_time || 
           lead.booking_time || 
           unifiedContext?.web?.booking_time || 
           unifiedContext?.web?.booking?.time ||
@@ -266,21 +285,21 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
         // Merge fresh data with existing lead prop
         const mergedLead: Lead = {
           ...lead,
-          name: data.customer_name || lead.name,
-          email: data.email || lead.email,
-          phone: data.phone || lead.phone,
-          timestamp: data.created_at || lead.timestamp,
-          last_interaction_at: data.last_interaction_at || lead.last_interaction_at || null,
+          name: typedData.customer_name || lead.name,
+          email: typedData.email || lead.email,
+          phone: typedData.phone || lead.phone,
+          timestamp: typedData.created_at || lead.timestamp,
+          last_interaction_at: typedData.last_interaction_at || lead.last_interaction_at || null,
           booking_date: bookingDate,
           booking_time: bookingTime,
-          lead_score: data.lead_score ?? lead.lead_score ?? null,
-          lead_stage: data.lead_stage || lead.lead_stage || null,
-          sub_stage: data.sub_stage || lead.sub_stage || null,
-          stage_override: data.stage_override ?? lead.stage_override ?? null,
-          unified_context: data.unified_context || lead.unified_context || null,
-          first_touchpoint: data.first_touchpoint || lead.first_touchpoint || null,
-          last_touchpoint: data.last_touchpoint || lead.last_touchpoint || null,
-          status: data.status || lead.status || null,
+          lead_score: typedData.lead_score ?? lead.lead_score ?? null,
+          lead_stage: typedData.lead_stage || lead.lead_stage || null,
+          sub_stage: typedData.sub_stage || lead.sub_stage || null,
+          stage_override: typedData.stage_override ?? lead.stage_override ?? null,
+          unified_context: typedData.unified_context || lead.unified_context || null,
+          first_touchpoint: typedData.first_touchpoint || lead.first_touchpoint || null,
+          last_touchpoint: typedData.last_touchpoint || lead.last_touchpoint || null,
+          status: typedData.status || lead.status || null,
         }
         setFreshLeadData(mergedLead)
       }
@@ -317,6 +336,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
         return
       }
       
+      const typedMessages30Days = (messages30Days ?? []) as Array<{ created_at?: string | null }>
       // Group messages by date for first 30 days
       const dailyCounts: Record<string, number> = {}
       
@@ -329,7 +349,8 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
       }
       
       // Count messages per day
-      messages30Days?.forEach((msg: any) => {
+      typedMessages30Days.forEach((msg) => {
+        if (!msg.created_at) return
         const dateStr = new Date(msg.created_at).toISOString().split('T')[0]
         if (dailyCounts[dateStr] !== undefined) {
           dailyCounts[dateStr] = (dailyCounts[dateStr] || 0) + 1
@@ -342,13 +363,13 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
         .sort((a, b) => a.date.localeCompare(b.date))
       
       // Calculate total interactions
-      const totalInteractions = messages30Days?.length || 0
+      const totalInteractions = typedMessages30Days.length
       
       // Calculate last touch day (most recent day with interactions)
       let lastTouchDay: string | null = null
-      if (messages30Days && messages30Days.length > 0) {
-        const lastMessage = messages30Days[messages30Days.length - 1]
-        const lastDate = new Date(lastMessage.created_at)
+      if (typedMessages30Days.length > 0) {
+        const lastMessage = typedMessages30Days[typedMessages30Days.length - 1]
+        const lastDate = lastMessage.created_at ? new Date(lastMessage.created_at) : new Date()
         lastTouchDay = lastDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
       }
       
@@ -508,6 +529,12 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
         .select('booking_date, booking_time, unified_context')
         .eq('id', lead.id)
         .single()
+      
+      const typedLeadData = leadData as {
+        booking_date?: string | null
+        booking_time?: string | null
+        unified_context?: any
+      } | null
 
       if (messages && Array.isArray(messages) && messages.length > 0) {
         // Calculate response rate: (agent replies / customer messages) * 100
@@ -555,9 +582,9 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
           : 0
 
         // Check booking from multiple sources - prioritize fresh data
-        const unifiedContext = leadData?.unified_context || lead.unified_context
+        const unifiedContext = typedLeadData?.unified_context || lead.unified_context
         const bookingDate = 
-          leadData?.booking_date || 
+          typedLeadData?.booking_date || 
           lead.booking_date || 
           unifiedContext?.web?.booking_date || 
           unifiedContext?.web?.booking?.date ||
@@ -570,7 +597,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
           null
         
         const bookingTime = 
-          leadData?.booking_time || 
+          typedLeadData?.booking_time || 
           lead.booking_time || 
           unifiedContext?.web?.booking_time || 
           unifiedContext?.web?.booking?.time ||
@@ -592,9 +619,9 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
         })
       } else {
         // Even with no messages, check for booking
-        const unifiedContext = leadData?.unified_context || lead.unified_context
+        const unifiedContext = typedLeadData?.unified_context || lead.unified_context
         const bookingDate = 
-          leadData?.booking_date || 
+          typedLeadData?.booking_date || 
           lead.booking_date || 
           unifiedContext?.web?.booking_date || 
           unifiedContext?.web?.booking?.date ||
@@ -607,7 +634,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
           null
         
         const bookingTime = 
-          leadData?.booking_time || 
+          typedLeadData?.booking_time || 
           lead.booking_time || 
           unifiedContext?.web?.booking_time || 
           unifiedContext?.web?.booking?.time ||
