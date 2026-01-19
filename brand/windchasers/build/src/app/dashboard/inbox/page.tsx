@@ -371,8 +371,12 @@ export default function InboxPage() {
           console.error('❌ Diagnostic: Cannot query messages for leads:', diagError.message)
         } else {
           console.log('🔍 Diagnostic: Messages for sample leads:', diagnosticMessages?.length || 0)
-          if (diagnosticMessages && diagnosticMessages.length > 0) {
-            console.log('   Sample message lead_ids:', diagnosticMessages.map(m => m.lead_id))
+          const diagMessages = (diagnosticMessages ?? []) as Array<{ lead_id?: string | null; id?: string | null }>
+          // #region agent log
+          fetch('http://127.0.0.1:7244/ingest/ccc34e9d-10fc-4755-9d86-188049e8d67e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'inbox/page.tsx:373',message:'diagnostic messages shape',data:{count:diagMessages.length,hasFirst:!!diagMessages[0],firstKeys:diagMessages[0]?Object.keys(diagMessages[0]).slice(0,5):[]},timestamp:Date.now(),sessionId:'debug-session',runId:'inbox-msg',hypothesisId:'H8'})}).catch(()=>{});
+          // #endregion agent log
+          if (diagMessages.length > 0) {
+            console.log('   Sample message lead_ids:', diagMessages.map(m => m.lead_id))
           }
         }
       }
