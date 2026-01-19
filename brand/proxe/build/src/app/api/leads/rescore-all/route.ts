@@ -90,24 +90,18 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Update days_inactive for all leads
-    const { error: updateError } = await supabase.rpc('update_lead_metrics', {
-      // This will be called per lead, but we can also do a bulk update
-    })
-
-    // Bulk update days_inactive for all leads
-    const { error: bulkUpdateError } = await supabase
-      .from('all_leads')
-      .update({
-        days_inactive: supabase.raw(`
-          GREATEST(0, EXTRACT(EPOCH FROM (NOW() - COALESCE(last_interaction_at, created_at))) / 86400)::INTEGER
-        `),
-      })
-      .not('lead_stage', 'in', '(converted,closed_lost)')
-
-    if (bulkUpdateError) {
-      console.error('Error bulk updating days_inactive:', bulkUpdateError)
-    }
+    // Update days_inactive for all leads using RPC function
+    // Note: days_inactive is updated per-lead via update_lead_metrics RPC during scoring
+    // If you need a bulk update, create an RPC function in Supabase:
+    // CREATE OR REPLACE FUNCTION bulk_update_days_inactive()
+    // RETURNS void AS $$
+    // UPDATE all_leads
+    // SET days_inactive = GREATEST(0, EXTRACT(EPOCH FROM (NOW() - COALESCE(last_interaction_at, created_at))) / 86400)::INTEGER
+    // WHERE lead_stage NOT IN ('converted', 'closed_lost');
+    // $$ LANGUAGE sql;
+    
+    // For now, days_inactive is updated during the per-lead scoring process above
+    // via the update_lead_metrics RPC function
 
     return NextResponse.json({
       success: true,

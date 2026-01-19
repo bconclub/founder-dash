@@ -101,11 +101,13 @@ export async function POST(request: NextRequest) {
 
     // Alternative: Try to call update function directly
     try {
+      // Get user for RPC call (auth is disabled but we need user_uuid for the function)
+      const { data: { user } } = await supabase.auth.getUser()
       const { data: updateResult, error: updateError } = await supabase.rpc(
         'update_lead_score_and_stage',
         {
           lead_uuid: lead_id,
-          user_uuid: user.id,
+          user_uuid: user?.id || null,
         }
       )
 
