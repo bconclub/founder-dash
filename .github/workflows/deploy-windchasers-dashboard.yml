@@ -6,7 +6,7 @@ on:
       - production
       - main
     paths:
-      - 'brand/windchasers/build/**'
+      - 'brand/windchasers/dashboard/build/**'
       - '.github/workflows/deploy-windchasers-dashboard.yml'
   workflow_dispatch:
 
