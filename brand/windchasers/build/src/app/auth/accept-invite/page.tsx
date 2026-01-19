@@ -101,19 +101,20 @@ function AcceptInviteForm() {
 
     // Mark invitation as accepted
     if (authData.user) {
-      const { error: updateError } = await supabase
+      // Type assertion needed due to missing type definitions for user_invitations table
+      const { error: updateError } = await (supabase as any)
         .from('user_invitations')
-        .update({ accepted_at: new Date().toISOString() } as any)
+        .update({ accepted_at: new Date().toISOString() })
         .eq('token', token)
 
       if (updateError) {
         console.error('Error updating invitation:', updateError)
       }
 
-      // Update dashboard_user role
-      const { error: roleError } = await supabase
+      // Type assertion needed due to missing type definitions for dashboard_users table
+      const { error: roleError } = await (supabase as any)
         .from('dashboard_users')
-        .update({ role: invitation.role } as any)
+        .update({ role: invitation.role })
         .eq('id', authData.user.id)
 
       if (roleError) {
