@@ -23,6 +23,11 @@ export async function middleware(request: NextRequest) {
     return await updateSession(request)
   }
   
+  // Skip auth check for widget preview page (public preview) - return immediately without session update
+  if (request.nextUrl.pathname === '/widget' || request.nextUrl.pathname.startsWith('/widget/')) {
+    return NextResponse.next()
+  }
+  
   // Update session for all other routes (including dashboard)
   return await updateSession(request)
 }
@@ -34,9 +39,10 @@ export const config = {
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
+     * - widget (public widget preview page)
      * - public folder
      */
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|widget|widget/|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }
 
