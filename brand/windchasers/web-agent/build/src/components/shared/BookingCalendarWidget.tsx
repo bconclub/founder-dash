@@ -106,6 +106,13 @@ export function BookingCalendarWidget({
     return `${year}-${month}-${day}`;
   };
 
+  // Helper to get absolute API URL (works in iframe)
+  const getApiUrl = (path: string) => {
+    if (typeof window === 'undefined') return path;
+    if (path.startsWith('http')) return path;
+    return `${window.location.origin}${path.startsWith('/') ? path : `/${path}`}`;
+  };
+
   // Check availability when date is selected
   useEffect(() => {
     if (selectedDate && !showForm && !showConfirmation) {
@@ -119,13 +126,6 @@ export function BookingCalendarWidget({
     setLoadingAvailability(true);
     setBookingError(null);
     setIsWarning(false);
-
-    // Helper to get absolute API URL (works in iframe)
-    const getApiUrl = (path: string) => {
-      if (typeof window === 'undefined') return path;
-      if (path.startsWith('http')) return path;
-      return `${window.location.origin}${path.startsWith('/') ? path : `/${path}`}`;
-    };
 
     try {
       const dateStr = formatDateForAPI(selectedDate);
