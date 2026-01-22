@@ -60,7 +60,6 @@ jobs:
           username: ${{ secrets.VPS_USERNAME }}
           key: ${{ secrets.VPS_DEPLOY_KEY }}
           port: ${{ secrets.VPS_SSH_PORT || 22 }}
-          port: 22
           timeout: 300s
           script: |
             cd /var/www/proxe-dashboard
