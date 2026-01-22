@@ -12,7 +12,7 @@ export default function WebAgentSettingsClient() {
   useEffect(() => {
     // Ensure iframe loads when component mounts
     if (iframeRef.current) {
-      iframeRef.current.src = '/widget'
+      iframeRef.current.src = 'https://widget.proxe.windchasers.in/widget'
     }
   }, [])
 
@@ -39,7 +39,7 @@ export default function WebAgentSettingsClient() {
       
       // Reload the iframe to reset the widget state
       if (iframeRef.current) {
-        iframeRef.current.src = '/widget'
+        iframeRef.current.src = 'https://widget.proxe.windchasers.in/widget'
       }
       
       setTimeout(() => {
@@ -228,7 +228,7 @@ export default function WebAgentSettingsClient() {
           >
             <iframe
               ref={iframeRef}
-              src="/widget"
+              src="https://widget.proxe.windchasers.in/widget"
               className="w-full h-full border-0"
               style={{
                 width: '100%',
