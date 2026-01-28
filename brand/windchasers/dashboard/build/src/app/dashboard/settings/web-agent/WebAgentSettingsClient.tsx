@@ -14,7 +14,7 @@ export default function WebAgentSettingsClient() {
     const widgetUrl = process.env.NEXT_PUBLIC_WEB_AGENT_URL 
       ? `${process.env.NEXT_PUBLIC_WEB_AGENT_URL}/widget`
       : typeof window !== 'undefined' && window.location.hostname === 'localhost'
-      ? 'http://localhost:3001/widget'
+      ? 'http://localhost:4003/widget'
       : 'https://widget.proxe.windchasers.in/widget'
     
     // Ensure iframe loads when component mounts
@@ -48,7 +48,7 @@ export default function WebAgentSettingsClient() {
       const widgetUrl = process.env.NEXT_PUBLIC_WEB_AGENT_URL 
         ? `${process.env.NEXT_PUBLIC_WEB_AGENT_URL}/widget`
         : typeof window !== 'undefined' && window.location.hostname === 'localhost'
-        ? 'http://localhost:3001/widget'
+        ? 'http://localhost:4003/widget'
         : 'https://widget.proxe.windchasers.in/widget'
       
       // Reload the iframe to reset the widget state
@@ -245,7 +245,7 @@ export default function WebAgentSettingsClient() {
               src={process.env.NEXT_PUBLIC_WEB_AGENT_URL 
                 ? `${process.env.NEXT_PUBLIC_WEB_AGENT_URL}/widget`
                 : typeof window !== 'undefined' && window.location.hostname === 'localhost'
-                ? 'http://localhost:3001/widget'
+                ? 'http://localhost:4003/widget'
                 : 'https://widget.proxe.windchasers.in/widget'}
               className="w-full h-full border-0"
               style={{

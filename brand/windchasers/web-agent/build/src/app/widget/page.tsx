@@ -11,6 +11,7 @@ import '@/styles/theme.css'
  */
 export default function WidgetPage() {
   const [mounted, setMounted] = useState(false)
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || '/api/chat'
 
   useEffect(() => {
     setMounted(true)
@@ -19,24 +20,32 @@ export default function WidgetPage() {
   if (!mounted) {
     return (
       <div style={{ 
-        width: '100%', 
+        width: '100vw', 
         height: '100vh',
         backgroundColor: 'transparent',
-        position: 'relative',
-        overflow: 'hidden'
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        overflow: 'hidden',
+        margin: 0,
+        padding: 0
       }} />
     )
   }
 
   return (
     <div style={{ 
-      width: '100%', 
+      width: '100vw', 
       height: '100vh',
       backgroundColor: 'transparent',
-      position: 'relative',
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      margin: 0,
+      padding: 0,
       overflow: 'hidden'
     }}>
-      <ChatWidget widgetStyle="searchbar" />
+      <ChatWidget apiUrl={apiUrl} widgetStyle="searchbar" />
     </div>
   )
 }
