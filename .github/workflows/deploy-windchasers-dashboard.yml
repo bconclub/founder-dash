@@ -261,6 +261,16 @@ jobs:
               echo "⚠️  WARNING: .next/static/chunks directory not found"
             fi
             
+            # Cache .next/cache directory for faster subsequent builds
+            if [ -d ".next/cache" ]; then
+              echo "💾 Caching .next/cache..."
+              rm -rf "$CACHE_DIR/.next-cache"
+              cp -r .next/cache "$CACHE_DIR/.next-cache" 2>/dev/null || echo "⚠️  Cache save failed"
+            fi
+            
+            BUILD_DURATION=$(($(date +%s) - BUILD_START))
+            echo "✅ Build completed in ${BUILD_DURATION}s"
+            
             # Create logs directory if it doesn't exist
             mkdir -p logs
             
