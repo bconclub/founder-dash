@@ -782,6 +782,9 @@ export async function POST(request: NextRequest) {
             .replace(/^(Hi|Hello|Hey),?\s*/gi, '')
             .trim();
 
+          // Initialize leadId variable (may be set by updateSessionProfile below)
+          let leadId: string | null = null;
+
           // Update session profile with client-provided data (if any)
           // This ensures profile data is saved to database and lead_id is created/updated
           // CRITICAL: This must happen BEFORE lead_id fetch to ensure data is saved
@@ -849,8 +852,9 @@ export async function POST(request: NextRequest) {
 
           // Fetch lead_id now (after profile may have been updated)
           // Also try to ensure lead exists if we have profile data
-          let leadId: string | null = null;
-          if (externalSessionId) {
+          // NOTE: leadId may already be set from updateSessionProfile above
+          // Only fetch if not already set
+          if (!leadId && externalSessionId) {
             try {
               const supabase = getSupabaseClient();
               if (!supabase) {
@@ -1010,6 +1014,17 @@ export async function POST(request: NextRequest) {
               });
             }
           } else {
+            // CRITICAL DEBUG: Log why leadId is null - this is the root cause
+            console.error('[Chat API] ✗✗✗ CRITICAL: leadId is NULL when trying to log customer message', {
+              externalSessionId,
+              hasUpdateSessionProfileResult: !!updateResultLeadId,
+              updateResultLeadId,
+              updateResultLeadIdValue: updateResultLeadId || 'NULL',
+              currentLeadId: leadId || 'NULL',
+              message: 'This message will NOT be logged - messages require leadId',
+              troubleshooting: 'Check if updateSessionProfile returned leadId and if it was assigned to leadId variable'
+            });
+            
             console.log('[Chat API] ✗ No lead_id available, skipping customer message logging', {
               externalSessionId,
               hasSupabaseClient: !!getSupabaseClient(),
