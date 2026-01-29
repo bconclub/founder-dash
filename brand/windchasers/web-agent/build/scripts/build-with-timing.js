@@ -50,23 +50,18 @@ try {
     }
   });
   
-  // Build command - use raw next build to avoid recursion
+  // Build command - directly call next build to avoid recursion
   const buildCommand = skipTypeCheck 
     ? 'node node_modules/.bin/next build --no-lint'
     : 'node node_modules/.bin/next build';
   
-  // If build:raw script exists, use it to avoid recursion
-  const useRawBuild = process.env.USE_RAW_BUILD === 'true';
-  const finalCommand = useRawBuild ? 'npm run build:raw' : buildCommand;
-  
   logStep('Next.js build', () => {
-    execSync(finalCommand, {
+    execSync(buildCommand, {
       stdio: 'inherit',
       env: {
         ...process.env,
         NODE_ENV: nodeEnv,
         NODE_OPTIONS: process.env.NODE_OPTIONS || '--max-old-space-size=4096',
-        USE_RAW_BUILD: 'true', // Prevent recursion
       },
     });
   });
