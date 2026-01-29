@@ -77,8 +77,8 @@ jobs:
           username: ${{ secrets.WINDCHASERS_VPS_USER }}
           key: ${{ secrets.WINDCHASERS_VPS_SSH_KEY }}
           port: 22
-          timeout: 900s
-          command_timeout: 15m
+          timeout: 1200s
+          command_timeout: 20m
           script: |
             cd /var/www/windchasers-web-agent
             
@@ -112,6 +112,12 @@ jobs:
             CACHE_DIR="/var/cache/windchasers-web-agent"
             mkdir -p "$CACHE_DIR/node_modules" "$CACHE_DIR/.next-cache"
             
+            # Clean existing node_modules to avoid conflicts
+            if [ -d "node_modules" ]; then
+              echo "🧹 Cleaning existing node_modules..."
+              rm -rf node_modules
+            fi
+            
             # Check if node_modules cache exists and is valid
             if [ -d "$CACHE_DIR/node_modules" ] && [ -f "$CACHE_DIR/node_modules/.cache-valid" ]; then
               CACHE_LOCK_HASH=$(cat "$CACHE_DIR/node_modules/.cache-valid" 2>/dev/null || echo "")
@@ -119,9 +125,13 @@ jobs:
               
               if [ "$CACHE_LOCK_HASH" = "$CURRENT_LOCK_HASH" ] && [ -n "$CURRENT_LOCK_HASH" ]; then
                 echo "✅ Using cached node_modules (lockfile unchanged)"
-                cp -r "$CACHE_DIR/node_modules" ./ || echo "⚠️  Cache copy failed, will reinstall"
+                cp -r "$CACHE_DIR/node_modules" ./ || {
+                  echo "⚠️  Cache copy failed, will reinstall"
+                  rm -rf node_modules
+                }
               else
                 echo "⚠️  Cache invalid (lockfile changed), will reinstall"
+                rm -rf "$CACHE_DIR/node_modules" 2>/dev/null || true
               fi
             fi
             
@@ -130,18 +140,27 @@ jobs:
             echo "⏱️  Start time: $(date +%H:%M:%S)"
             INSTALL_START=$(date +%s)
             
-            # Set production environment variables
+            # Set production environment variables (but keep devDeps for build)
             export NODE_ENV=production
             export NEXT_TELEMETRY_DISABLED=1
-            export NPM_CONFIG_PRODUCTION=false  # Keep devDeps for build (TypeScript, etc.)
+            unset NPM_CONFIG_PRODUCTION  # Remove to avoid warning, we need devDeps
             
             # Use npm ci for faster, reliable installs
-            # .npmrc already configured for production optimizations
-            # Note: We need devDependencies for building Next.js (TypeScript, etc.)
-            npm ci --prefer-offline --no-audit --no-fund --loglevel=warn || {
-              echo "⚠️  npm ci failed, trying npm install..."
-              npm install --prefer-offline --no-audit --no-fund --loglevel=warn
-            }
+            # Clean install to avoid conflicts
+            if [ ! -d "node_modules" ] || [ ! -f "node_modules/.package-lock.json" ]; then
+              echo "📥 Running npm ci..."
+              npm ci --prefer-offline --no-audit --no-fund --loglevel=warn 2>&1 | grep -v "warn config production" || {
+                echo "⚠️  npm ci failed, cleaning and retrying..."
+                rm -rf node_modules package-lock.json
+                npm install --package-lock-only --prefer-offline --no-audit --no-fund --loglevel=warn 2>&1 | grep -v "warn config production" || true
+                npm ci --prefer-offline --no-audit --no-fund --loglevel=warn 2>&1 | grep -v "warn config production" || {
+                  echo "⚠️  npm ci failed again, using npm install..."
+                  npm install --prefer-offline --no-audit --no-fund --loglevel=warn 2>&1 | grep -v "warn config production"
+                }
+              }
+            else
+              echo "✅ Using existing node_modules"
+            fi
             
             # Cache node_modules if install succeeded
             if [ -d "node_modules" ]; then
