@@ -116,7 +116,7 @@ jobs:
             echo "⏱️  Start time: $(date +%H:%M:%S)"
             INSTALL_START=$(date +%s)
             
-            npm ci --prefer-offline --no-audit --no-fund --loglevel=warn
+            npm ci --include=dev --prefer-offline --no-audit --no-fund --loglevel=warn
             
             INSTALL_DURATION=$(($(date +%s) - INSTALL_START))
             echo "✅ Dependencies installed in ${INSTALL_DURATION}s"
