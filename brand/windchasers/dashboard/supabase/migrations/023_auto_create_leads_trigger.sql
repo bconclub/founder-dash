@@ -198,14 +198,15 @@ CREATE TRIGGER trigger_auto_create_lead_on_insert
   WHEN (NEW.customer_phone IS NOT NULL AND NEW.brand = 'windchasers')
   EXECUTE FUNCTION auto_create_lead_from_session();
 
--- Step 5: Test the trigger with existing session
--- This will create leads for existing sessions that have phone but no lead_id
+-- Step 5: Backfill existing sessions (one-time, automatic)
+-- This automatically creates leads for existing sessions that have phone but no lead_id
+-- Runs automatically when migration is executed - no manual steps needed
 DO $$
 DECLARE
   session_record RECORD;
   updated_count INTEGER := 0;
 BEGIN
-  -- Update sessions to trigger the trigger
+  -- Update sessions to trigger the trigger (automatic backfill)
   FOR session_record IN 
     SELECT external_session_id
     FROM web_sessions
@@ -213,7 +214,7 @@ BEGIN
       AND customer_phone IS NOT NULL
       AND lead_id IS NULL
   LOOP
-    -- Trigger update to fire the trigger
+    -- Trigger update to fire the trigger (automatic)
     UPDATE web_sessions
     SET updated_at = updated_at  -- Touch the record to trigger
     WHERE external_session_id = session_record.external_session_id;
@@ -221,9 +222,13 @@ BEGIN
     updated_count := updated_count + 1;
   END LOOP;
   
-  RAISE NOTICE 'Triggered lead creation for % sessions', updated_count;
+  RAISE NOTICE 'Automatically created leads for % existing sessions', updated_count;
 END $$;
 
 -- Migration complete!
--- Now whenever a web_session is updated with a phone number, a lead will be automatically created
--- This works as a backup to the application-level ensureAllLeads function
+-- The trigger is now fully automatic:
+-- 1. Automatically fires on INSERT when new session has phone
+-- 2. Automatically fires on UPDATE when session gets phone number
+-- 3. Automatically creates leads without any manual intervention
+-- 4. Works as backup to application-level ensureAllLeads function
+-- 5. One-time backfill of existing sessions happens automatically when migration runs

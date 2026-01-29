@@ -1,4 +1,4 @@
-import { getSupabaseClient } from './supabase';
+import { getSupabaseClient, getSupabaseServiceClient } from './supabase';
 
 // Channel type definition
 // NOTE: Full type includes all 4 channels for future use
@@ -169,20 +169,36 @@ export async function ensureAllLeads(
     externalSessionId
   });
 
-  const supabase = getSupabaseClient();
+  // Use service role client for lead creation (bypasses RLS, more reliable)
+  // Fallback to anon client if service client unavailable
+  let supabase = getSupabaseServiceClient();
+  const usingServiceClient = !!supabase;
+  
   if (!supabase) {
-    console.error('[ensureAllLeads] Supabase client not available', {
+    console.warn('[ensureAllLeads] Service role client not available, falling back to anon client', {
+      hasServiceKey: !!process.env.WINDCHASERS_SUPABASE_SERVICE_KEY,
       envCheck: {
         hasUrl: !!process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL || !!process.env.WINDCHASERS_SUPABASE_URL,
-        hasKey: !!process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_ANON_KEY || !!process.env.WINDCHASERS_SUPABASE_ANON_KEY
+        hasAnonKey: !!process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_ANON_KEY || !!process.env.WINDCHASERS_SUPABASE_ANON_KEY
+      }
+    });
+    supabase = getSupabaseClient();
+  } else {
+    console.log('[ensureAllLeads] Using service role client (bypasses RLS)', {
+      urlPrefix: process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL?.substring(0, 20) || 'N/A'
+    });
+  }
+  
+  if (!supabase) {
+    console.error('[ensureAllLeads] No Supabase client available (neither service nor anon)', {
+      envCheck: {
+        hasServiceKey: !!process.env.WINDCHASERS_SUPABASE_SERVICE_KEY,
+        hasUrl: !!process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL || !!process.env.WINDCHASERS_SUPABASE_URL,
+        hasAnonKey: !!process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_ANON_KEY || !!process.env.WINDCHASERS_SUPABASE_ANON_KEY
       }
     });
     return null;
   }
-  
-  console.log('[ensureAllLeads] Supabase client available', {
-    urlPrefix: process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL?.substring(0, 20) || 'N/A'
-  });
 
   // Phone is REQUIRED for lead creation - email alone is not enough
   const normalizedPhone = normalizePhone(phone);
