@@ -40,7 +40,7 @@ async function getAuthClient() {
 
 export async function POST(request: NextRequest) {
   try {
-    const { date, time, name, email, phone, brand = 'proxe', sessionId } = await request.json();
+    const { date, time, name, email, phone, brand = 'windchasers', sessionId, courseDetails, courseInterest, sessionType } = await request.json();
 
     if (!date || !time || !name || !email || !phone) {
       return NextResponse.json(
@@ -51,14 +51,16 @@ export async function POST(request: NextRequest) {
 
     // Helper function to get Supabase client
     const getSupabaseClient = () => {
-      const supabaseUrl = process.env.PROXE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-      const supabaseKey = process.env.PROXE_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+      const supabaseUrl = process.env.WINDCHASERS_SUPABASE_URL || process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL;
+      const supabaseKey = process.env.WINDCHASERS_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_ANON_KEY;
       if (!supabaseUrl || !supabaseKey) return null;
       return createClient(supabaseUrl, supabaseKey);
     };
 
     // Find sessionId if not provided (by email or phone)
     let externalSessionId = sessionId;
+    let sessionData: any = null;
+    
     if (!externalSessionId) {
       try {
         const supabase = getSupabaseClient();
@@ -97,10 +99,122 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Fetch session data to get course details and conversation summary
+    if (externalSessionId) {
+      try {
+        const supabase = getSupabaseClient();
+        if (supabase) {
+          const { data: session } = await supabase
+            .from('web_sessions')
+            .select('conversation_summary, user_inputs_summary, customer_name, customer_phone, customer_email, lead_id')
+            .eq('external_session_id', externalSessionId)
+            .eq('brand', brand.toLowerCase())
+            .maybeSingle();
+          
+          if (session) {
+            sessionData = session;
+            
+            // Try to get course interest from all_leads unified_context if lead_id exists
+            if (session.lead_id) {
+              try {
+                const { data: leadData } = await supabase
+                  .from('all_leads')
+                  .select('unified_context')
+                  .eq('id', session.lead_id)
+                  .maybeSingle();
+                
+                if (leadData?.unified_context?.windchasers?.course_interest) {
+                  sessionData.course_interest = leadData.unified_context.windchasers.course_interest;
+                }
+              } catch (leadError) {
+                console.warn('[Booking API] Could not fetch lead data:', leadError);
+              }
+            }
+          }
+        }
+      } catch (sessionFetchError) {
+        console.warn('[Booking API] Could not fetch session data:', sessionFetchError);
+      }
+    }
+
+    // Extract course information from session data or provided parameters
+    let courseInfo = courseDetails || courseInterest || '';
+    let conversationSummary = '';
+    let detectedSessionType = sessionType || '';
+    
+    if (sessionData) {
+      // Get course interest from session data (from all_leads unified_context)
+      if (sessionData.course_interest && !courseInfo) {
+        courseInfo = sessionData.course_interest;
+      }
+      
+      // Also try to extract from user_inputs_summary as fallback
+      if (!courseInfo && sessionData.user_inputs_summary && Array.isArray(sessionData.user_inputs_summary)) {
+        // Look for course-related inputs in the conversation
+        const courseKeywords = ['pilot', 'helicopter', 'drone', 'cabin'];
+        for (const input of sessionData.user_inputs_summary) {
+          const inputText = (input.input || '').toLowerCase();
+          for (const keyword of courseKeywords) {
+            if (inputText.includes(keyword)) {
+              courseInfo = keyword;
+              break;
+            }
+          }
+          if (courseInfo) break;
+        }
+      }
+      
+      // Get conversation summary
+      if (sessionData.conversation_summary) {
+        conversationSummary = sessionData.conversation_summary;
+      }
+      
+      // Detect session type from conversation summary or user inputs if not provided
+      if (!detectedSessionType) {
+        const summaryText = (conversationSummary || '').toLowerCase();
+        const allText = summaryText + ' ' + (sessionData.user_inputs_summary || [])
+          .map((input: any) => (input.input || '').toLowerCase())
+          .join(' ');
+        
+        // Keywords for offline/facility visit
+        const offlineKeywords = ['offline', 'facility', 'visit', 'in-person', 'in person', 'campus', 'center', 'office', 'location', 'come to', 'visit us', 'physical'];
+        // Keywords for online
+        const onlineKeywords = ['online', 'zoom', 'video', 'virtual', 'call', 'meeting', 'remote', 'skype', 'google meet', 'teams'];
+        
+        const hasOfflineKeywords = offlineKeywords.some(keyword => allText.includes(keyword));
+        const hasOnlineKeywords = onlineKeywords.some(keyword => allText.includes(keyword));
+        
+        if (hasOfflineKeywords && !hasOnlineKeywords) {
+          detectedSessionType = 'offline';
+        } else if (hasOnlineKeywords && !hasOfflineKeywords) {
+          detectedSessionType = 'online';
+        } else if (hasOfflineKeywords && hasOnlineKeywords) {
+          // If both are mentioned, prioritize offline if facility/visit is mentioned
+          if (allText.includes('facility') || allText.includes('visit') || allText.includes('campus')) {
+            detectedSessionType = 'offline';
+          } else {
+            detectedSessionType = 'online';
+          }
+        }
+      }
+    }
+
+    // Map course interest codes to readable names
+    const courseNameMap: Record<string, string> = {
+      'pilot': 'Pilot Training',
+      'helicopter': 'Helicopter Training',
+      'drone': 'Drone Training',
+      'cabin': 'Cabin Crew Training',
+    };
+    
+    const courseDisplayName = courseInfo && courseNameMap[courseInfo.toLowerCase()] 
+      ? courseNameMap[courseInfo.toLowerCase()] 
+      : courseInfo || 'Aviation Course Inquiry';
+
     // Check for existing booking by phone or email
     let existingBooking = null;
     try {
-      existingBooking = await checkExistingBooking(phone, email, brand as 'proxe');
+      existingBooking = await checkExistingBooking(phone, email, brand as 'windchasers');
     } catch (bookingCheckError) {
       // Log error but don't crash - allow booking to proceed
       console.error('[Booking API] Error checking existing booking:', bookingCheckError);
@@ -163,15 +277,59 @@ export async function POST(request: NextRequest) {
     // Format display time
     const displayTime = formatTimeForDisplay(`${hour}:${minute.toString().padStart(2, '0')}`);
 
-    // Event title
-    const eventTitle = 'PROXe Demo';
+    // Event title: Candidate Name - Course Details [Session Type]
+    let eventTitle = `${name} - ${courseDisplayName}`;
+    if (detectedSessionType) {
+      const sessionTypeLabel = detectedSessionType === 'offline' ? 'Facility Visit' : 'Online';
+      eventTitle += ` [${sessionTypeLabel}]`;
+    }
+
+    // Build rich description with course details and conversation summary
+    let description = `Windchasers Aviation Academy - Consultation Booking\n\n`;
+    description += `Candidate Information:\n`;
+    description += `Name: ${name}\n`;
+    description += `Email: ${email}\n`;
+    description += `Phone: ${phone}\n\n`;
+    
+    if (courseDisplayName && courseDisplayName !== 'Aviation Course Inquiry') {
+      description += `Course Interest: ${courseDisplayName}\n\n`;
+    }
+    
+    // Add session type (offline/facility visit vs online)
+    if (detectedSessionType) {
+      const sessionTypeDisplay = detectedSessionType === 'offline' 
+        ? 'Offline / Facility Visit' 
+        : detectedSessionType === 'online' 
+        ? 'Online Session' 
+        : detectedSessionType;
+      description += `Session Type: ${sessionTypeDisplay}\n\n`;
+    }
+    
+    if (conversationSummary) {
+      description += `Conversation Summary:\n${conversationSummary}\n\n`;
+    }
+    
+    description += `Booking Details:\n`;
+    description += `Date: ${formatDate(date)}\n`;
+    description += `Time: ${displayTime}\n\n`;
+    
+    // Add location based on session type
+    if (detectedSessionType === 'offline') {
+      description += `Location: Windchasers Aviation Academy Facility\n`;
+      description += `(Please confirm exact address with candidate)\n\n`;
+    } else if (detectedSessionType === 'online') {
+      description += `Location: Online Session (Video Call)\n`;
+      description += `(Meeting link will be shared separately)\n\n`;
+    }
+    
+    description += `Contact: ${email}`;
 
     // Create event
     // Note: Service accounts cannot invite attendees without Domain-Wide Delegation
     // However, we'll try to add them and handle the error gracefully
-    const event = {
+    const event: any = {
       summary: eventTitle,
-      description: `${eventTitle}\n\nMeeting Booking Details:\n\nName: ${name}\nEmail: ${email}\nPhone: ${phone}\n\nContact: ${email}`,
+      description: description,
       start: {
         dateTime: eventStart,
         timeZone: TIMEZONE,
@@ -191,6 +349,13 @@ export async function POST(request: NextRequest) {
         ],
       },
     };
+
+    // Add location based on session type
+    if (detectedSessionType === 'offline') {
+      event.location = 'Windchasers Aviation Academy Facility';
+    } else if (detectedSessionType === 'online') {
+      event.location = 'Online Session (Video Call)';
+    }
 
     let createdEvent;
     let hasAttendees = false;
@@ -296,7 +461,7 @@ export async function POST(request: NextRequest) {
             email: email,
             phone: phone,
           },
-          brand as 'proxe'
+          brand as 'windchasers'
         );
         console.log('[Booking API] Successfully saved booking to database', { externalSessionId, eventId: createdEvent.data.id });
       } catch (storeError) {

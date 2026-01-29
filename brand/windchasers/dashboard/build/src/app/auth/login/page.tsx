@@ -43,9 +43,26 @@ export default function LoginPage() {
       }
     }
 
-    // Don't auto-redirect on login page - let the user stay here
-    // This prevents redirect loops when cookies aren't synced yet
-  }, [])
+    // Check if user is already logged in and redirect to dashboard
+    const checkExistingSession = async () => {
+      try {
+        const supabase = createClient()
+        const { data: { user }, error } = await supabase.auth.getUser()
+        
+        if (user && !error) {
+          // User is already authenticated, redirect to dashboard
+          console.log('✅ User already logged in, redirecting to dashboard')
+          router.push('/dashboard')
+          router.refresh()
+        }
+      } catch (err) {
+        // If check fails, user is not logged in - stay on login page
+        console.log('ℹ️ No existing session found, staying on login page')
+      }
+    }
+
+    checkExistingSession()
+  }, [router])
 
   // Countdown timer for rate limit
   useEffect(() => {

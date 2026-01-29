@@ -508,6 +508,17 @@ brand/proxe/
 - `/api/dashboard/metrics`
 - Real-time updates via `useRealtimeMetrics` hook
 
+**UI Styling - Metric Cards**:
+- **Total Conversations Card**: Blue tint (`rgba(59, 130, 246, 0.05)` background, `rgba(59, 130, 246, 0.2)` border)
+- **Total Leads Card**: Brand color tint (Windchasers: `rgba(201, 169, 97, 0.05)` background, `rgba(201, 169, 97, 0.2)` border using brand color `#C9A961`)
+- **Hot Leads Card**: Green tint (`rgba(34, 197, 94, 0.05)` background, `rgba(34, 197, 94, 0.2)` border)
+- **Upcoming Events Card**: Blue tint (`rgba(59, 130, 246, 0.05)` background, `rgba(59, 130, 246, 0.2)` border)
+
+**Brand Color Implementation**:
+- Windchasers brand color: `#C9A961` (gold/tan)
+- Defined in CSS variables: `--accent-primary: #C9A961`
+- Total Leads card uses brand color for background tint and border to maintain brand consistency
+
 #### `LeadsTable`
 **Location**: `src/components/dashboard/LeadsTable.tsx`
 
@@ -1585,7 +1596,7 @@ npm run lint
 
 **Build Date**: Set during build process via `NEXT_PUBLIC_BUILD_TIME`
 
-**Last Updated**: January 27, 2026
+**Last Updated**: January 29, 2026
 
 **Recent Updates**:
 - ✅ Multi-brand architecture documentation added
@@ -1594,6 +1605,7 @@ npm run lint
 - ✅ AI prompts documented (PROXe and Windchasers system prompts)
 - ✅ Build errors fix documented (ESLint disabled during builds)
 - ✅ Build verification procedures documented
+- ✅ Windchasers FounderDashboard Total Leads card updated to use brand color (`#C9A961`) instead of purple for background tint
 
 ---
 

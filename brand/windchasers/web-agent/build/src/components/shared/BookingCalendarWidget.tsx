@@ -74,6 +74,7 @@ export function BookingCalendarWidget({
     name: prefillName || '',
     email: prefillEmail || '',
     phone: cleanPhoneNumber(prefillPhone),
+    sessionType: '' as 'online' | 'offline' | '',
   });
   useEffect(() => {
     setFormData((prev) => {
@@ -223,6 +224,12 @@ export function BookingCalendarWidget({
     if (!formData.name || !formData.email || !formData.phone || !selectedDate || !selectedTime) {
       return;
     }
+    
+    // Require session type selection
+    if (!formData.sessionType) {
+      setBookingError('Please select session type (Online or Facility Visit)');
+      return;
+    }
 
     setBookingError(null);
     setIsWarning(false);
@@ -241,6 +248,7 @@ export function BookingCalendarWidget({
           name: formData.name,
           email: formData.email,
           phone: formData.phone,
+          sessionType: formData.sessionType,
           ...(sessionId && { sessionId }),
           ...(brand && { brand }),
         }),
@@ -526,6 +534,62 @@ export function BookingCalendarWidget({
                 required
                 placeholder="Enter your phone number"
               />
+            </div>
+
+            <div className={styles.formGroup}>
+              <label htmlFor="sessionType" style={{ display: 'block', marginBottom: '8px', fontWeight: '500', fontSize: '14px' }}>
+                Session Type <span style={{ color: '#ef4444' }}>*</span>
+              </label>
+              <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                <label style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  cursor: 'pointer',
+                  padding: '10px 16px',
+                  border: `2px solid ${formData.sessionType === 'online' ? '#3b82f6' : '#e5e7eb'}`,
+                  borderRadius: '8px',
+                  backgroundColor: formData.sessionType === 'online' ? '#eff6ff' : 'transparent',
+                  transition: 'all 0.2s',
+                  flex: '1',
+                  minWidth: '120px'
+                }}>
+                  <input
+                    type="radio"
+                    id="sessionType-online"
+                    name="sessionType"
+                    value="online"
+                    checked={formData.sessionType === 'online'}
+                    onChange={(e) => setFormData({ ...formData, sessionType: e.target.value as 'online' | 'offline' })}
+                    style={{ marginRight: '8px' }}
+                    required
+                  />
+                  <span>Online Session</span>
+                </label>
+                <label style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  cursor: 'pointer',
+                  padding: '10px 16px',
+                  border: `2px solid ${formData.sessionType === 'offline' ? '#3b82f6' : '#e5e7eb'}`,
+                  borderRadius: '8px',
+                  backgroundColor: formData.sessionType === 'offline' ? '#eff6ff' : 'transparent',
+                  transition: 'all 0.2s',
+                  flex: '1',
+                  minWidth: '120px'
+                }}>
+                  <input
+                    type="radio"
+                    id="sessionType-offline"
+                    name="sessionType"
+                    value="offline"
+                    checked={formData.sessionType === 'offline'}
+                    onChange={(e) => setFormData({ ...formData, sessionType: e.target.value as 'online' | 'offline' })}
+                    style={{ marginRight: '8px' }}
+                    required
+                  />
+                  <span>Facility Visit</span>
+                </label>
+              </div>
             </div>
 
             <div className={styles.formActions}>

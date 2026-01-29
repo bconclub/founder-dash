@@ -534,16 +534,104 @@ export async function POST(request: NextRequest) {
             .replace(/^(Hi|Hello|Hey),?\s*/gi, '')
             .trim();
 
+          // CRITICAL: Ensure lead exists BEFORE logging conversations
+          // This must happen early so conversations can be logged immediately
+          let leadId: string | null = null;
+          
+          if (externalSessionId) {
+            try {
+              const supabase = getSupabaseClient();
+              if (!supabase) {
+                console.error('[Chat API] Supabase client not available');
+              } else {
+                // First, try to get lead_id from web_sessions
+                const { data: session, error: sessionError } = await supabase
+                  .from('web_sessions')
+                  .select('lead_id, customer_name, customer_email, customer_phone')
+                  .eq('external_session_id', externalSessionId)
+                  .maybeSingle();
+                
+                if (sessionError && sessionError.code !== 'PGRST116') { // PGRST116 = not found, which is OK
+                  console.error('[Chat API] Error fetching session:', sessionError);
+                } else {
+                  leadId = session?.lead_id || null;
+                  
+                  console.log('[Chat API] Fetched session data:', {
+                    leadId,
+                    hasPhone: !!session?.customer_phone,
+                    hasEmail: !!session?.customer_email,
+                    hasName: !!session?.customer_name
+                  });
+                  
+                  // Get profile data from session or userProfile
+                  const profileName = session?.customer_name || userProfile?.userName || null;
+                  const profileEmail = session?.customer_email || userProfile?.email || null;
+                  const profilePhone = session?.customer_phone || userProfile?.phone || null;
+                  
+                  // If no lead_id, try to create one IMMEDIATELY (before logging conversations)
+                  if (!leadId && (profilePhone || profileEmail)) {
+                    console.log('[Chat API] No lead_id found, creating lead BEFORE logging conversations', {
+                      hasPhone: !!profilePhone,
+                      hasEmail: !!profileEmail,
+                      hasName: !!profileName
+                    });
+                    
+                    const createdLeadId = await ensureAllLeads(
+                      profileName,
+                      profileEmail,
+                      profilePhone,
+                      brand as 'proxe',
+                      externalSessionId
+                    );
+                    
+                    console.log('[Chat API] ensureAllLeads result:', createdLeadId);
+                    
+                    if (createdLeadId) {
+                      // Update web_sessions with the new lead_id IMMEDIATELY
+                      const { error: updateError } = await supabase
+                        .from('web_sessions')
+                        .update({ lead_id: createdLeadId })
+                        .eq('external_session_id', externalSessionId);
+                      
+                      if (updateError) {
+                        console.error('[Chat API] Failed to update web_sessions with lead_id:', updateError);
+                      } else {
+                        leadId = createdLeadId;
+                        console.log('[Chat API] ✓ Lead created and linked to session:', leadId);
+                      }
+                    } else {
+                      console.warn('[Chat API] Could not create lead - ensureAllLeads returned null', {
+                        phone: profilePhone,
+                        email: profileEmail
+                      });
+                    }
+                  } else if (!leadId && !profilePhone && !profileEmail) {
+                    console.log('[Chat API] Cannot create lead - no phone or email available yet', {
+                      hasName: !!profileName,
+                      hasEmail: !!profileEmail,
+                      hasPhone: !!profilePhone,
+                      messageCount
+                    });
+                    // For first message without contact info, we'll skip conversation logging
+                    // but ensure the session exists so we can link it later
+                  } else if (leadId) {
+                    console.log('[Chat API] Using existing lead_id:', leadId);
+                  }
+                }
+              }
+            } catch (err) {
+              console.error('[Chat API] Error fetching/ensuring lead_id:', err);
+            }
+          }
+
           // Update session profile with client-provided data (if any)
           // This ensures profile data is saved to database and lead_id is created/updated
+          // Do this AFTER ensuring lead exists, so we can update the lead too
           if (externalSessionId && (userProfile?.userName || userProfile?.email || userProfile?.phone)) {
             console.log('[Chat API] Updating session profile with client data:', {
               hasName: !!userProfile?.userName,
               hasEmail: !!userProfile?.email,
-              hasPhone: !!userProfile?.phone,
-              name: userProfile?.userName,
-              email: userProfile?.email,
-              phone: userProfile?.phone
+              hasPhone: !!userProfile?.phone
             });
             
             try {
@@ -558,93 +646,25 @@ export async function POST(request: NextRequest) {
                 brand as 'proxe'
               );
               console.log('[Chat API] updateSessionProfile completed successfully');
-            } catch (err) {
-              console.error('[Chat API] Failed to update session profile:', err);
-            }
-          }
-
-          // Fetch lead_id now (after profile may have been updated)
-          // Also try to ensure lead exists if we have profile data
-          let leadId: string | null = null;
-          if (externalSessionId) {
-            try {
-              const supabase = getSupabaseClient();
-              if (!supabase) {
-                console.error('[Chat API] Supabase client not available');
-              } else {
-                // First, try to get lead_id from web_sessions
-                const { data: session, error: sessionError } = await supabase
-                  .from('web_sessions')
-                  .select('lead_id, customer_name, customer_email, customer_phone')
-                  .eq('external_session_id', externalSessionId)
-                  .single();
-                
-                if (sessionError) {
-                  console.error('[Chat API] Error fetching session:', sessionError);
-                } else {
-                  leadId = session?.lead_id || null;
+              
+              // Re-fetch lead_id in case it was just created
+              if (!leadId) {
+                const supabase = getSupabaseClient();
+                if (supabase) {
+                  const { data: updatedSession } = await supabase
+                    .from('web_sessions')
+                    .select('lead_id')
+                    .eq('external_session_id', externalSessionId)
+                    .maybeSingle();
                   
-                  console.log('[Chat API] Fetched session data:', {
-                    leadId,
-                    hasPhone: !!session?.customer_phone,
-                    hasEmail: !!session?.customer_email,
-                    hasName: !!session?.customer_name,
-                    phone: session?.customer_phone,
-                    email: session?.customer_email,
-                    name: session?.customer_name
-                  });
-                  
-                  // If no lead_id but we have profile data, try to ensure/create the lead
-                  // Use database data first, fallback to client profile data
-                  const profileName = session?.customer_name || userProfile?.userName || null;
-                  const profileEmail = session?.customer_email || userProfile?.email || null;
-                  const profilePhone = session?.customer_phone || userProfile?.phone || null;
-                  
-                  if (!leadId && profilePhone) {
-                    console.log('[Chat API] No lead_id found, attempting to ensure lead exists with phone:', profilePhone);
-                    
-                    const createdLeadId = await ensureAllLeads(
-                      profileName,
-                      profileEmail,
-                      profilePhone,
-                      brand as 'proxe',
-                      externalSessionId
-                    );
-                    
-                    console.log('[Chat API] ensureAllLeads result:', createdLeadId);
-                    
-                    if (createdLeadId) {
-                      // Update web_sessions with the new lead_id
-                      const { error: updateError } = await supabase
-                        .from('web_sessions')
-                        .update({ lead_id: createdLeadId })
-                        .eq('external_session_id', externalSessionId);
-                      
-                      if (updateError) {
-                        console.error('[Chat API] Failed to update web_sessions with lead_id:', updateError);
-                      } else {
-                        leadId = createdLeadId;
-                        console.log('[Chat API] Created/ensured lead and updated web_sessions:', leadId);
-                      }
-                    } else {
-                      console.log('[Chat API] Could not create lead - ensureAllLeads returned null', {
-                        phone: profilePhone,
-                        normalizedPhone: profilePhone ? profilePhone.replace(/\D/g, '').slice(-10) : null
-                      });
-                    }
-                  } else if (!leadId && !profilePhone) {
-                    console.log('[Chat API] Cannot create lead - phone number is required but missing', {
-                      hasName: !!profileName,
-                      hasEmail: !!profileEmail,
-                      hasPhone: !!profilePhone
-                    });
-                  } else if (leadId) {
-                    console.log('[Chat API] Using existing lead_id:', leadId);
+                  if (updatedSession?.lead_id) {
+                    leadId = updatedSession.lead_id;
+                    console.log('[Chat API] Lead_id obtained after profile update:', leadId);
                   }
                 }
               }
             } catch (err) {
-              console.error('[Chat API] Error fetching/ensuring lead_id:', err);
+              console.error('[Chat API] Failed to update session profile:', err);
             }
           }
 

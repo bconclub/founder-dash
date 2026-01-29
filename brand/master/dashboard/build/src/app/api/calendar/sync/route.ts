@@ -86,14 +86,44 @@ export async function POST(request: NextRequest) {
     const futureDate = new Date()
     futureDate.setMonth(futureDate.getMonth() + 6) // Sync next 6 months
 
-    const { data: calendarEvents } = await calendar.events.list({
-      calendarId: CALENDAR_ID,
-      timeMin: now.toISOString(),
-      timeMax: futureDate.toISOString(),
-      timeZone: TIMEZONE,
-      singleEvents: true,
-      orderBy: 'startTime',
-    })
+    let calendarEvents
+    try {
+      const response = await calendar.events.list({
+        calendarId: CALENDAR_ID,
+        timeMin: now.toISOString(),
+        timeMax: futureDate.toISOString(),
+        timeZone: TIMEZONE,
+        singleEvents: true,
+        orderBy: 'startTime',
+      })
+      calendarEvents = response.data
+    } catch (calendarError: any) {
+      const serviceAccountEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL
+      let errorMessage = 'Failed to access calendar'
+      let details = calendarError.message || 'Unknown error'
+      let suggestion = ''
+
+      if (calendarError.code === 404 || details.includes('Not Found')) {
+        errorMessage = 'Calendar not found or access denied'
+        details = `The calendar "${CALENDAR_ID}" was not found or the service account doesn't have access.`
+        suggestion = `Please share the calendar "${CALENDAR_ID}" with the service account email "${serviceAccountEmail}" and give it "Make changes to events" permission.`
+      } else if (calendarError.code === 403 || details.includes('Forbidden')) {
+        errorMessage = 'Access denied to calendar'
+        details = `The service account "${serviceAccountEmail}" doesn't have permission to access the calendar "${CALENDAR_ID}".`
+        suggestion = `Share the calendar "${CALENDAR_ID}" with "${serviceAccountEmail}" and give it "Make changes to events" permission.`
+      }
+
+      return NextResponse.json(
+        {
+          error: errorMessage,
+          details: details,
+          suggestion: suggestion,
+          calendarId: CALENDAR_ID,
+          serviceAccountEmail: serviceAccountEmail,
+        },
+        { status: calendarError.code === 404 || calendarError.code === 403 ? 403 : 500 }
+      )
+    }
 
     const existingEvents = new Map(
       (calendarEvents?.items || []).map((event) => [
@@ -170,23 +200,33 @@ export async function POST(request: NextRequest) {
           } catch (updateError: any) {
             // If update fails (e.g., event deleted), create new one
             if (updateError.code === 404) {
-              const newEvent = await calendar.events.insert({
-                calendarId: CALENDAR_ID,
-                requestBody: eventData,
-              })
-
-              // Update booking metadata with new event ID
-              await supabase
-                .from('unified_leads')
-                .update({
-                  metadata: {
-                    ...booking.metadata,
-                    googleEventId: newEvent.data.id,
-                  },
+              try {
+                const newEvent = await calendar.events.insert({
+                  calendarId: CALENDAR_ID,
+                  requestBody: eventData,
                 })
-                .eq('id', booking.id)
 
-              created++
+                // Update booking metadata with new event ID
+                await supabase
+                  .from('unified_leads')
+                  .update({
+                    metadata: {
+                      ...booking.metadata,
+                      googleEventId: newEvent.data.id,
+                    },
+                  })
+                  .eq('id', booking.id)
+
+                created++
+              } catch (createError: any) {
+                if (createError.code === 403 || createError.code === 404) {
+                  errors.push(`Access denied: Share calendar "${CALENDAR_ID}" with service account "${serviceAccountEmail}"`)
+                } else {
+                  errors.push(`Failed to create event for booking ${booking.id}: ${createError.message}`)
+                }
+              }
+            } else if (updateError.code === 403) {
+              errors.push(`Access denied: Share calendar "${CALENDAR_ID}" with service account "${serviceAccountEmail}"`)
             } else {
               errors.push(`Failed to update booking ${booking.id}: ${updateError.message}`)
             }
@@ -212,7 +252,11 @@ export async function POST(request: NextRequest) {
 
             created++
           } catch (createError: any) {
-            errors.push(`Failed to create event for booking ${booking.id}: ${createError.message}`)
+            if (createError.code === 403 || createError.code === 404) {
+              errors.push(`Access denied: Share calendar "${CALENDAR_ID}" with service account "${serviceAccountEmail}"`)
+            } else {
+              errors.push(`Failed to create event for booking ${booking.id}: ${createError.message}`)
+            }
           }
         }
       } catch (error: any) {

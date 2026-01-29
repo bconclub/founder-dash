@@ -89,14 +89,53 @@ export async function POST(request: NextRequest) {
     const startOfDayUTC = new Date(`${dateStr}T00:00:00+05:30`).toISOString()
     const endOfDayUTC = new Date(`${dateStr}T23:59:59+05:30`).toISOString()
 
-    const response = await calendar.events.list({
-      calendarId: CALENDAR_ID,
-      timeMin: startOfDayUTC,
-      timeMax: endOfDayUTC,
-      timeZone: TIMEZONE,
-      singleEvents: true,
-      orderBy: 'startTime',
-    })
+    let response
+    try {
+      response = await calendar.events.list({
+        calendarId: CALENDAR_ID,
+        timeMin: startOfDayUTC,
+        timeMax: endOfDayUTC,
+        timeZone: TIMEZONE,
+        singleEvents: true,
+        orderBy: 'startTime',
+      })
+    } catch (calendarError: any) {
+      let errorMessage = 'Failed to check calendar availability'
+      let details = calendarError.message || 'Unknown error'
+      let suggestion = ''
+
+      if (calendarError.code === 404 || details.includes('Not Found')) {
+        errorMessage = 'Calendar not found or access denied'
+        details = `The calendar "${CALENDAR_ID}" was not found or the service account doesn't have access.`
+        suggestion = `Please share the calendar "${CALENDAR_ID}" with the service account email "${serviceAccountEmail}" and give it "See all event details" permission.`
+      } else if (calendarError.code === 403 || details.includes('Forbidden')) {
+        errorMessage = 'Access denied to calendar'
+        details = `The service account "${serviceAccountEmail}" doesn't have permission to access the calendar "${CALENDAR_ID}".`
+        suggestion = `Share the calendar "${CALENDAR_ID}" with "${serviceAccountEmail}" and give it "See all event details" permission.`
+      }
+
+      return NextResponse.json(
+        {
+          error: errorMessage,
+          details: details,
+          suggestion: suggestion,
+          calendarId: CALENDAR_ID,
+          serviceAccountEmail: serviceAccountEmail,
+          date,
+          availability: {},
+          slots: AVAILABLE_SLOTS.map((slot) => {
+            const displayTime = formatTimeForDisplay(slot)
+            return {
+              time: displayTime,
+              time24: slot,
+              available: true, // Default to available on error
+              displayTime: displayTime,
+            }
+          }),
+        },
+        { status: calendarError.code === 404 || calendarError.code === 403 ? 403 : 500 }
+      )
+    }
 
     const events = response.data.items || []
     const availability: Record<string, boolean> = {}
@@ -166,10 +205,32 @@ export async function POST(request: NextRequest) {
     })
   } catch (error: any) {
     console.error('Error checking availability:', error)
+    
+    // Provide specific guidance for common errors
+    let errorMessage = error.message || 'Failed to check availability'
+    let details = error.details || 'Unknown error occurred'
+    
+    if (error.message?.includes('DECODER') || error.message?.includes('unsupported') || 
+        error.code === 'ERR_OSSL_UNSUPPORTED' || error.message?.includes('Invalid private key format')) {
+      errorMessage = 'Invalid private key format'
+      details = 'The private key format is invalid. Please ensure your GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY environment variable contains the full private key with proper line breaks.'
+    }
+    
     return NextResponse.json(
       {
-        error: error.message || 'Failed to check availability',
-        details: error.details || 'Unknown error occurred',
+        error: errorMessage,
+        details: details,
+        date,
+        availability: {},
+        slots: AVAILABLE_SLOTS.map((slot) => {
+          const displayTime = formatTimeForDisplay(slot)
+          return {
+            time: displayTime,
+            time24: slot,
+            available: true, // Default to available on error
+            displayTime: displayTime,
+          }
+        }),
       },
       { status: 500 }
     )

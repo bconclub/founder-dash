@@ -65,15 +65,44 @@ export async function GET(request: NextRequest) {
       ? new Date(endDate).toISOString()
       : new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString() // 90 days from now
 
-    const response = await calendar.events.list({
-      calendarId: CALENDAR_ID,
-      timeMin,
-      timeMax,
-      timeZone: TIMEZONE,
-      singleEvents: true,
-      orderBy: 'startTime',
-      maxResults,
-    })
+    let response
+    try {
+      response = await calendar.events.list({
+        calendarId: CALENDAR_ID,
+        timeMin,
+        timeMax,
+        timeZone: TIMEZONE,
+        singleEvents: true,
+        orderBy: 'startTime',
+        maxResults,
+      })
+    } catch (calendarError: any) {
+      let errorMessage = 'Failed to fetch calendar events'
+      let details = calendarError.message || 'Unknown error'
+      let suggestion = ''
+
+      // Handle specific Google Calendar API errors
+      if (calendarError.code === 404 || details.includes('Not Found')) {
+        errorMessage = 'Calendar not found or access denied'
+        details = `The calendar "${CALENDAR_ID}" was not found or the service account doesn't have access.`
+        suggestion = `Please share the calendar "${CALENDAR_ID}" with the service account email "${serviceAccountEmail}" and give it "See all event details" permission.`
+      } else if (calendarError.code === 403 || details.includes('Forbidden')) {
+        errorMessage = 'Access denied to calendar'
+        details = `The service account "${serviceAccountEmail}" doesn't have permission to access the calendar "${CALENDAR_ID}".`
+        suggestion = `Share the calendar "${CALENDAR_ID}" with "${serviceAccountEmail}" and give it "See all event details" permission.`
+      }
+
+      return NextResponse.json(
+        {
+          error: errorMessage,
+          details: details,
+          suggestion: suggestion,
+          calendarId: CALENDAR_ID,
+          serviceAccountEmail: serviceAccountEmail,
+        },
+        { status: calendarError.code === 404 || calendarError.code === 403 ? 403 : 500 }
+      )
+    }
 
     const events = (response.data.items || []).map((event) => ({
       id: event.id,
@@ -169,10 +198,39 @@ export async function POST(request: NextRequest) {
       attendees: email ? [{ email, displayName: name }] : [],
     }
 
-    const createdEvent = await calendar.events.insert({
-      calendarId: CALENDAR_ID,
-      requestBody: eventData,
-    })
+    let createdEvent
+    try {
+      createdEvent = await calendar.events.insert({
+        calendarId: CALENDAR_ID,
+        requestBody: eventData,
+      })
+    } catch (calendarError: any) {
+      let errorMessage = 'Failed to create calendar event'
+      let details = calendarError.message || 'Unknown error'
+      let suggestion = ''
+
+      // Handle specific Google Calendar API errors
+      if (calendarError.code === 404 || details.includes('Not Found')) {
+        errorMessage = 'Calendar not found or access denied'
+        details = `The calendar "${CALENDAR_ID}" was not found or the service account doesn't have access.`
+        suggestion = `Please share the calendar "${CALENDAR_ID}" with the service account email "${serviceAccountEmail}" and give it "Make changes to events" permission.`
+      } else if (calendarError.code === 403 || details.includes('Forbidden')) {
+        errorMessage = 'Access denied to calendar'
+        details = `The service account "${serviceAccountEmail}" doesn't have permission to create events in the calendar "${CALENDAR_ID}".`
+        suggestion = `Share the calendar "${CALENDAR_ID}" with "${serviceAccountEmail}" and give it "Make changes to events" permission.`
+      }
+
+      return NextResponse.json(
+        {
+          error: errorMessage,
+          details: details,
+          suggestion: suggestion,
+          calendarId: CALENDAR_ID,
+          serviceAccountEmail: serviceAccountEmail,
+        },
+        { status: calendarError.code === 404 || calendarError.code === 403 ? 403 : 500 }
+      )
+    }
 
     return NextResponse.json({
       success: true,
@@ -270,11 +328,40 @@ export async function PUT(request: NextRequest) {
       attendees: email ? [{ email, displayName: name || 'Guest' }] : existingEvent.data.attendees || [],
     }
 
-    const updatedEvent = await calendar.events.update({
-      calendarId: CALENDAR_ID,
-      eventId,
-      requestBody: eventData,
-    })
+    let updatedEvent
+    try {
+      updatedEvent = await calendar.events.update({
+        calendarId: CALENDAR_ID,
+        eventId,
+        requestBody: eventData,
+      })
+    } catch (calendarError: any) {
+      let errorMessage = 'Failed to update calendar event'
+      let details = calendarError.message || 'Unknown error'
+      let suggestion = ''
+
+      // Handle specific Google Calendar API errors
+      if (calendarError.code === 404 || details.includes('Not Found')) {
+        errorMessage = 'Calendar or event not found or access denied'
+        details = `The calendar "${CALENDAR_ID}" or event "${eventId}" was not found or the service account doesn't have access.`
+        suggestion = `Please share the calendar "${CALENDAR_ID}" with the service account email "${serviceAccountEmail}" and give it "Make changes to events" permission.`
+      } else if (calendarError.code === 403 || details.includes('Forbidden')) {
+        errorMessage = 'Access denied to calendar'
+        details = `The service account "${serviceAccountEmail}" doesn't have permission to update events in the calendar "${CALENDAR_ID}".`
+        suggestion = `Share the calendar "${CALENDAR_ID}" with "${serviceAccountEmail}" and give it "Make changes to events" permission.`
+      }
+
+      return NextResponse.json(
+        {
+          error: errorMessage,
+          details: details,
+          suggestion: suggestion,
+          calendarId: CALENDAR_ID,
+          serviceAccountEmail: serviceAccountEmail,
+        },
+        { status: calendarError.code === 404 || calendarError.code === 403 ? 403 : 500 }
+      )
+    }
 
     return NextResponse.json({
       success: true,

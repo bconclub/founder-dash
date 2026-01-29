@@ -96,16 +96,60 @@ function getISTTimestamp(): string {
 }
 
 // Helper function to normalize phone number for all_leads deduplication
+// Handles various formats: international (+91), with/without country codes, spaces, dashes, etc.
 function normalizePhone(phone: string | null | undefined): string | null {
   if (!phone) return null;
   
   // Remove all non-digit characters
   const digits = phone.replace(/\D/g, '');
   
-  if (!digits || digits.length < 10) return null;
+  if (!digits || digits.length < 10) {
+    console.log('[normalizePhone] Phone number too short or invalid', { 
+      original: phone, 
+      digits, 
+      length: digits?.length 
+    });
+    return null;
+  }
   
-  // Always return last 10 digits for matching
-  return digits.slice(-10);
+  // Handle international formats
+  // Remove common country codes (India: +91, US: +1, etc.)
+  let cleanedDigits = digits;
+  
+  // Remove India country code (+91)
+  if (cleanedDigits.startsWith('91') && cleanedDigits.length > 10) {
+    cleanedDigits = cleanedDigits.slice(2);
+  }
+  // Remove US/Canada country code (+1)
+  else if (cleanedDigits.startsWith('1') && cleanedDigits.length === 11) {
+    cleanedDigits = cleanedDigits.slice(1);
+  }
+  
+  // Remove leading zeros
+  cleanedDigits = cleanedDigits.replace(/^0+/, '');
+  
+  // Need at least 10 digits after cleaning
+  if (cleanedDigits.length < 10) {
+    console.log('[normalizePhone] Phone number too short after cleaning', { 
+      original: phone, 
+      digits, 
+      cleanedDigits,
+      length: cleanedDigits.length 
+    });
+    return null;
+  }
+  
+  // Always return last 10 digits for matching (handles cases with extra digits)
+  const normalized = cleanedDigits.slice(-10);
+  
+  console.log('[normalizePhone] Normalized phone', { 
+    original: phone, 
+    normalized,
+    digits,
+    cleanedDigits
+  });
+  
+  return normalized;
 }
 
 // Helper function to ensure all_leads record exists and return lead_id
@@ -116,15 +160,37 @@ export async function ensureAllLeads(
   brand: 'proxe',
   externalSessionId?: string
 ): Promise<string | null> {
+  console.log('[ensureAllLeads] Called', {
+    hasName: !!customerName,
+    hasEmail: !!email,
+    hasPhone: !!phone,
+    phone: phone ? phone.substring(0, 5) + '...' : null,
+    brand,
+    externalSessionId
+  });
+
   const supabase = getSupabaseClient();
   if (!supabase) {
+    console.error('[ensureAllLeads] Supabase client not available');
     return null;
   }
 
   // Need at least phone for deduplication
   const normalizedPhone = normalizePhone(phone);
   if (!normalizedPhone) {
-    return null;
+    // Try email as fallback if phone normalization failed
+    if (!email) {
+      console.warn('[ensureAllLeads] Cannot create lead: no valid phone or email', {
+        phone,
+        email,
+        customerName
+      });
+      return null;
+    }
+    console.log('[ensureAllLeads] Phone normalization failed, will use email for lookup', {
+      phone,
+      email
+    });
   }
 
   try {
@@ -132,13 +198,18 @@ export async function ensureAllLeads(
     let unifiedContext: any = {};
     if (externalSessionId) {
       const tableName = getChannelTable('web');
-      const { data: sessionData } = await supabase
+      const { data: sessionData, error: sessionError } = await supabase
         .from(tableName)
         .select('conversation_summary, booking_status, booking_date, booking_time, user_inputs_summary')
         .eq('external_session_id', externalSessionId)
         .maybeSingle();
       
-      if (sessionData) {
+      if (sessionError) {
+        console.warn('[ensureAllLeads] Failed to fetch session data for context', {
+          error: sessionError,
+          externalSessionId
+        });
+      } else if (sessionData) {
         unifiedContext = {
           web: {
             conversation_summary: cleanSummary(sessionData.conversation_summary) || null,
@@ -151,25 +222,65 @@ export async function ensureAllLeads(
       }
     }
 
-    // Check if all_leads table exists (might not be migrated yet)
-    const { data: existing, error: fetchError } = await supabase
-      .from('all_leads')
-      .select('id, unified_context')
-      .eq('customer_phone_normalized', normalizedPhone)
-      .eq('brand', brand)
-      .maybeSingle();
+    // Check if all_leads table exists and find existing lead
+    let existing: any = null;
+    let fetchError: any = null;
+
+    if (normalizedPhone) {
+      // Try to find by normalized phone first
+      const { data, error } = await supabase
+        .from('all_leads')
+        .select('id, unified_context, email, customer_name, phone')
+        .eq('customer_phone_normalized', normalizedPhone)
+        .eq('brand', brand)
+        .maybeSingle();
+      
+      existing = data;
+      fetchError = error;
+    }
+
+    // If not found by phone and we have email, try email
+    if (!existing && email) {
+      const { data, error } = await supabase
+        .from('all_leads')
+        .select('id, unified_context, email, customer_name, phone')
+        .eq('email', email)
+        .eq('brand', brand)
+        .maybeSingle();
+      
+      if (!fetchError) fetchError = error;
+      if (data) existing = data;
+    }
 
     if (fetchError) {
       // Table might not exist yet - that's okay, we'll continue without lead_id
       if (fetchError.code === '42P01') {
-        console.log('[chatSessions] all_leads table not found, continuing without lead_id');
+        console.log('[ensureAllLeads] all_leads table not found, continuing without lead_id', {
+          code: fetchError.code,
+          message: fetchError.message
+        });
         return null;
       }
-      console.warn('[chatSessions] Failed to check all_leads', fetchError);
+      console.error('[ensureAllLeads] Failed to check all_leads', {
+        error: fetchError,
+        code: fetchError.code,
+        message: fetchError.message,
+        details: fetchError.details,
+        hint: fetchError.hint,
+        normalizedPhone,
+        email
+      });
       return null;
     }
 
     if (existing) {
+      console.log('[ensureAllLeads] Found existing lead', {
+        leadId: existing.id,
+        existingName: existing.customer_name,
+        existingEmail: existing.email,
+        existingPhone: existing.phone
+      });
+
       // Merge with existing unified_context
       const existingContext = existing.unified_context || {};
       const mergedContext = {
@@ -191,39 +302,145 @@ export async function ensureAllLeads(
       if (customerName) updates.customer_name = customerName;
       if (email) updates.email = email;
       if (phone) updates.phone = phone;
+      if (normalizedPhone) updates.customer_phone_normalized = normalizedPhone;
 
-      await supabase
+      const { error: updateError } = await supabase
         .from('all_leads')
         .update(updates)
         .eq('id', existing.id);
+
+      if (updateError) {
+        console.error('[ensureAllLeads] Failed to update existing lead', {
+          error: updateError,
+          code: updateError.code,
+          message: updateError.message,
+          details: updateError.details,
+          leadId: existing.id,
+          updates
+        });
+        return null;
+      }
+
+      console.log('[ensureAllLeads] Successfully updated existing lead', {
+        leadId: existing.id
+      });
       return existing.id;
     }
 
     // Create new all_leads record
+    // Need at least phone or email to create
+    if (!normalizedPhone && !email) {
+      console.warn('[ensureAllLeads] Cannot create lead: no phone or email', {
+        phone,
+        email,
+        customerName
+      });
+      return null;
+    }
+
+    const insertData: any = {
+      customer_name: customerName,
+      email: email,
+      phone: phone,
+      first_touchpoint: 'web',
+      last_touchpoint: 'web',
+      last_interaction_at: new Date().toISOString(),
+      brand: brand,
+      unified_context: Object.keys(unifiedContext).length > 0 ? unifiedContext : null,
+    };
+
+    if (normalizedPhone) {
+      insertData.customer_phone_normalized = normalizedPhone;
+    }
+
+    console.log('[ensureAllLeads] Creating new lead', {
+      hasName: !!insertData.customer_name,
+      hasEmail: !!insertData.email,
+      hasPhone: !!insertData.phone,
+      hasNormalizedPhone: !!insertData.customer_phone_normalized
+    });
+
     const { data: created, error: createError } = await supabase
       .from('all_leads')
-      .insert({
-        customer_name: customerName,
-        email: email,
-        phone: phone,
-        customer_phone_normalized: normalizedPhone,
-        first_touchpoint: 'web',
-        last_touchpoint: 'web',
-        last_interaction_at: new Date().toISOString(),
-        brand: brand,
-        unified_context: Object.keys(unifiedContext).length > 0 ? unifiedContext : null,
-      })
+      .insert(insertData)
       .select('id')
       .single();
 
     if (createError) {
-      console.warn('[chatSessions] Failed to create all_leads', createError);
+      // Handle unique constraint violation (duplicate phone/email)
+      if (createError.code === '23505' || createError.message?.includes('duplicate')) {
+        console.log('[ensureAllLeads] Duplicate lead detected, fetching existing', {
+          error: createError,
+          normalizedPhone,
+          email
+        });
+        
+        // Try to fetch the existing record
+        let existingLead: any = null;
+        if (normalizedPhone) {
+          const { data } = await supabase
+            .from('all_leads')
+            .select('id')
+            .eq('customer_phone_normalized', normalizedPhone)
+            .eq('brand', brand)
+            .maybeSingle();
+          existingLead = data;
+        }
+        
+        if (!existingLead && email) {
+          const { data } = await supabase
+            .from('all_leads')
+            .select('id')
+            .eq('email', email)
+            .eq('brand', brand)
+            .maybeSingle();
+          existingLead = data;
+        }
+        
+        if (existingLead) {
+          console.log('[ensureAllLeads] Found existing lead after conflict', {
+            leadId: existingLead.id
+          });
+          return existingLead.id;
+        }
+      }
+      
+      console.error('[ensureAllLeads] Failed to create all_leads', {
+        error: createError,
+        code: createError.code,
+        message: createError.message,
+        details: createError.details,
+        hint: createError.hint,
+        insertData: {
+          ...insertData,
+          phone: insertData.phone ? insertData.phone.substring(0, 5) + '...' : null
+        }
+      });
       return null;
     }
 
-    return created?.id || null;
-  } catch (error) {
-    console.warn('[chatSessions] Error ensuring all_leads', error);
+    if (!created || !created.id) {
+      console.error('[ensureAllLeads] Created lead but no ID returned', {
+        created
+      });
+      return null;
+    }
+
+    console.log('[ensureAllLeads] Successfully created new lead', {
+      leadId: created.id
+    });
+    return created.id;
+  } catch (error: any) {
+    console.error('[ensureAllLeads] Exception ensuring all_leads', {
+      error,
+      errorMessage: error?.message,
+      errorStack: error?.stack,
+      customerName,
+      email,
+      phone: phone ? phone.substring(0, 5) + '...' : null,
+      brand,
+      externalSessionId
+    });
     return null;
   }
 }
@@ -573,17 +790,95 @@ export async function updateSessionProfile(
         externalSessionId
       );
 
-      // Update web_sessions with lead_id if we got one
+      // Update web_sessions with lead_id if we got one - with retry logic
       if (leadId) {
-        const { error: leadIdError } = await supabase
-          .from(tableName)
-          .update({ lead_id: leadId })
-          .eq('external_session_id', externalSessionId);
+        console.log('[updateSessionProfile] Attempting to set lead_id on session', {
+          leadId,
+          externalSessionId,
+          tableName
+        });
 
-        if (leadIdError && leadIdError.code !== '42702') { // Ignore "column doesn't exist" errors
-          console.warn('[updateSessionProfile] Failed to update lead_id', leadIdError);
+        let retries = 3;
+        let lastError: any = null;
+        
+        while (retries > 0) {
+          const { error: leadIdError, data: updateData } = await supabase
+            .from(tableName)
+            .update({ lead_id: leadId })
+            .eq('external_session_id', externalSessionId)
+            .select('id, lead_id');
+
+          if (!leadIdError) {
+            // Verify the update succeeded
+            if (updateData && updateData.length > 0 && updateData[0].lead_id === leadId) {
+              console.log('[updateSessionProfile] Successfully set lead_id on session', {
+                leadId,
+                externalSessionId,
+                sessionId: updateData[0].id
+              });
+              break;
+            } else {
+              console.warn('[updateSessionProfile] Update returned but lead_id not set', {
+                updateData,
+                expectedLeadId: leadId
+              });
+            }
+          } else {
+            lastError = leadIdError;
+            
+            // Ignore "column doesn't exist" errors (table might not be migrated)
+            if (leadIdError.code === '42702') {
+              console.log('[updateSessionProfile] lead_id column does not exist, skipping', {
+                code: leadIdError.code
+              });
+              break;
+            }
+            
+            // Don't retry on constraint violations or auth errors
+            if (leadIdError.code === '23503' || leadIdError.code === '42501') {
+              console.error('[updateSessionProfile] Non-retryable error updating lead_id', {
+                error: leadIdError,
+                code: leadIdError.code
+              });
+              break;
+            }
+            
+            retries--;
+            if (retries > 0) {
+              console.warn('[updateSessionProfile] Retrying lead_id update', {
+                retriesLeft: retries,
+                error: leadIdError
+              });
+              // Wait a bit before retry
+              await new Promise(resolve => setTimeout(resolve, 500));
+            }
+          }
         }
+        
+        if (retries === 0 && lastError) {
+          console.error('[updateSessionProfile] Failed to update lead_id after retries', {
+            error: lastError,
+            code: lastError.code,
+            message: lastError.message,
+            leadId,
+            externalSessionId
+          });
+        }
+      } else {
+        console.warn('[updateSessionProfile] ensureAllLeads returned null, cannot set lead_id', {
+          externalSessionId,
+          hasPhone: !!mergedProfile.phone,
+          hasEmail: !!mergedProfile.email,
+          hasName: !!mergedProfile.userName
+        });
       }
+    } else {
+      console.warn('[updateSessionProfile] No contact info available, cannot create lead', {
+        externalSessionId,
+        hasName: !!mergedProfile.userName,
+        hasEmail: !!mergedProfile.email,
+        hasPhone: !!mergedProfile.phone
+      });
     }
   } else {
     console.warn('[updateSessionProfile] Could not fetch updated session', { externalSessionId });
@@ -753,11 +1048,48 @@ export async function upsertSummary(
     console.log('[Supabase] Successfully updated summary', { externalSessionId, updatedRows: data?.length });
     
     // Update unified_context in all_leads if lead_id exists
-    if (data && data.length > 0 && data[0].lead_id) {
+    let leadId = data && data.length > 0 ? data[0].lead_id : null;
+    
+    // If no lead_id, try to get it from session or create lead
+    if (!leadId) {
+      console.log('[upsertSummary] No lead_id found, attempting to get or create lead');
+      
+      // Fetch session to get contact info
+      const { data: sessionData } = await supabase
+        .from(tableName)
+        .select('customer_name, customer_email, customer_phone')
+        .eq('external_session_id', externalSessionId)
+        .maybeSingle();
+      
+      if (sessionData && (sessionData.customer_phone || sessionData.customer_email)) {
+        // Try to create/get lead
+        const createdLeadId = await ensureAllLeads(
+          sessionData.customer_name,
+          sessionData.customer_email,
+          sessionData.customer_phone,
+          brand,
+          externalSessionId
+        );
+        
+        if (createdLeadId) {
+          // Update session with lead_id
+          await supabase
+            .from(tableName)
+            .update({ lead_id: createdLeadId })
+            .eq('external_session_id', externalSessionId);
+          
+          leadId = createdLeadId;
+          console.log('[upsertSummary] Created/found lead and linked to session:', leadId);
+        }
+      }
+    }
+    
+    // Update unified_context in all_leads if we have lead_id
+    if (leadId && data && data.length > 0) {
       const sessionData = data[0];
       const unifiedContext = {
         web: {
-          conversation_summary: summary,
+          conversation_summary: cleanSummary(summary),
           booking_status: sessionData.booking_status || null,
           booking_date: sessionData.booking_date || null,
           booking_time: sessionData.booking_time || null,
@@ -766,27 +1098,51 @@ export async function upsertSummary(
       };
 
       // Get existing unified_context and merge
-      const { data: existingLead } = await supabase
+      const { data: existingLead, error: fetchError } = await supabase
         .from('all_leads')
         .select('unified_context')
-        .eq('id', data[0].lead_id)
+        .eq('id', leadId)
         .maybeSingle();
 
-      const existingContext = existingLead?.unified_context || {};
-      const mergedContext = {
-        ...existingContext,
-        web: {
-          ...(existingContext.web || {}),
-          ...unifiedContext.web,
-        }
-      };
+      if (fetchError) {
+        console.error('[upsertSummary] Failed to fetch existing unified_context', {
+          error: fetchError,
+          leadId
+        });
+      } else {
+        const existingContext = existingLead?.unified_context || {};
+        const mergedContext = {
+          ...existingContext,
+          web: {
+            ...(existingContext.web || {}),
+            ...unifiedContext.web,
+          }
+        };
 
-      await supabase
-        .from('all_leads')
-        .update({
-          unified_context: mergedContext,
-        })
-        .eq('id', data[0].lead_id);
+        const { error: updateError } = await supabase
+          .from('all_leads')
+          .update({
+            unified_context: mergedContext,
+          })
+          .eq('id', leadId);
+
+        if (updateError) {
+          console.error('[upsertSummary] Failed to update unified_context in all_leads', {
+            error: updateError,
+            leadId
+          });
+        } else {
+          console.log('[upsertSummary] Successfully updated unified_context in all_leads', {
+            leadId,
+            summaryLength: summary.length
+          });
+        }
+      }
+    } else if (!leadId) {
+      console.warn('[upsertSummary] Cannot update unified_context - no lead_id available', {
+        externalSessionId,
+        hasSessionData: !!data
+      });
     }
   }
 }
@@ -1395,5 +1751,176 @@ export async function fetchConversations(
       channel
     });
     return [];
+  }
+}
+
+// Backfill function to retroactively link web_sessions to all_leads
+// This can be called to fix existing sessions that have phone/email but no lead_id
+export async function backfillSessionLeads(
+  brand: 'proxe' = 'proxe',
+  limit: number = 100
+): Promise<{
+  processed: number;
+  leadsCreated: number;
+  leadsUpdated: number;
+  sessionsLinked: number;
+  errors: number;
+}> {
+  console.log('[backfillSessionLeads] Starting backfill', { brand, limit });
+  
+  const supabase = getSupabaseClient();
+  if (!supabase) {
+    console.error('[backfillSessionLeads] Supabase client not available');
+    return {
+      processed: 0,
+      leadsCreated: 0,
+      leadsUpdated: 0,
+      sessionsLinked: 0,
+      errors: 1
+    };
+  }
+
+  const tableName = getChannelTable('web');
+  let processed = 0;
+  let leadsCreated = 0;
+  let leadsUpdated = 0;
+  let sessionsLinked = 0;
+  let errors = 0;
+
+  try {
+    // Fetch sessions with phone/email but no lead_id
+    const { data: sessions, error: fetchError } = await supabase
+      .from(tableName)
+      .select('id, external_session_id, customer_name, customer_email, customer_phone, brand, conversation_summary, booking_status, booking_date, booking_time, user_inputs_summary, created_at, updated_at')
+      .is('lead_id', null)
+      .or('customer_phone.not.is.null,customer_email.not.is.null')
+      .limit(limit);
+
+    if (fetchError) {
+      console.error('[backfillSessionLeads] Failed to fetch sessions', {
+        error: fetchError,
+        code: fetchError.code,
+        message: fetchError.message
+      });
+      return {
+        processed: 0,
+        leadsCreated: 0,
+        leadsUpdated: 0,
+        sessionsLinked: 0,
+        errors: 1
+      };
+    }
+
+    if (!sessions || sessions.length === 0) {
+      console.log('[backfillSessionLeads] No sessions found to backfill');
+      return {
+        processed: 0,
+        leadsCreated: 0,
+        leadsUpdated: 0,
+        sessionsLinked: 0,
+        errors: 0
+      };
+    }
+
+    console.log('[backfillSessionLeads] Found sessions to process', {
+      count: sessions.length
+    });
+
+    // Process each session
+    for (const session of sessions) {
+      try {
+        processed++;
+        
+        const leadId = await ensureAllLeads(
+          session.customer_name,
+          session.customer_email,
+          session.customer_phone,
+          (session.brand || brand) as 'proxe',
+          session.external_session_id
+        );
+
+        if (leadId) {
+          // Update session with lead_id
+          const { error: updateError } = await supabase
+            .from(tableName)
+            .update({ lead_id: leadId })
+            .eq('id', session.id);
+
+          if (updateError) {
+            console.error('[backfillSessionLeads] Failed to update session with lead_id', {
+              error: updateError,
+              sessionId: session.id,
+              externalSessionId: session.external_session_id,
+              leadId
+            });
+            errors++;
+          } else {
+            sessionsLinked++;
+            
+            // Check if this was a new lead or existing
+            const { data: leadData } = await supabase
+              .from('all_leads')
+              .select('created_at')
+              .eq('id', leadId)
+              .maybeSingle();
+            
+            if (leadData) {
+              // Check if lead was created recently (within last minute) - likely new
+              const leadAge = Date.now() - new Date(leadData.created_at).getTime();
+              if (leadAge < 60000) {
+                leadsCreated++;
+              } else {
+                leadsUpdated++;
+              }
+            }
+          }
+        } else {
+          console.warn('[backfillSessionLeads] ensureAllLeads returned null', {
+            sessionId: session.id,
+            externalSessionId: session.external_session_id,
+            hasPhone: !!session.customer_phone,
+            hasEmail: !!session.customer_email
+          });
+          errors++;
+        }
+      } catch (err: any) {
+        console.error('[backfillSessionLeads] Error processing session', {
+          error: err,
+          errorMessage: err?.message,
+          sessionId: session.id,
+          externalSessionId: session.external_session_id
+        });
+        errors++;
+      }
+    }
+
+    console.log('[backfillSessionLeads] Backfill complete', {
+      processed,
+      leadsCreated,
+      leadsUpdated,
+      sessionsLinked,
+      errors
+    });
+
+    return {
+      processed,
+      leadsCreated,
+      leadsUpdated,
+      sessionsLinked,
+      errors
+    };
+  } catch (err: any) {
+    console.error('[backfillSessionLeads] Exception during backfill', {
+      error: err,
+      errorMessage: err?.message,
+      errorStack: err?.stack
+    });
+    return {
+      processed,
+      leadsCreated,
+      leadsUpdated,
+      sessionsLinked,
+      errors: errors + 1
+    };
   }
 }

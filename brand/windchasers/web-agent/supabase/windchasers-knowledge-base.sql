@@ -2,14 +2,24 @@
 -- Windchasers Knowledge Base Data
 -- Insert aviation training content for AI chat responses
 -- Brand: windchasers
+-- 
+-- MANUAL ENTRY WORKFLOW (Like PROXe):
+-- 1. Admin adds entries directly in Supabase dashboard
+-- 2. Fill in: question, answer, category, subcategory, content, keywords
+-- 3. Entry is immediately searchable via enhanced full-text search
+-- 4. Use the search_knowledge_base() function for ranked results
 -- ============================================================================
 
 -- Ensure knowledge_base table exists (create if needed)
+-- Note: Migration 023_enhance_knowledge_base.sql adds question, answer, subcategory columns
 CREATE TABLE IF NOT EXISTS knowledge_base (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     brand TEXT NOT NULL CHECK (brand = 'windchasers'),
     content TEXT NOT NULL,
     category TEXT,
+    subcategory TEXT, -- Added in migration 023
+    question TEXT, -- Added in migration 023 - the question users might ask
+    answer TEXT, -- Added in migration 023 - the answer to provide
     keywords TEXT[],
     metadata JSONB DEFAULT '{}'::jsonb,
     title TEXT,
@@ -21,8 +31,11 @@ CREATE TABLE IF NOT EXISTS knowledge_base (
 -- Create index for faster searches
 CREATE INDEX IF NOT EXISTS idx_knowledge_base_brand ON knowledge_base(brand);
 CREATE INDEX IF NOT EXISTS idx_knowledge_base_category ON knowledge_base(category);
+CREATE INDEX IF NOT EXISTS idx_knowledge_base_subcategory ON knowledge_base(subcategory);
 CREATE INDEX IF NOT EXISTS idx_knowledge_base_keywords ON knowledge_base USING GIN(keywords);
 CREATE INDEX IF NOT EXISTS idx_knowledge_base_content ON knowledge_base USING GIN(to_tsvector('english', content));
+-- Enhanced full-text search index (created in migration 023)
+-- CREATE INDEX IF NOT EXISTS idx_knowledge_base_fulltext ON knowledge_base USING GIN(to_tsvector('english', coalesce(question, '') || ' ' || coalesce(answer, '') || ' ' || coalesce(content, '')));
 
 -- ============================================================================
 -- PROGRAMS: DGCA Ground Classes
