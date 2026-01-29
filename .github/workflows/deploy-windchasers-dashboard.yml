@@ -191,6 +191,17 @@ jobs:
             
             echo "✅ Build verification complete"
             
+            # Verify chunks were generated
+            if [ -d ".next/static/chunks" ]; then
+              CHUNK_COUNT=$(find .next/static/chunks -name "*.js" 2>/dev/null | wc -l)
+              echo "📦 Found $CHUNK_COUNT JavaScript chunks"
+              if [ "$CHUNK_COUNT" -lt 10 ]; then
+                echo "⚠️  WARNING: Very few chunks found ($CHUNK_COUNT) - build may be incomplete"
+              fi
+            else
+              echo "⚠️  WARNING: .next/static/chunks directory not found"
+            fi
+            
             # Create logs directory if it doesn't exist
             mkdir -p logs
             
