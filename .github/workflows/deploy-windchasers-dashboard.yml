@@ -23,7 +23,9 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '18'  # LTS - faster and more stable
+          cache: 'npm'
+          cache-dependency-path: brand/windchasers/dashboard/build/package-lock.json
           cache: 'npm'
           cache-dependency-path: brand/windchasers/dashboard/build/package-lock.json
       
@@ -103,18 +105,73 @@ jobs:
             fi
             echo "✅ Supabase environment variables found in .env.local"
             
-            # Clean previous build to avoid chunk mismatches
+            # VPS-side caching setup
+            echo "📦 Setting up build cache..."
+            CACHE_DIR="/var/cache/windchasers-dashboard"
+            mkdir -p "$CACHE_DIR/node_modules" "$CACHE_DIR/.next-cache"
+            
+            # Check if node_modules cache exists and is valid
+            if [ -d "$CACHE_DIR/node_modules" ] && [ -f "$CACHE_DIR/node_modules/.cache-valid" ]; then
+              CACHE_LOCK_HASH=$(cat "$CACHE_DIR/node_modules/.cache-valid" 2>/dev/null || echo "")
+              CURRENT_LOCK_HASH=$(md5sum package-lock.json 2>/dev/null | cut -d' ' -f1 || sha256sum package-lock.json 2>/dev/null | cut -d' ' -f1 || echo "")
+              
+              if [ "$CACHE_LOCK_HASH" = "$CURRENT_LOCK_HASH" ] && [ -n "$CURRENT_LOCK_HASH" ]; then
+                echo "✅ Using cached node_modules (lockfile unchanged)"
+                cp -r "$CACHE_DIR/node_modules" ./ || echo "⚠️  Cache copy failed, will reinstall"
+              else
+                echo "⚠️  Cache invalid (lockfile changed), will reinstall"
+              fi
+            fi
+            
+            # Clean previous build (but preserve cache)
             echo "🧹 Cleaning previous build..."
             rm -rf .next
             rm -rf node_modules/.cache
             
-            # Install dependencies (need dev deps for build)
+            # Install dependencies with optimizations
             echo "📦 Installing dependencies..."
-            npm ci
+            INSTALL_START=$(date +%s)
+            
+            # Set production environment variables
+            export NODE_ENV=production
+            export NEXT_TELEMETRY_DISABLED=1
+            export NPM_CONFIG_PRODUCTION=false  # Keep devDeps for build
+            
+            # Use npm ci with optimizations
+            npm ci --prefer-offline --no-audit --no-fund --loglevel=warn || {
+              echo "⚠️  npm ci failed, trying npm install..."
+              npm install --prefer-offline --no-audit --no-fund --loglevel=warn
+            }
+            
+            # Cache node_modules if install succeeded
+            if [ -d "node_modules" ]; then
+              echo "💾 Caching node_modules..."
+              rm -rf "$CACHE_DIR/node_modules"
+              cp -r node_modules "$CACHE_DIR/" || echo "⚠️  Cache save failed"
+              CURRENT_LOCK_HASH=$(md5sum package-lock.json 2>/dev/null | cut -d' ' -f1 || sha256sum package-lock.json 2>/dev/null | cut -d' ' -f1 || echo "")
+              echo "$CURRENT_LOCK_HASH" > "$CACHE_DIR/node_modules/.cache-valid" || true
+            fi
+            
+            INSTALL_DURATION=$(($(date +%s) - INSTALL_START))
+            echo "✅ Dependencies installed in ${INSTALL_DURATION}s"
+            
+            # Restore .next cache if available
+            if [ -d "$CACHE_DIR/.next-cache" ] && [ "$(ls -A $CACHE_DIR/.next-cache 2>/dev/null)" ]; then
+              echo "💾 Restoring .next cache..."
+              mkdir -p .next
+              cp -r "$CACHE_DIR/.next-cache"/* .next/ 2>/dev/null || echo "⚠️  Cache restore failed"
+            fi
             
             # Build the application
             echo "🏗️  Building Next.js application..."
-            echo "This may take several minutes..."
+            echo "⏱️  Build start time: $(date +%H:%M:%S)"
+            BUILD_START=$(date +%s)
+            
+            # Set build environment variables
+            export NODE_OPTIONS="--max-old-space-size=4096"
+            export NODE_ENV=production
+            export NEXT_TELEMETRY_DISABLED=1
+            
             npm run build 2>&1 | tee build.log || {
               echo "❌ Build command failed!"
               echo "Last 50 lines of build output:"
