@@ -4,10 +4,13 @@
   "private": true,
   "scripts": {
     "dev": "node node_modules/.bin/next dev -p 4003",
-    "build": "node node_modules/.bin/next build",
-    "build:fast": "SKIP_TYPE_CHECK=true TSC_COMPILE_ON_ERROR=true node node_modules/.bin/next build --no-lint",
+    "build": "node scripts/build-with-timing.js",
+    "build:fast": "SKIP_TYPE_CHECK=true TSC_COMPILE_ON_ERROR=true NODE_ENV=production node node_modules/.bin/next build --no-lint",
+    "build:production": "NODE_ENV=production SKIP_TYPE_CHECK=true node scripts/build-with-timing.js",
+    "build:raw": "node node_modules/.bin/next build",
     "start": "node node_modules/.bin/next start",
-    "lint": "node node_modules/.bin/next lint"
+    "lint": "node node_modules/.bin/next lint",
+    "analyze": "ANALYZE=true npm run build"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.68.0",

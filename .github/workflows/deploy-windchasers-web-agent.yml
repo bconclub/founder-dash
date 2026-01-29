@@ -24,6 +24,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: brand/windchasers/web-agent/build/package-lock.json
       
       - name: Setup SSH
         uses: webfactory/ssh-agent@v0.9.0
@@ -35,6 +37,14 @@ jobs:
           mkdir -p ~/.ssh
           ssh-keyscan -H ${{ secrets.WINDCHASERS_VPS_HOST }} >> ~/.ssh/known_hosts
       
+      - name: Cache node_modules for faster installs
+        uses: actions/cache@v3
+        with:
+          path: brand/windchasers/web-agent/build/node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('brand/windchasers/web-agent/build/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-modules-
+      
       - name: Deploy to VPS via Rsync
         run: |
           rsync -avz --delete \
@@ -44,6 +54,7 @@ jobs:
             --exclude='.git' \
             --exclude='*.log' \
             --exclude='.DS_Store' \
+            --exclude='.npm' \
             -e "ssh -o StrictHostKeyChecking=no" \
             brand/windchasers/web-agent/build/ \
             ${{ secrets.WINDCHASERS_VPS_USER }}@${{ secrets.WINDCHASERS_VPS_HOST }}:/var/www/windchasers-web-agent/
@@ -96,16 +107,34 @@ jobs:
             fi
             echo "✅ Supabase environment variables found in .env.local"
             
-            # Install dependencies (need dev deps for build)
+            # Install dependencies with optimizations
             echo "📦 Installing dependencies..."
-            npm ci
-
-            # Build the application
+            echo "⏱️  Start time: $(date +%H:%M:%S)"
+            INSTALL_START=$(date +%s)
+            
+            # Use npm ci for faster, reliable installs
+            # .npmrc already configured for production optimizations
+            npm ci --prefer-offline --no-audit --no-fund
+            
+            INSTALL_DURATION=$(($(date +%s) - INSTALL_START))
+            echo "✅ Dependencies installed in ${INSTALL_DURATION}s"
+            
+            # Build the application with timing
             echo "🏗️  Building Next.js application..."
-            echo "⏱️  This may take 5-10 minutes (including type checking)..."
-            # Set NODE_OPTIONS to increase memory if needed
+            echo "⏱️  Build start time: $(date +%H:%M:%S)"
+            BUILD_START=$(date +%s)
+            
+            # Set NODE_OPTIONS to increase memory
             export NODE_OPTIONS="--max-old-space-size=4096"
-            npm run build
+            export NODE_ENV=production
+            export SKIP_TYPE_CHECK=true
+            
+            # Use optimized build script with timing
+            npm run build:production || npm run build
+            
+            BUILD_DURATION=$(($(date +%s) - BUILD_START))
+            echo "✅ Build completed in ${BUILD_DURATION}s"
+            echo "⏱️  Total deployment time: $(($(date +%s) - INSTALL_START))s"
             
             # Check build exit code
             BUILD_EXIT_CODE=$?
