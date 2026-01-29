@@ -14,9 +14,10 @@ interface PromptOptions {
   knowledgeBase?: string;
   message: string;
   bookingAlreadyScheduled?: boolean;
+  messageCount?: number;
 }
 
-function buildCorePrompt(brand: string, userName?: string | null, knowledgeBase?: string): string {
+function buildCorePrompt(brand: string, userName?: string | null, knowledgeBase?: string, messageCount?: number): string {
   const normalizedBrand = brand.toLowerCase();
   
   // Use the detailed PROXe prompt for proxe brand
@@ -28,7 +29,7 @@ function buildCorePrompt(brand: string, userName?: string | null, knowledgeBase?
   // Use the detailed Windchasers prompt for windchasers brand
   if (normalizedBrand === 'windchasers') {
     const nameLine = userName ? `\n\nThe user is ${userName}. Address them by name once, then continue naturally.` : '';
-    return getWindchasersSystemPrompt(knowledgeBase || '') + nameLine;
+    return getWindchasersSystemPrompt(knowledgeBase || '', messageCount) + nameLine;
   }
 
   // Fallback for other brands
@@ -70,11 +71,12 @@ export function buildPrompt({
   knowledgeBase,
   message,
   bookingAlreadyScheduled,
+  messageCount,
 }: PromptOptions) {
   const normalizedBrand = brand.toLowerCase();
   const isProxe = normalizedBrand === 'proxe';
   const isWindchasers = normalizedBrand === 'windchasers';
-  const system = buildCorePrompt(brand, userName, knowledgeBase);
+  const system = buildCorePrompt(brand, userName, knowledgeBase, messageCount);
 
   const summaryBlock = summary
     ? `Conversation summary so far:\n${summary}\n`
@@ -93,12 +95,18 @@ export function buildPrompt({
     ? 'Reminder: the user already scheduled a booking. Acknowledge it and avoid rebooking.'
     : '';
 
+  // Add first message guidance for Windchasers
+  const firstMessageGuidance = (isWindchasers && (messageCount === 1 || messageCount === 0))
+    ? `\n\n⚠️ CRITICAL: This is the FIRST user message (messageCount: ${messageCount || 0}).\n- Do NOT ask qualification questions (name, phone, email, user type, education, timeline, course interest).\n- Do NOT ask "Are you exploring this for yourself or for someone else?"\n- Do NOT mention costs, pricing, or investment unless user explicitly asks about it.\n- ONLY answer the user's question or greet them.\n- Keep it simple: answer what they asked, nothing more.`
+    : '';
+
   const instructions = [
     summaryBlock,
     historyBlock,
     knowledgeBlock,
     bookingNote,
     'You are a lead qualification assistant. Format ALL responses with double line breaks between paragraphs (<br><br>). Short, punchy sentences. Consistent spacing throughout. Never mix formatting styles mid-conversation. Apply this exact formatting to EVERY message you send, regardless of content type. ABSOLUTE MAXIMUM: 2 sentences per response. Never exceed 2 sentences.',
+    firstMessageGuidance,
   ].filter(Boolean).join('\n\n');
 
   const userPrompt = `${instructions}\n\nLatest user message:\n${message}\n\nCraft your reply:`;

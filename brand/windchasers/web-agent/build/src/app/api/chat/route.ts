@@ -495,6 +495,7 @@ export async function POST(request: NextRequest) {
       knowledgeBase: knowledgeContext,
       message: finalMessage,
       bookingAlreadyScheduled: isBookingAlreadyScheduled || !!existingBookingMessage,
+      messageCount: messageCount,
     });
 
     const additionalGuidance = isThirdMessage
