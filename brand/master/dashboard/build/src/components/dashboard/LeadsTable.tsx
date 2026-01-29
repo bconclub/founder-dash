@@ -333,7 +333,7 @@ export default function LeadsTable({
       const masterData = lead.unified_context?.master || {}
       const userType = masterData.user_type || ''
       const courseInterest = masterData.course_interest || ''
-      const timeline = masterData.plan_to_fly || ''
+      const timeline = masterData.plan_to_fly || masterData.timeline || ''
       return [
         lead.name || '',
         lead.email || '',

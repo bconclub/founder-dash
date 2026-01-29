@@ -76,6 +76,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const pathname = usePathname()
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [isCollapsed, setIsCollapsed] = useState(false)
+  const [isHovered, setIsHovered] = useState(false)
+  const [isScrolled, setIsScrolled] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
   const [isCheckingAuth, setIsCheckingAuth] = useState(true)
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
@@ -84,6 +86,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [buildDate, setBuildDate] = useState<string>('')
   const [buildVersion, setBuildVersion] = useState<string>('1.0.0')
   const [moreOptionsOpen, setMoreOptionsOpen] = useState(false)
+  const autoHideTimeoutRef = React.useRef<NodeJS.Timeout | null>(null)
   
   // Get build/deployment date and version (only on client to avoid hydration mismatch)
   useEffect(() => {
@@ -164,6 +167,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       if (savedState !== null) {
         setIsCollapsed(savedState === 'true')
       }
+      // Note: Don't set default collapsed state here - let auto-hide handle it after initial render
     } catch (error) {
       console.error('Error loading preferences:', error)
       // Fallback to dark mode
@@ -174,6 +178,58 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       }
     }
   }, [])
+
+  // Auto-hide sidebar after inactivity (only on desktop, not mobile)
+  useEffect(() => {
+    if (isMobile || isCheckingAuth) return
+
+    const startAutoHideTimer = () => {
+      // Clear existing timer
+      if (autoHideTimeoutRef.current) {
+        clearTimeout(autoHideTimeoutRef.current)
+      }
+
+      // Only auto-hide if not manually expanded and not hovered
+      if (!isCollapsed && !isHovered && !isScrolled) {
+        autoHideTimeoutRef.current = setTimeout(() => {
+          setIsCollapsed(true)
+          localStorage.setItem('sidebar-collapsed', 'true')
+        }, 3000) // Auto-hide after 3 seconds of inactivity
+      }
+    }
+
+    // Start timer when sidebar is expanded and not hovered/scrolled
+    if (!isCollapsed && !isHovered && !isScrolled) {
+      startAutoHideTimer()
+    }
+
+    return () => {
+      if (autoHideTimeoutRef.current) {
+        clearTimeout(autoHideTimeoutRef.current)
+      }
+    }
+  }, [isCollapsed, isHovered, isScrolled, isMobile, isCheckingAuth])
+
+  // Initial auto-hide after page load (only on desktop)
+  useEffect(() => {
+    if (isMobile || isCheckingAuth) return
+    
+    // Only auto-hide if user hasn't manually set a preference
+    const savedState = localStorage.getItem('sidebar-collapsed')
+    if (savedState !== null) return // User has a preference, don't override
+
+    // Start auto-hide timer after initial load (give user time to see sidebar)
+    const initialTimer = setTimeout(() => {
+      if (!isHovered && !isScrolled && !isCollapsed) {
+        setIsCollapsed(true)
+        localStorage.setItem('sidebar-collapsed', 'true')
+      }
+    }, 5000) // Auto-hide after 5 seconds on initial load
+
+    return () => {
+      clearTimeout(initialTimer)
+    }
+  }, [isMobile, isCheckingAuth]) // Run when mobile/auth state changes
 
   // Check if mobile
   useEffect(() => {
@@ -193,7 +249,45 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const toggleSidebar = () => {
     const newState = !isCollapsed
     setIsCollapsed(newState)
+    setIsHovered(false)
+    setIsScrolled(false)
     localStorage.setItem('sidebar-collapsed', String(newState))
+    
+    // Clear auto-hide timer when manually toggled
+    if (autoHideTimeoutRef.current) {
+      clearTimeout(autoHideTimeoutRef.current)
+      autoHideTimeoutRef.current = null
+    }
+  }
+
+  const handleSidebarMouseEnter = () => {
+    if (isMobile) return
+    setIsHovered(true)
+    // Expand sidebar on hover if collapsed
+    if (isCollapsed) {
+      setIsCollapsed(false)
+    }
+    // Clear auto-hide timer
+    if (autoHideTimeoutRef.current) {
+      clearTimeout(autoHideTimeoutRef.current)
+      autoHideTimeoutRef.current = null
+    }
+  }
+
+  const handleSidebarMouseLeave = () => {
+    if (isMobile) return
+    setIsHovered(false)
+    // Collapse immediately when mouse leaves (no delay)
+    if (!isCollapsed && !isScrolled) {
+      // Clear any existing timer
+      if (autoHideTimeoutRef.current) {
+        clearTimeout(autoHideTimeoutRef.current)
+        autoHideTimeoutRef.current = null
+      }
+      // Collapse immediately
+      setIsCollapsed(true)
+      localStorage.setItem('sidebar-collapsed', 'true')
+    }
   }
 
   const toggleTheme = () => {
@@ -264,7 +358,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
       {/* Fixed Sidebar */}
       <div 
-        className={`dashboard-layout-sidebar fixed inset-y-0 left-0 z-50 flex flex-col transition-all duration-200 ease-in-out overflow-hidden ${
+        className={`dashboard-layout-sidebar fixed inset-y-0 left-0 z-50 flex flex-col transition-all duration-300 ease-in-out overflow-hidden ${
           isMobile && !mobileSidebarOpen ? '-translate-x-full' : 'translate-x-0'
         }`}
         style={{
@@ -272,59 +366,81 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           backgroundColor: 'var(--bg-secondary)',
           borderRight: '1px solid var(--border-primary)',
         }}
+        onMouseEnter={handleSidebarMouseEnter}
+        onMouseLeave={handleSidebarMouseLeave}
       >
         {/* Logo and Toggle */}
         <div 
           className="dashboard-layout-sidebar-header flex items-center justify-between flex-shrink-0"
-          style={{ padding: '20px 16px' }}
+          style={{ 
+            padding: isCollapsed ? '20px' : '20px 16px',
+            justifyContent: isCollapsed ? 'center' : 'space-between',
+          }}
         >
           {!isCollapsed && (
-            <h1 className="dashboard-layout-sidebar-logo text-xl font-bold" style={{ color: 'var(--text-primary)' }}>Windchasers</h1>
+            <>
+              <h1 className="dashboard-layout-sidebar-logo text-xl font-bold" style={{ color: 'var(--text-primary)' }}>Windchasers</h1>
+              {!isMobile && (
+                <button
+                  onClick={toggleSidebar}
+                  className="dashboard-layout-sidebar-toggle-button p-1.5 rounded-md transition-colors"
+                  style={{ backgroundColor: 'transparent', color: 'var(--text-primary)' }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent'
+                  }}
+                  aria-label="Collapse sidebar"
+                >
+                  <MdChevronLeft size={20} />
+                </button>
+              )}
+              {isMobile && (
+                <button
+                  onClick={() => setMobileSidebarOpen(false)}
+                  className="dashboard-layout-sidebar-close-button p-1.5 rounded-md transition-colors"
+                  style={{ backgroundColor: 'transparent', color: 'var(--text-primary)' }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent'
+                  }}
+                  aria-label="Close sidebar"
+                >
+                  <MdClose size={20} />
+                </button>
+              )}
+            </>
           )}
           {isCollapsed && (
-            <div className="dashboard-layout-sidebar-logo-collapsed w-8 h-8 rounded-full flex items-center justify-center text-white font-bold" style={{ backgroundColor: 'var(--accent-primary)' }}>
-              W
+            <div 
+              className="dashboard-layout-sidebar-logo-collapsed flex items-center justify-center cursor-pointer"
+              style={{ 
+                width: '40px',
+                height: '40px',
+              }}
+              onClick={() => {
+                if (!isMobile) {
+                  setIsCollapsed(false)
+                  localStorage.setItem('sidebar-collapsed', 'false')
+                }
+              }}
+              title="Click to expand sidebar"
+            >
+              <img
+                src="/windchasers-icon.png"
+                alt="Windchasers"
+                className="w-full h-full object-contain"
+                style={{ maxWidth: '40px', maxHeight: '40px' }}
+              />
             </div>
-          )}
-          {isMobile ? (
-            <button
-              onClick={() => setMobileSidebarOpen(false)}
-              className="dashboard-layout-sidebar-close-button p-1.5 rounded-md transition-colors"
-              style={{ backgroundColor: 'transparent', color: 'var(--text-primary)' }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'transparent'
-              }}
-              aria-label="Close sidebar"
-            >
-              <MdClose size={20} />
-            </button>
-          ) : (
-            <button
-              onClick={toggleSidebar}
-              className="dashboard-layout-sidebar-toggle-button p-1.5 rounded-md transition-colors"
-              style={{ backgroundColor: 'transparent', color: 'var(--text-primary)' }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'transparent'
-              }}
-              aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            >
-              {isCollapsed ? (
-                <MdChevronRight size={20} />
-              ) : (
-                <MdChevronLeft size={20} />
-              )}
-            </button>
           )}
         </div>
 
         {/* Navigation */}
-        <nav className="dashboard-layout-sidebar-navigation flex-1 overflow-y-auto flex flex-col" style={{ padding: isCollapsed ? '16px 0' : '16px' }}>
+        <nav className="dashboard-layout-sidebar-navigation flex-1 overflow-hidden flex flex-col" style={{ padding: isCollapsed ? '16px 0' : '16px' }}>
           {/* Main Navigation */}
           <div className="dashboard-layout-sidebar-navigation-list space-y-1 flex-1">
             {navigation.map((item, index) => {
@@ -527,6 +643,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                     border: '1px solid var(--border-primary)',
                     minWidth: '120px',
                   }}
+                  onMouseLeave={() => setUserMenuOpen(false)}
                 >
                   <button
                     onClick={handleLogout}
@@ -548,184 +665,374 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             </div>
           </div>
 
-          {/* 2. Icon Bar - Below User Section */}
-          <div 
-            className="dashboard-layout-icon-bar flex-shrink-0 border-t flex items-center justify-center"
-            style={{ 
-              borderColor: 'var(--border-primary)',
-              backgroundColor: 'transparent',
-              padding: '12px',
-              gap: '12px',
-            }}
-          >
-            {/* Help Icon */}
-            <button
-              onClick={() => window.open('https://docs.goproxe.com', '_blank')}
-              className="dashboard-layout-icon-button flex items-center justify-center rounded-md transition-colors"
-              style={{
-                width: '24px',
-                height: '24px',
-                color: 'var(--text-primary)',
+          {/* 2. Icon Bar - Below User Section (only show when expanded, or show three-dot menu when collapsed) */}
+          {!isCollapsed ? (
+            <div 
+              className="dashboard-layout-icon-bar flex-shrink-0 border-t flex items-center justify-center"
+              style={{ 
+                borderColor: 'var(--border-primary)',
                 backgroundColor: 'transparent',
-              }}
-              title="Help & Documentation"
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'transparent'
+                padding: '12px',
+                gap: '12px',
               }}
             >
-              <MdHelp size={24} />
-            </button>
-
-            {/* Theme Toggle */}
-            <button
-              onClick={toggleTheme}
-              className="dashboard-layout-icon-button flex items-center justify-center rounded-md transition-colors"
-              style={{
-                width: '24px',
-                height: '24px',
-                color: 'var(--text-primary)',
-                backgroundColor: 'transparent',
-              }}
-              title="Toggle Theme"
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'transparent'
-              }}
-            >
-              {isDarkMode ? <MdLightMode size={24} /> : <MdDarkMode size={24} />}
-            </button>
-
-            {/* Status Icon */}
-            <Link
-              href="/dashboard/status"
-              className="dashboard-layout-icon-button flex items-center justify-center rounded-md transition-colors"
-              style={{
-                width: '24px',
-                height: '24px',
-                color: 'var(--text-primary)',
-                backgroundColor: 'transparent',
-              }}
-              title="System Status"
-              onClick={() => {
-                if (isMobile) {
-                  setMobileSidebarOpen(false)
-                }
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'transparent'
-              }}
-            >
-              <MdMonitorHeart size={24} />
-            </Link>
-
-            {/* More Options */}
-            <div className="dashboard-layout-more-options relative">
+              {/* Help Icon */}
               <button
-                onClick={() => setMoreOptionsOpen(!moreOptionsOpen)}
+                onClick={() => window.open('https://docs.goproxe.com', '_blank')}
                 className="dashboard-layout-icon-button flex items-center justify-center rounded-md transition-colors"
                 style={{
                   width: '24px',
                   height: '24px',
+                  minWidth: '24px',
+                  minHeight: '24px',
                   color: 'var(--text-primary)',
-                  backgroundColor: moreOptionsOpen ? 'var(--bg-hover)' : 'transparent',
+                  backgroundColor: 'transparent',
                 }}
-                title="More Options"
+                title="Help & Documentation"
                 onMouseEnter={(e) => {
-                  if (!moreOptionsOpen) {
-                    e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
-                  }
+                  e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
                 }}
                 onMouseLeave={(e) => {
-                  if (!moreOptionsOpen) {
-                    e.currentTarget.style.backgroundColor = 'transparent'
-                  }
+                  e.currentTarget.style.backgroundColor = 'transparent'
                 }}
               >
-                <MdMoreHoriz size={24} />
+                <MdHelp size={24} />
               </button>
-              
-              {moreOptionsOpen && (
-                <div 
-                  className="dashboard-layout-more-options-dropdown absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 rounded-md shadow-lg py-1 z-50"
+
+              {/* Theme Toggle */}
+              <button
+                onClick={toggleTheme}
+                className="dashboard-layout-icon-button flex items-center justify-center rounded-md transition-colors"
+                style={{
+                  width: '24px',
+                  height: '24px',
+                  minWidth: '24px',
+                  minHeight: '24px',
+                  color: 'var(--text-primary)',
+                  backgroundColor: 'transparent',
+                }}
+                title="Toggle Theme"
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent'
+                }}
+              >
+                {isDarkMode ? <MdLightMode size={24} /> : <MdDarkMode size={24} />}
+              </button>
+
+              {/* Status Icon */}
+              <Link
+                href="/dashboard/status"
+                className="dashboard-layout-icon-button flex items-center justify-center rounded-md transition-colors"
+                style={{
+                  width: '24px',
+                  height: '24px',
+                  minWidth: '24px',
+                  minHeight: '24px',
+                  color: 'var(--text-primary)',
+                  backgroundColor: 'transparent',
+                }}
+                title="System Status"
+                onClick={() => {
+                  if (isMobile) {
+                    setMobileSidebarOpen(false)
+                  }
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent'
+                }}
+              >
+                <MdMonitorHeart size={24} />
+              </Link>
+
+              {/* More Options */}
+              <div className="dashboard-layout-more-options relative">
+                <button
+                  onClick={() => setMoreOptionsOpen(!moreOptionsOpen)}
+                  className="dashboard-layout-icon-button flex items-center justify-center rounded-md transition-colors"
                   style={{
-                    backgroundColor: 'var(--bg-secondary)',
-                    border: '1px solid var(--border-primary)',
-                    minWidth: '180px',
+                    width: '24px',
+                    height: '24px',
+                    minWidth: '24px',
+                    minHeight: '24px',
+                    color: 'var(--text-primary)',
+                    backgroundColor: moreOptionsOpen ? 'var(--bg-hover)' : 'transparent',
                   }}
-                  onMouseLeave={() => setMoreOptionsOpen(false)}
+                  title="More Options"
+                  onMouseEnter={(e) => {
+                    if (!moreOptionsOpen) {
+                      e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!moreOptionsOpen) {
+                      e.currentTarget.style.backgroundColor = 'transparent'
+                    }
+                  }}
                 >
-                  <button
-                    onClick={() => {
-                      setMoreOptionsOpen(false)
-                      // TODO: Implement keyboard shortcuts modal
-                      console.log('Keyboard Shortcuts')
-                    }}
-                    className="dashboard-layout-more-options-item flex items-center w-full text-left px-4 py-2 text-sm transition-colors duration-200"
+                  <MdMoreHoriz size={24} />
+                </button>
+                
+                {moreOptionsOpen && (
+                  <div 
+                    className="dashboard-layout-more-options-dropdown absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 rounded-md shadow-lg py-1 z-50"
                     style={{
-                      color: 'var(--text-primary)',
+                      backgroundColor: 'var(--bg-secondary)',
+                      border: '1px solid var(--border-primary)',
+                      minWidth: '180px',
                     }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = 'transparent'
-                    }}
+                    onMouseLeave={() => setMoreOptionsOpen(false)}
                   >
-                    <MdKeyboard size={18} style={{ marginRight: '12px' }} />
-                    Keyboard Shortcuts
-                  </button>
-                  <button
-                    onClick={() => {
-                      setMoreOptionsOpen(false)
-                      // TODO: Implement report issue
-                      window.open('https://github.com/bconclub/proxe-dashboard/issues/new', '_blank')
-                    }}
-                    className="dashboard-layout-more-options-item flex items-center w-full text-left px-4 py-2 text-sm transition-colors duration-200"
-                    style={{
-                      color: 'var(--text-primary)',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = 'transparent'
-                    }}
-                  >
-                    <MdBugReport size={18} style={{ marginRight: '12px' }} />
-                    Report Issue
-                  </button>
-                  <button
-                    onClick={() => {
-                      setMoreOptionsOpen(false)
-                      // TODO: Implement send feedback
-                      window.open('mailto:support@goproxe.com?subject=Dashboard Feedback', '_blank')
-                    }}
-                    className="dashboard-layout-more-options-item flex items-center w-full text-left px-4 py-2 text-sm transition-colors duration-200"
-                    style={{
-                      color: 'var(--text-primary)',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = 'transparent'
-                    }}
-                  >
-                    <MdFeedback size={18} style={{ marginRight: '12px' }} />
-                    Send Feedback
-                  </button>
-                </div>
-              )}
-            </div>
+                    <button
+                      onClick={() => {
+                        setMoreOptionsOpen(false)
+                        // TODO: Implement keyboard shortcuts modal
+                        console.log('Keyboard Shortcuts')
+                      }}
+                      className="dashboard-layout-more-options-item flex items-center w-full text-left px-4 py-2 text-sm transition-colors duration-200"
+                      style={{
+                        color: 'var(--text-primary)',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent'
+                      }}
+                    >
+                      <MdKeyboard size={18} style={{ marginRight: '12px' }} />
+                      Keyboard Shortcuts
+                    </button>
+                    <button
+                      onClick={() => {
+                        setMoreOptionsOpen(false)
+                        // TODO: Implement report issue
+                        window.open('https://github.com/bconclub/proxe-dashboard/issues/new', '_blank')
+                      }}
+                      className="dashboard-layout-more-options-item flex items-center w-full text-left px-4 py-2 text-sm transition-colors duration-200"
+                      style={{
+                        color: 'var(--text-primary)',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent'
+                      }}
+                    >
+                      <MdBugReport size={18} style={{ marginRight: '12px' }} />
+                      Report Issue
+                    </button>
+                    <button
+                      onClick={() => {
+                        setMoreOptionsOpen(false)
+                        // TODO: Implement send feedback
+                        window.open('mailto:support@goproxe.com?subject=Dashboard Feedback', '_blank')
+                      }}
+                      className="dashboard-layout-more-options-item flex items-center w-full text-left px-4 py-2 text-sm transition-colors duration-200"
+                      style={{
+                        color: 'var(--text-primary)',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent'
+                      }}
+                    >
+                      <MdFeedback size={18} style={{ marginRight: '12px' }} />
+                      Send Feedback
+                    </button>
+                  </div>
+                )}
+              </div>
           </div>
+          ) : (
+            /* When collapsed, show only three-dot menu */
+            <div 
+              className="dashboard-layout-icon-bar-collapsed flex-shrink-0 border-t flex items-center justify-center"
+              style={{ 
+                borderColor: 'var(--border-primary)',
+                backgroundColor: 'transparent',
+                padding: '12px 8px',
+              }}
+            >
+              <div className="dashboard-layout-more-options relative">
+                <button
+                  onClick={() => setMoreOptionsOpen(!moreOptionsOpen)}
+                  className="dashboard-layout-icon-button flex items-center justify-center rounded-md transition-colors"
+                  style={{
+                    width: '32px',
+                    height: '32px',
+                    minWidth: '32px',
+                    minHeight: '32px',
+                    color: 'var(--text-primary)',
+                    backgroundColor: moreOptionsOpen ? 'var(--bg-hover)' : 'transparent',
+                  }}
+                  title="More Options"
+                  onMouseEnter={(e) => {
+                    if (!moreOptionsOpen) {
+                      e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!moreOptionsOpen) {
+                      e.currentTarget.style.backgroundColor = 'transparent'
+                    }
+                  }}
+                >
+                  <MdMoreHoriz size={20} />
+                </button>
+                
+                {moreOptionsOpen && (
+                  <div 
+                    className="dashboard-layout-more-options-dropdown absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 rounded-md shadow-lg py-1 z-50"
+                    style={{
+                      backgroundColor: 'var(--bg-secondary)',
+                      border: '1px solid var(--border-primary)',
+                      minWidth: '180px',
+                    }}
+                    onMouseLeave={() => setMoreOptionsOpen(false)}
+                  >
+                    <button
+                      onClick={() => {
+                        setMoreOptionsOpen(false)
+                        window.open('https://docs.goproxe.com', '_blank')
+                      }}
+                      className="dashboard-layout-more-options-item flex items-center w-full text-left px-4 py-2 text-sm transition-colors duration-200"
+                      style={{
+                        color: 'var(--text-primary)',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent'
+                      }}
+                    >
+                      <MdHelp size={18} style={{ marginRight: '12px' }} />
+                      Help & Documentation
+                    </button>
+                    <button
+                      onClick={() => {
+                        setMoreOptionsOpen(false)
+                        toggleTheme()
+                      }}
+                      className="dashboard-layout-more-options-item flex items-center w-full text-left px-4 py-2 text-sm transition-colors duration-200"
+                      style={{
+                        color: 'var(--text-primary)',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent'
+                      }}
+                    >
+                      {isDarkMode ? (
+                        <>
+                          <MdLightMode size={18} style={{ marginRight: '12px' }} />
+                          Light Mode
+                        </>
+                      ) : (
+                        <>
+                          <MdDarkMode size={18} style={{ marginRight: '12px' }} />
+                          Dark Mode
+                        </>
+                      )}
+                    </button>
+                    <Link
+                      href="/dashboard/status"
+                      onClick={() => {
+                        setMoreOptionsOpen(false)
+                        if (isMobile) {
+                          setMobileSidebarOpen(false)
+                        }
+                      }}
+                      className="dashboard-layout-more-options-item flex items-center w-full text-left px-4 py-2 text-sm transition-colors duration-200"
+                      style={{
+                        color: 'var(--text-primary)',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent'
+                      }}
+                    >
+                      <MdMonitorHeart size={18} style={{ marginRight: '12px' }} />
+                      System Status
+                    </Link>
+                    <button
+                      onClick={() => {
+                        setMoreOptionsOpen(false)
+                        // TODO: Implement keyboard shortcuts modal
+                        console.log('Keyboard Shortcuts')
+                      }}
+                      className="dashboard-layout-more-options-item flex items-center w-full text-left px-4 py-2 text-sm transition-colors duration-200"
+                      style={{
+                        color: 'var(--text-primary)',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent'
+                      }}
+                    >
+                      <MdKeyboard size={18} style={{ marginRight: '12px' }} />
+                      Keyboard Shortcuts
+                    </button>
+                    <button
+                      onClick={() => {
+                        setMoreOptionsOpen(false)
+                        // TODO: Implement report issue
+                        window.open('https://github.com/bconclub/proxe-dashboard/issues/new', '_blank')
+                      }}
+                      className="dashboard-layout-more-options-item flex items-center w-full text-left px-4 py-2 text-sm transition-colors duration-200"
+                      style={{
+                        color: 'var(--text-primary)',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent'
+                      }}
+                    >
+                      <MdBugReport size={18} style={{ marginRight: '12px' }} />
+                      Report Issue
+                    </button>
+                    <button
+                      onClick={() => {
+                        setMoreOptionsOpen(false)
+                        // TODO: Implement send feedback
+                        window.open('mailto:support@goproxe.com?subject=Dashboard Feedback', '_blank')
+                      }}
+                      className="dashboard-layout-more-options-item flex items-center w-full text-left px-4 py-2 text-sm transition-colors duration-200"
+                      style={{
+                        color: 'var(--text-primary)',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent'
+                      }}
+                    >
+                      <MdFeedback size={18} style={{ marginRight: '12px' }} />
+                      Send Feedback
+                    </button>
+                  </div>
+                )}
+              </div>
+          </div>
+          )}
 
           {/* 3. Version Badge - Below Icon Bar */}
           <div 
@@ -787,7 +1094,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
       {/* Main Content */}
       <div 
-        className="dashboard-layout-main-content flex flex-col min-h-screen transition-all duration-200 ease-in-out"
+        className="dashboard-layout-main-content flex flex-col min-h-screen transition-all duration-300 ease-in-out"
         style={{
           marginLeft: sidebarContentMargin,
           backgroundColor: 'var(--bg-primary)',

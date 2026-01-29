@@ -16,6 +16,11 @@ const zenDots = Zen_Dots({
 export const metadata: Metadata = {
   title: 'WindChasers Dashboard',
   description: 'WindChasers Aviation Academy - Dashboard for managing leads, bookings, and metrics',
+  icons: {
+    icon: '/windchasers-icon.png',
+    shortcut: '/windchasers-icon.png',
+    apple: '/windchasers-icon.png',
+  },
 }
 
 export default function RootLayout({

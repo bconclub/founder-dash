@@ -28,11 +28,11 @@ export default function WebAgentSettingsClient() {
       // Localhost fallback - use root page
       widgetUrl = 'http://localhost:4003/'
     } else if (typeof window !== 'undefined') {
-      // Production fallback - use root page
-      widgetUrl = `${window.location.origin}/`
+      // Production fallback - use web-agent domain
+      widgetUrl = 'https://agent.windchasers.in/'
     } else {
       // Server-side fallback
-      widgetUrl = '/'
+      widgetUrl = 'https://agent.windchasers.in/'
     }
     
     // Ensure iframe loads when component mounts
@@ -68,8 +68,8 @@ export default function WebAgentSettingsClient() {
         : typeof window !== 'undefined' && window.location.hostname === 'localhost'
         ? 'http://localhost:4003/widget'
         : typeof window !== 'undefined'
-        ? `${window.location.origin}/widget`
-        : '/widget'
+        ? 'https://agent.windchasers.in/widget'
+        : 'https://agent.windchasers.in/widget'
       
       // Reload the iframe to reset the widget state
       if (iframeRef.current) {
@@ -276,9 +276,9 @@ export default function WebAgentSettingsClient() {
                 } else if (isLocalhost) {
                   return 'http://localhost:4003/'
                 } else if (typeof window !== 'undefined') {
-                  return `${window.location.origin}/`
+                  return 'https://agent.windchasers.in/'
                 } else {
-                  return '/'
+                  return 'https://agent.windchasers.in/'
                 }
               })()}
               className="w-full h-full border-0"

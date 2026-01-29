@@ -333,7 +333,7 @@ export default function LeadsTable({
       const windchasersData = lead.unified_context?.windchasers || {}
       const userType = windchasersData.user_type || ''
       const courseInterest = windchasersData.course_interest || ''
-      const timeline = windchasersData.plan_to_fly || ''
+      const timeline = windchasersData.plan_to_fly || windchasersData.timeline || ''
       return [
         lead.name || '',
         lead.email || '',
@@ -576,7 +576,8 @@ export default function LeadsTable({
                   <td className="leads-table-cell leads-table-cell-timeline px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                     {(() => {
                       const windchasersData = lead.unified_context?.windchasers || {}
-                      const timeline = windchasersData.plan_to_fly
+                      // Check both plan_to_fly and timeline for backward compatibility
+                      const timeline = windchasersData.plan_to_fly || windchasersData.timeline
                       if (!timeline) return '-'
                       // Format timeline for display
                       const timelineMap: Record<string, string> = {

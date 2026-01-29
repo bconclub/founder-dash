@@ -3,7 +3,6 @@ import { Exo_2 } from 'next/font/google'
 import '@/styles/globals.css'
 import '@/styles/theme.css'
 import AnalyticsScripts from '@/components/shared/AnalyticsScripts'
-import LoadingBar from '@/components/shared/LoadingBar'
 import { DeployModalProvider } from '@/contexts/DeployModalContext'
 
 const exo2 = Exo_2({
@@ -40,7 +39,6 @@ export default function RootLayout({
     <html lang="en" data-brand="windchasers" data-theme="aviation-gold" className={exo2.variable} suppressHydrationWarning>
       <body suppressHydrationWarning>
         <AnalyticsScripts />
-        <LoadingBar />
         <DeployModalProvider>
           {children}
         </DeployModalProvider>

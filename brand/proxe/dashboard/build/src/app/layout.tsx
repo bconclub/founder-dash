@@ -16,6 +16,11 @@ const zenDots = Zen_Dots({
 export const metadata: Metadata = {
   title: 'PROXe HQ',
   description: 'Dashboard for managing leads, bookings, and metrics',
+  icons: {
+    icon: '/favicon.ico',
+    shortcut: '/favicon.ico',
+    apple: '/favicon.ico',
+  },
 }
 
 export default function RootLayout({
@@ -24,7 +29,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning data-brand="proxe" data-theme="default">
       <body className={`${exo2.className} ${zenDots.variable}`} suppressHydrationWarning>
         <Script
           id="theme-init"

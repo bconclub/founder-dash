@@ -72,13 +72,14 @@ export async function GET(
       console.log('Using unified_summary from unified_context for lead:', leadId)
       
       // Still need to fetch activities and stage history for attribution
-      const { data: lastStageChange } = await supabase
+      const { data: lastStageChangeData } = await supabase
         .from('stage_history')
         .select('changed_by, changed_at, new_stage')
         .eq('lead_id', leadId)
         .order('changed_at', { ascending: false })
         .limit(1)
-        .single()
+      
+      const lastStageChange = lastStageChangeData && lastStageChangeData.length > 0 ? lastStageChangeData[0] : null
 
       const { data: recentActivities } = await supabase
         .from('activities')
@@ -158,6 +159,9 @@ export async function GET(
           budget: lead.unified_context?.budget || lead.unified_context?.web?.budget || lead.unified_context?.whatsapp?.budget,
           serviceInterest: lead.unified_context?.service_interest || lead.unified_context?.web?.service_interest,
           painPoints: lead.unified_context?.pain_points || lead.unified_context?.web?.pain_points,
+          userType: lead.unified_context?.windchasers?.user_type || null,
+          courseInterest: lead.unified_context?.windchasers?.course_interest || null,
+          planToFly: lead.unified_context?.windchasers?.plan_to_fly || lead.unified_context?.windchasers?.timeline || null,
         },
         leadStage: lead.lead_stage,
         subStage: lead.sub_stage,
@@ -172,27 +176,20 @@ export async function GET(
       })
     }
 
-    // Priority 2: Combine web and whatsapp summaries if they exist
+    // Priority 2: Generate unified summary from web and whatsapp summaries if they exist
+    // (but unified_summary doesn't exist yet)
     if (webSummary || whatsappSummary) {
-      console.log('Combining web and whatsapp summaries from unified_context for lead:', leadId)
+      console.log('Generating unified summary from web/whatsapp summaries for lead:', leadId)
       
-      let combinedSummary = ''
-      if (webSummary && whatsappSummary) {
-        combinedSummary = `Web: ${webSummary}\n\nWhatsApp: ${whatsappSummary}`
-      } else if (webSummary) {
-        combinedSummary = `Web: ${webSummary}`
-      } else if (whatsappSummary) {
-        combinedSummary = `WhatsApp: ${whatsappSummary}`
-      }
-
-      // Still need to fetch activities and stage history for attribution
-      const { data: lastStageChange } = await supabase
+      // Fetch additional context needed for unified summary generation
+      const { data: lastStageChangeData } = await supabase
         .from('stage_history')
         .select('changed_by, changed_at, new_stage')
         .eq('lead_id', leadId)
         .order('changed_at', { ascending: false })
         .limit(1)
-        .single()
+      
+      const lastStageChange = lastStageChangeData && lastStageChangeData.length > 0 ? lastStageChangeData[0] : null
 
       const { data: recentActivities } = await supabase
         .from('activities')
@@ -205,7 +202,249 @@ export async function GET(
         `)
         .eq('lead_id', leadId)
         .order('created_at', { ascending: false })
-        .limit(1)
+        .limit(5)
+
+      // Calculate basic metrics
+      const lastInteraction = lead.last_interaction_at || lead.created_at
+      const daysInactive = lastInteraction
+        ? Math.max(0, Math.floor((new Date().getTime() - new Date(lastInteraction).getTime()) / (1000 * 60 * 60 * 24)))
+        : 0
+
+      // Fetch messages for response rate calculation
+      let responseRate = 0
+      try {
+        const { data: messages } = await supabase
+          .from('conversations')
+          .select('sender')
+          .eq('lead_id', leadId)
+
+        if (messages && messages.length > 0) {
+          const customerMessages = messages.filter(m => m.sender === 'customer').length
+          responseRate = Math.round((customerMessages / messages.length) * 100)
+        }
+      } catch (error) {
+        console.error('Error calculating response rate:', error)
+      }
+
+      // Extract key info
+      const windchasersData = lead.unified_context?.windchasers || {}
+      const keyInfo = {
+        budget: lead.unified_context?.budget || lead.unified_context?.web?.budget || lead.unified_context?.whatsapp?.budget,
+        serviceInterest: lead.unified_context?.service_interest || lead.unified_context?.web?.service_interest,
+        painPoints: lead.unified_context?.pain_points || lead.unified_context?.web?.pain_points,
+        userType: windchasersData.user_type || null,
+        courseInterest: windchasersData.course_interest || null,
+        planToFly: windchasersData.plan_to_fly || windchasersData.timeline || null,
+        education: windchasersData.education || null,
+      }
+
+      // Build activities context
+      const activitiesContext = recentActivities
+        ?.map(a => {
+          const creator = Array.isArray(a.dashboard_users) 
+            ? a.dashboard_users[0] 
+            : a.dashboard_users
+          return `[${a.created_at}] ${creator?.name || creator?.email || 'Team'}: ${a.activity_type} - ${a.note}`
+        })
+        .join('\n') || 'No team activities'
+
+      // Build windchasers-specific info
+      const windchasersInfo = []
+      if (keyInfo.userType) {
+        windchasersInfo.push(`User Type: ${keyInfo.userType}`)
+      }
+      if (keyInfo.courseInterest) {
+        const courseMap: Record<string, string> = {
+          'pilot': 'DGCA/Flight Training',
+          'helicopter': 'Helicopter Training',
+          'drone': 'Drone Training',
+          'cabin': 'Cabin Crew Training',
+          'DGCA': 'DGCA Training',
+          'Flight': 'Flight Training',
+          'Heli': 'Helicopter Training',
+          'Cabin': 'Cabin Crew Training',
+          'Drone': 'Drone Training'
+        }
+        windchasersInfo.push(`Course Interest: ${courseMap[keyInfo.courseInterest] || keyInfo.courseInterest}`)
+      }
+      if (keyInfo.planToFly) {
+        const timelineMap: Record<string, string> = {
+          'asap': 'ASAP',
+          '1-3mo': '1-3 Months',
+          '6+mo': '6+ Months',
+          '1yr+': '1 Year+'
+        }
+        windchasersInfo.push(`Timeline: ${timelineMap[keyInfo.planToFly] || keyInfo.planToFly}`)
+      }
+      if (keyInfo.education) {
+        windchasersInfo.push(`Education: ${keyInfo.education === '12th_completed' ? '12th Completed' : 'In School'}`)
+      }
+
+      // Try to generate unified summary using Claude API
+      const apiKey = process.env.CLAUDE_API_KEY
+      if (apiKey) {
+        try {
+          const prompt = `Generate a comprehensive, detailed unified summary for this aviation training lead by intelligently combining information from multiple communication channels. The summary should be informative and provide a complete picture of the lead's journey and status.
+
+FORMAT REQUIREMENTS:
+- Write 3-5 sentences (not just one line)
+- Intelligently merge information from all channels into a cohesive narrative
+- Include context about when they first contacted, through which channel(s)
+- Describe their current status and engagement level across all channels
+- Mention key details like user type, course interest, timeline if available
+- Include any budget, pain points, or specific interests mentioned
+- Note their current stage in the sales funnel
+- Suggest next steps or recommended actions
+
+CRITICAL RULES:
+- ONLY state actions explicitly confirmed in messages
+- "ok done" or "sure" does NOT mean signup completed
+- If no explicit confirmation of signup/payment, state: "Inquiring about [topic]"
+- NEVER assume actions that aren't explicitly stated
+- Use actual message content, not inferred intent
+- Be descriptive and provide context, not just a single sentence
+- Create a unified narrative that flows naturally, don't just list channel summaries
+
+Lead Information:
+Name: ${lead.customer_name || 'Customer'}
+Stage: ${lead.lead_stage || 'Unknown'}${lead.sub_stage ? ` (${lead.sub_stage})` : ''}
+Days Inactive: ${daysInactive}
+Response Rate: ${responseRate}%
+${windchasersInfo.length > 0 ? `\nAviation-Specific Details:\n${windchasersInfo.join('\n')}` : ''}
+
+Channel Summaries to Unify:
+${webSummary ? `Web Channel Summary:\n${webSummary}\n` : ''}
+${whatsappSummary ? `WhatsApp Channel Summary:\n${whatsappSummary}\n` : ''}
+
+Recent Activities:
+${activitiesContext}
+
+${keyInfo.budget ? `Budget mentioned: ${keyInfo.budget}` : ''}
+${keyInfo.serviceInterest ? `Service interest: ${keyInfo.serviceInterest}` : ''}
+${keyInfo.painPoints ? `Pain points: ${keyInfo.painPoints}` : ''}
+${lead.unified_context?.next_touchpoint ? `Next Touchpoint: ${lead.unified_context.next_touchpoint}` : ''}
+
+Generate a comprehensive 3-5 sentence unified summary that intelligently combines information from all channels into a cohesive narrative. Include context, current status, key details, and next steps. Make it informative and actionable. Follow the CRITICAL RULES - only state explicitly confirmed actions.`
+
+          // Add timeout to prevent hanging
+          const controller = new AbortController()
+          const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
+          
+          let response
+          try {
+            response = await fetch('https://api.anthropic.com/v1/messages', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': apiKey,
+                'anthropic-version': '2023-06-01',
+              },
+              body: JSON.stringify({
+                model: 'claude-sonnet-4-20250514',
+                max_tokens: 800,
+                messages: [
+                  {
+                    role: 'user',
+                    content: prompt,
+                  },
+                ],
+              }),
+              signal: controller.signal,
+            })
+            clearTimeout(timeoutId)
+          } catch (fetchError: any) {
+            clearTimeout(timeoutId)
+            if (fetchError.name === 'AbortError') {
+              console.error('Claude API request timed out after 30 seconds')
+            } else {
+              console.error('Claude API request failed:', fetchError)
+            }
+            throw fetchError // Re-throw to be caught by outer catch
+          }
+
+          if (response.ok) {
+            const data = await response.json()
+            const unifiedSummary = data.content?.[0]?.text || ''
+            if (unifiedSummary) {
+              // Build attribution
+              let attribution = ''
+              if (lastStageChange) {
+                const changedBy = lastStageChange.changed_by
+                let actorName = 'PROXe AI'
+                let action = `changed stage to ${lastStageChange.new_stage}`
+                
+                if (changedBy !== 'PROXe AI' && changedBy !== 'system') {
+                  const { data: user } = await supabase
+                    .from('dashboard_users')
+                    .select('name, email')
+                    .eq('id', changedBy)
+                    .single()
+                  
+                  if (user) {
+                    actorName = user.name || user.email || 'Team Member'
+                  }
+                }
+                
+                const timeAgo = formatTimeAgo(lastStageChange.changed_at)
+                attribution = `Last updated by ${actorName} ${timeAgo} - ${action}`
+              } else if (recentActivities && recentActivities.length > 0) {
+                const latestActivity = recentActivities[0]
+                const creator = Array.isArray(latestActivity.dashboard_users) 
+                  ? latestActivity.dashboard_users[0] 
+                  : latestActivity.dashboard_users
+                const actorName = creator?.name || creator?.email || 'Team Member'
+                const timeAgo = formatTimeAgo(latestActivity.created_at)
+                attribution = `Last updated by ${actorName} ${timeAgo} - ${latestActivity.activity_type}`
+              }
+
+              const summaryData = {
+                leadName: lead.customer_name || 'Customer',
+                lastMessage: null,
+                conversationStatus: 'Active',
+                responseRate,
+                daysInactive,
+                nextTouchpoint: lead.unified_context?.next_touchpoint || lead.unified_context?.sequence?.next_step,
+                keyInfo,
+                leadStage: lead.lead_stage,
+                subStage: lead.sub_stage,
+                bookingDate: bookingDate,
+                bookingTime: bookingTime,
+              }
+
+              return NextResponse.json({
+                summary: unifiedSummary,
+                attribution,
+                data: summaryData,
+              })
+            }
+          } else {
+            const errorText = await response.text()
+            console.error('Claude API error:', response.status, errorText)
+          }
+        } catch (error) {
+          console.error('Error generating unified summary from channel summaries:', error)
+          // Fall through to fallback
+        }
+      }
+
+      // Fallback: If Claude API fails or is unavailable, create a better combined summary
+      let fallbackSummary = ''
+      if (webSummary && whatsappSummary) {
+        // Try to create a more unified narrative
+        fallbackSummary = `${lead.customer_name || 'Customer'} has engaged through both web and WhatsApp channels. `
+        fallbackSummary += `Web interaction: ${webSummary} `
+        fallbackSummary += `WhatsApp interaction: ${whatsappSummary} `
+        fallbackSummary += `Currently in ${lead.lead_stage || 'Unknown'} stage${lead.sub_stage ? ` (${lead.sub_stage})` : ''}.`
+      } else if (webSummary) {
+        fallbackSummary = `${lead.customer_name || 'Customer'} engaged via web channel. ${webSummary} Currently in ${lead.lead_stage || 'Unknown'} stage${lead.sub_stage ? ` (${lead.sub_stage})` : ''}.`
+      } else if (whatsappSummary) {
+        fallbackSummary = `${lead.customer_name || 'Customer'} engaged via WhatsApp. ${whatsappSummary} Currently in ${lead.lead_stage || 'Unknown'} stage${lead.sub_stage ? ` (${lead.sub_stage})` : ''}.`
+      }
+      
+      // Safety check: ensure we always have a summary
+      if (!fallbackSummary || fallbackSummary.trim() === '') {
+        fallbackSummary = `${lead.customer_name || 'Customer'} is currently in the ${lead.lead_stage || 'Unknown'} stage${lead.sub_stage ? ` (${lead.sub_stage})` : ''}.`
+      }
 
       // Build attribution
       let attribution = ''
@@ -230,35 +469,12 @@ export async function GET(
         attribution = `Last updated by ${actorName} ${timeAgo} - ${action}`
       } else if (recentActivities && recentActivities.length > 0) {
         const latestActivity = recentActivities[0]
-        // dashboard_users is an array from the relation query, get first element
         const creator = Array.isArray(latestActivity.dashboard_users) 
           ? latestActivity.dashboard_users[0] 
           : latestActivity.dashboard_users
         const actorName = creator?.name || creator?.email || 'Team Member'
         const timeAgo = formatTimeAgo(latestActivity.created_at)
         attribution = `Last updated by ${actorName} ${timeAgo} - ${latestActivity.activity_type}`
-      }
-
-      // Calculate basic metrics for summaryData
-      const lastInteraction = lead.last_interaction_at || lead.created_at
-      const daysInactive = lastInteraction
-        ? Math.max(0, Math.floor((new Date().getTime() - new Date(lastInteraction).getTime()) / (1000 * 60 * 60 * 24)))
-        : 0
-
-      // Fetch messages for response rate calculation
-      let responseRate = 0
-      try {
-        const { data: messages } = await supabase
-          .from('conversations')
-          .select('sender')
-          .eq('lead_id', leadId)
-
-        if (messages && messages.length > 0) {
-          const customerMessages = messages.filter(m => m.sender === 'customer').length
-          responseRate = Math.round((customerMessages / messages.length) * 100)
-        }
-      } catch (error) {
-        console.error('Error calculating response rate:', error)
       }
 
       const summaryData = {
@@ -268,11 +484,7 @@ export async function GET(
         responseRate,
         daysInactive,
         nextTouchpoint: lead.unified_context?.next_touchpoint || lead.unified_context?.sequence?.next_step,
-        keyInfo: {
-          budget: lead.unified_context?.budget || lead.unified_context?.web?.budget || lead.unified_context?.whatsapp?.budget,
-          serviceInterest: lead.unified_context?.service_interest || lead.unified_context?.web?.service_interest,
-          painPoints: lead.unified_context?.pain_points || lead.unified_context?.web?.pain_points,
-        },
+        keyInfo,
         leadStage: lead.lead_stage,
         subStage: lead.sub_stage,
         bookingDate: bookingDate,
@@ -280,7 +492,7 @@ export async function GET(
       }
 
       return NextResponse.json({
-        summary: combinedSummary,
+        summary: fallbackSummary,
         attribution,
         data: summaryData,
       })
@@ -346,10 +558,15 @@ export async function GET(
     const nextTouchpoint = lead.unified_context?.next_touchpoint || lead.unified_context?.sequence?.next_step
 
     // Extract key info from unified_context
+    const windchasersData = lead.unified_context?.windchasers || {}
     const keyInfo = {
       budget: lead.unified_context?.budget || lead.unified_context?.web?.budget || lead.unified_context?.whatsapp?.budget,
       serviceInterest: lead.unified_context?.service_interest || lead.unified_context?.web?.service_interest,
       painPoints: lead.unified_context?.pain_points || lead.unified_context?.web?.pain_points,
+      userType: windchasersData.user_type || null,
+      courseInterest: windchasersData.course_interest || null,
+      planToFly: windchasersData.plan_to_fly || windchasersData.timeline || null,
+      education: windchasersData.education || null,
     }
 
     // Determine conversation status
@@ -409,13 +626,14 @@ export async function GET(
       .limit(5)
 
     // Fetch last stage change
-    const { data: lastStageChange } = await supabase
+    const { data: lastStageChangeData } = await supabase
       .from('stage_history')
       .select('changed_by, changed_at, new_stage')
       .eq('lead_id', leadId)
       .order('changed_at', { ascending: false })
       .limit(1)
-      .single()
+    
+    const lastStageChange = lastStageChangeData && lastStageChangeData.length > 0 ? lastStageChangeData[0] : null
 
     // Generate AI summary if Claude API key is available
     const apiKey = process.env.CLAUDE_API_KEY
@@ -437,21 +655,63 @@ export async function GET(
           })
           .join('\n') || 'No team activities'
 
-        const prompt = `Generate a unified summary for this lead in this EXACT format:
+        // Build comprehensive context for summary
+        const windchasersInfo = []
+        if (keyInfo.userType) {
+          windchasersInfo.push(`User Type: ${keyInfo.userType}`)
+        }
+        if (keyInfo.courseInterest) {
+          const courseMap: Record<string, string> = {
+            'pilot': 'DGCA/Flight Training',
+            'helicopter': 'Helicopter Training',
+            'drone': 'Drone Training',
+            'cabin': 'Cabin Crew Training',
+            'DGCA': 'DGCA Training',
+            'Flight': 'Flight Training',
+            'Heli': 'Helicopter Training',
+            'Cabin': 'Cabin Crew Training',
+            'Drone': 'Drone Training'
+          }
+          windchasersInfo.push(`Course Interest: ${courseMap[keyInfo.courseInterest] || keyInfo.courseInterest}`)
+        }
+        if (keyInfo.planToFly) {
+          const timelineMap: Record<string, string> = {
+            'asap': 'ASAP',
+            '1-3mo': '1-3 Months',
+            '6+mo': '6+ Months',
+            '1yr+': '1 Year+'
+          }
+          windchasersInfo.push(`Timeline: ${timelineMap[keyInfo.planToFly] || keyInfo.planToFly}`)
+        }
+        if (keyInfo.education) {
+          windchasersInfo.push(`Education: ${keyInfo.education === '12th_completed' ? '12th Completed' : 'In School'}`)
+        }
 
-"[Time ago] via [channel]. Customer [last action]. Currently [status]. [Key extracted info: interested in X, budget Y, pain points Z]. Next: [recommended action]."
+        const prompt = `Generate a comprehensive, detailed unified summary for this aviation training lead. The summary should be informative and provide a complete picture of the lead's journey and status.
 
-CRITICAL RULES FOR SUMMARY:
+FORMAT REQUIREMENTS:
+- Write 3-5 sentences (not just one line)
+- Include context about when they first contacted, through which channel
+- Describe their current status and engagement level
+- Mention key details like user type, course interest, timeline if available
+- Include any budget, pain points, or specific interests mentioned
+- Note their current stage in the sales funnel
+- Suggest next steps or recommended actions
+
+CRITICAL RULES:
 - ONLY state actions explicitly confirmed in messages
 - "ok done" or "sure" does NOT mean signup completed
 - If no explicit confirmation of signup/payment, state: "Inquiring about [topic]"
 - NEVER assume actions that aren't explicitly stated
 - Use actual message content, not inferred intent
+- Be descriptive and provide context, not just a single sentence
 
-Lead: ${summaryData.leadName}
+Lead Information:
+Name: ${summaryData.leadName}
 Stage: ${lead.lead_stage || 'Unknown'}${lead.sub_stage ? ` (${lead.sub_stage})` : ''}
 Days Inactive: ${daysInactive}
 Response Rate: ${responseRate}%
+${windchasersInfo.length > 0 ? `\nAviation-Specific Details:\n${windchasersInfo.join('\n')}` : ''}
 
 Last 10 Messages:
 ${conversationContext || 'No messages yet'}
@@ -459,7 +719,7 @@ ${conversationContext || 'No messages yet'}
 Recent Activities:
 ${activitiesContext}
 
-${summaryData.lastMessage ? `Last Message: ${summaryData.lastMessage.sender === 'customer' ? 'Customer' : 'PROXe'} sent "${summaryData.lastMessage.content.substring(0, 150)}" via ${summaryData.lastMessage.channel} at ${new Date(summaryData.lastMessage.timestamp).toLocaleString()}` : 'No messages yet'}
+${summaryData.lastMessage ? `Last Message: ${summaryData.lastMessage.sender === 'customer' ? 'Customer' : 'PROXe'} sent "${summaryData.lastMessage.content.substring(0, 200)}" via ${summaryData.lastMessage.channel} at ${new Date(summaryData.lastMessage.timestamp).toLocaleString()}` : 'No messages yet'}
 
 Conversation Status: ${conversationStatus}
 ${summaryData.nextTouchpoint ? `Next Touchpoint: ${summaryData.nextTouchpoint}` : ''}
@@ -467,26 +727,43 @@ ${keyInfo.budget ? `Budget mentioned: ${keyInfo.budget}` : ''}
 ${keyInfo.serviceInterest ? `Service interest: ${keyInfo.serviceInterest}` : ''}
 ${keyInfo.painPoints ? `Pain points: ${keyInfo.painPoints}` : ''}
 
-Generate the summary in the exact format specified above. Make it concise and actionable. Follow the CRITICAL RULES - only state explicitly confirmed actions.`
+Generate a comprehensive 3-5 sentence summary that provides a complete picture of this lead. Include context, current status, key details, and next steps. Make it informative and actionable. Follow the CRITICAL RULES - only state explicitly confirmed actions.`
 
-        const response = await fetch('https://api.anthropic.com/v1/messages', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': apiKey,
-            'anthropic-version': '2023-06-01',
-          },
-          body: JSON.stringify({
-            model: 'claude-sonnet-4-20250514',
-            max_tokens: 400,
-            messages: [
-              {
-                role: 'user',
-                content: prompt,
-              },
-            ],
-          }),
-        })
+        // Add timeout to prevent hanging
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
+        
+        let response
+        try {
+          response = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-api-key': apiKey,
+              'anthropic-version': '2023-06-01',
+            },
+            body: JSON.stringify({
+              model: 'claude-sonnet-4-20250514',
+              max_tokens: 800, // Increased from 400 to allow for more comprehensive summaries
+              messages: [
+                {
+                  role: 'user',
+                  content: prompt,
+                },
+              ],
+            }),
+            signal: controller.signal,
+          })
+          clearTimeout(timeoutId)
+        } catch (fetchError: any) {
+          clearTimeout(timeoutId)
+          if (fetchError.name === 'AbortError') {
+            console.error('Claude API request timed out after 30 seconds')
+          } else {
+            console.error('Claude API request failed:', fetchError)
+          }
+          throw fetchError // Re-throw to be caught by outer catch
+        }
 
         if (response.ok) {
           const data = await response.json()
@@ -550,6 +827,38 @@ Generate the summary in the exact format specified above. Make it concise and ac
       fallbackSummary += ` (${lead.sub_stage})`
     }
     fallbackSummary += `. `
+
+    // Add windchasers-specific info
+    const windchasersDetails = []
+    if (keyInfo.userType) {
+      windchasersDetails.push(`User Type: ${keyInfo.userType}`)
+    }
+    if (keyInfo.courseInterest) {
+      const courseMap: Record<string, string> = {
+        'pilot': 'DGCA/Flight Training',
+        'helicopter': 'Helicopter Training',
+        'drone': 'Drone Training',
+        'cabin': 'Cabin Crew Training',
+        'DGCA': 'DGCA Training',
+        'Flight': 'Flight Training',
+        'Heli': 'Helicopter Training',
+        'Cabin': 'Cabin Crew Training',
+        'Drone': 'Drone Training'
+      }
+      windchasersDetails.push(`Course Interest: ${courseMap[keyInfo.courseInterest] || keyInfo.courseInterest}`)
+    }
+    if (keyInfo.planToFly) {
+      const timelineMap: Record<string, string> = {
+        'asap': 'ASAP',
+        '1-3mo': '1-3 Months',
+        '6+mo': '6+ Months',
+        '1yr+': '1 Year+'
+      }
+      windchasersDetails.push(`Timeline: ${timelineMap[keyInfo.planToFly] || keyInfo.planToFly}`)
+    }
+    if (windchasersDetails.length > 0) {
+      fallbackSummary += `${windchasersDetails.join(', ')}. `
+    }
 
     if (summaryData.lastMessage) {
       const sender = summaryData.lastMessage.sender === 'customer' ? 'Customer' : 'PROXe'

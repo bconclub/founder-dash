@@ -57,10 +57,10 @@ export async function POST(request: NextRequest) {
     const auth = await getAuthClient()
     const calendar = google.calendar({ version: 'v3', auth })
 
-    // Get all bookings from database
+    // Get all bookings from database (include metadata and unified_context)
     const { data: bookings, error: bookingsError } = await supabase
       .from('unified_leads')
-      .select('*')
+      .select('id, name, email, phone, booking_date, booking_time, first_touchpoint, last_touchpoint, source, metadata, unified_context')
       .not('booking_date', 'is', null)
       .not('booking_time', 'is', null)
       .not('booking_date', 'eq', '')
@@ -138,11 +138,71 @@ export async function POST(request: NextRequest) {
         const endHour = hour + 1
         const eventEnd = `${bookingDate}T${endHour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}:00+05:30`
 
-        const eventTitle = `Windchasers Demo - ${booking.name || 'Unnamed'}`
+        // Build event title and description using booking details from metadata if available
+        const courseInterest = booking.metadata?.courseInterest || booking.unified_context?.windchasers?.course_interest;
+        const sessionType = booking.metadata?.sessionType;
+        const conversationSummary = booking.metadata?.conversationSummary || booking.metadata?.conversation_summary || booking.unified_context?.web?.conversation_summary;
+        
+        // Map course interest codes to readable names
+        const courseNameMap: Record<string, string> = {
+          'pilot': 'Pilot Training',
+          'helicopter': 'Helicopter Training',
+          'drone': 'Drone Training',
+          'cabin': 'Cabin Crew Training',
+        };
+        const courseDisplayName = courseInterest && courseNameMap[courseInterest.toLowerCase()] 
+          ? courseNameMap[courseInterest.toLowerCase()] 
+          : courseInterest || 'Aviation Course Inquiry';
+
+        // Build event title: Candidate Name - Course Details [Session Type]
+        let eventTitle = `${booking.name || 'Unnamed'} - ${courseDisplayName}`;
+        if (sessionType) {
+          const sessionTypeLabel = sessionType === 'offline' ? 'Facility Visit' : 'Online';
+          eventTitle += ` [${sessionTypeLabel}]`;
+        } else {
+          // Fallback to simple title if no details
+          eventTitle = `Windchasers Demo - ${booking.name || 'Unnamed'}`;
+        }
+
+        // Build description - use stored description if available, otherwise build from details
+        let description = '';
+        if (booking.metadata?.description) {
+          // Use stored description (shorter unified description)
+          description = booking.metadata.description;
+        } else {
+          // Build description from available details
+          description = `Windchasers Aviation Academy - Consultation Booking\n\n`;
+          description += `Candidate Information:\n`;
+          description += `Name: ${booking.name || 'N/A'}\n`;
+          description += `Email: ${booking.email || 'N/A'}\n`;
+          description += `Phone: ${booking.phone || 'N/A'}\n\n`;
+          
+          if (courseDisplayName && courseDisplayName !== 'Aviation Course Inquiry') {
+            description += `Course Interest: ${courseDisplayName}\n\n`;
+          }
+          
+          if (sessionType) {
+            const sessionTypeDisplay = sessionType === 'offline' 
+              ? 'Offline / Facility Visit' 
+              : sessionType === 'online' 
+              ? 'Online Session' 
+              : sessionType;
+            description += `Session Type: ${sessionTypeDisplay}\n\n`;
+          }
+          
+          if (conversationSummary) {
+            description += `Conversation Summary:\n${conversationSummary}\n\n`;
+          }
+          
+          description += `Booking Details:\n`;
+          description += `Date: ${bookingDate}\n`;
+          description += `Time: ${bookingTime}\n\n`;
+          description += `Source: ${booking.first_touchpoint || booking.last_touchpoint || booking.source || 'web'}`;
+        }
 
         const eventData = {
           summary: eventTitle,
-          description: `Windchasers Demo Booking\n\nName: ${booking.name || 'N/A'}\nEmail: ${booking.email || 'N/A'}\nPhone: ${booking.phone || 'N/A'}\n\nSource: ${booking.first_touchpoint || booking.last_touchpoint || booking.source || 'web'}`,
+          description: description,
           start: {
             dateTime: eventStart,
             timeZone: TIMEZONE,
@@ -154,6 +214,13 @@ export async function POST(request: NextRequest) {
           attendees: booking.email
             ? [{ email: booking.email, displayName: booking.name || 'Guest' }]
             : [],
+        }
+
+        // Add location based on session type
+        if (sessionType === 'offline') {
+          eventData.location = 'Windchasers Aviation Academy Facility';
+        } else if (sessionType === 'online') {
+          eventData.location = 'Online Session (Video Call)';
         }
 
         const googleEventId = booking.metadata?.googleEventId

@@ -224,14 +224,32 @@ export async function ensureAllLeads(
         .maybeSingle();
       
       if (sessionData) {
+        // Extract windchasers data from user_inputs_summary
+        const userInputs: any[] = Array.isArray(sessionData.user_inputs_summary) 
+          ? sessionData.user_inputs_summary 
+          : [];
+        
+        // Find windchasers profile data from user inputs
+        const windchasersData: any = {};
+        userInputs.forEach((input: any) => {
+          if (input.user_type) windchasersData.user_type = input.user_type;
+          if (input.course_interest) windchasersData.course_interest = input.course_interest;
+          if (input.timeline) {
+            windchasersData.timeline = input.timeline;
+            windchasersData.plan_to_fly = input.timeline; // Also store as plan_to_fly
+          }
+          if (input.education) windchasersData.education = input.education;
+        });
+
         unifiedContext = {
           web: {
             conversation_summary: cleanSummary(sessionData.conversation_summary) || null,
             booking_status: sessionData.booking_status || null,
             booking_date: sessionData.booking_date || null,
             booking_time: sessionData.booking_time || null,
-            user_inputs: sessionData.user_inputs_summary || [],
-          }
+            user_inputs: userInputs,
+          },
+          ...(Object.keys(windchasersData).length > 0 ? { windchasers: windchasersData } : {})
         };
       }
     }
@@ -317,6 +335,10 @@ export async function ensureAllLeads(
         web: {
           ...(existingContext.web || {}),
           ...unifiedContext.web,
+        },
+        windchasers: {
+          ...(existingContext.windchasers || {}),
+          ...(unifiedContext.windchasers || {}),
         }
       };
 
@@ -378,6 +400,12 @@ export async function ensureAllLeads(
       brand: brand,
       unified_context: Object.keys(unifiedContext).length > 0 ? unifiedContext : null,
     };
+    
+    // Ensure windchasers data is included if present
+    if (unifiedContext.windchasers && Object.keys(unifiedContext.windchasers).length > 0) {
+      insertData.unified_context = insertData.unified_context || {};
+      insertData.unified_context.windchasers = unifiedContext.windchasers;
+    }
 
     if (normalizedPhone) {
       insertData.customer_phone_normalized = normalizedPhone;
@@ -1293,6 +1321,10 @@ export async function storeBooking(
     name?: string; // Optional: update contact info if provided
     email?: string; // Optional: update contact info if provided
     phone?: string; // Optional: update contact info if provided
+    courseInterest?: string; // Course interest (e.g., 'pilot', 'helicopter', 'drone', 'cabin')
+    sessionType?: string; // Session type ('online' or 'offline')
+    description?: string; // Booking description/details
+    conversationSummary?: string; // Conversation summary
   },
   brand: 'proxe' | 'windchasers' = 'proxe'
 ) {
@@ -1317,6 +1349,15 @@ export async function storeBooking(
   // Always store booking details (don't require complete lead)
   // Booking details are valuable even if contact info isn't complete yet
 
+  // Build booking metadata with details
+  const bookingMetadata: Record<string, any> = {
+    googleEventId: booking.googleEventId ?? null,
+    courseInterest: booking.courseInterest || null,
+    sessionType: booking.sessionType || null,
+    description: booking.description || null,
+    conversationSummary: booking.conversationSummary || null,
+  };
+
   // Build update object
   const bookingUpdate: Record<string, any> = {
     booking_date: booking.date,
@@ -1324,13 +1365,14 @@ export async function storeBooking(
     google_event_id: booking.googleEventId ?? null,
     booking_status: booking.status ?? 'Call Booked',
     booking_created_at: getISTTimestamp(),
+    metadata: bookingMetadata,
   };
 
   const { data, error } = await supabase
     .from(tableName)
     .update(bookingUpdate)
     .eq('external_session_id', externalSessionId)
-    .select('lead_id, conversation_summary, user_inputs_summary');
+    .select('lead_id, conversation_summary, user_inputs_summary, metadata');
 
   if (error) {
     // Fallback to old sessions table
@@ -1355,24 +1397,36 @@ export async function storeBooking(
   } else if (data && data.length > 0 && data[0].lead_id) {
     // Update unified_context in all_leads
     const sessionData = data[0];
+    const existingMetadata = sessionData.metadata || {};
+    const mergedMetadata = {
+      ...existingMetadata,
+      ...bookingMetadata,
+    };
+    
     const unifiedContext = {
       web: {
-        conversation_summary: cleanSummary(sessionData.conversation_summary) || null,
+        conversation_summary: cleanSummary(booking.conversationSummary || sessionData.conversation_summary) || null,
         booking_status: booking.status ?? 'Call Booked',
         booking_date: booking.date,
         booking_time: booking.time,
         user_inputs: sessionData.user_inputs_summary || [],
+        booking_details: {
+          courseInterest: booking.courseInterest || null,
+          sessionType: booking.sessionType || null,
+          description: booking.description || null,
+        },
       }
     };
 
     // Get existing unified_context and merge
     const { data: existingLead } = await supabase
       .from('all_leads')
-      .select('unified_context')
+      .select('unified_context, metadata')
       .eq('id', data[0].lead_id)
       .maybeSingle();
 
     const existingContext = existingLead?.unified_context || {};
+    const existingLeadMetadata = existingLead?.metadata || {};
     const mergedContext = {
       ...existingContext,
       web: {
@@ -1381,10 +1435,15 @@ export async function storeBooking(
       }
     };
 
+    // Update both unified_context and metadata in all_leads
     await supabase
       .from('all_leads')
       .update({
         unified_context: mergedContext,
+        metadata: {
+          ...existingLeadMetadata,
+          ...mergedMetadata,
+        },
       })
       .eq('id', data[0].lead_id);
   }
@@ -1596,10 +1655,10 @@ export async function updateWindchasersProfile(
 
   const tableName = getChannelTable('web');
 
-  // Fetch current session to get existing profile data
+  // Fetch current session to get existing profile data and lead_id
   const { data: currentSession } = await supabase
     .from(tableName)
-    .select('user_inputs_summary, customer_name, customer_email, customer_phone')
+    .select('user_inputs_summary, customer_name, customer_email, customer_phone, lead_id')
     .eq('external_session_id', externalSessionId)
     .maybeSingle();
 
@@ -1632,7 +1691,8 @@ export async function updateWindchasersProfile(
     user_type: profileData.user_type || null,
     education: profileData.education || null,
     course_interest: profileData.course_interest || null,
-    timeline: profileData.timeline || null,
+    plan_to_fly: profileData.timeline || null, // Store as plan_to_fly to match schema
+    timeline: profileData.timeline || null, // Keep timeline for backward compatibility
     button_clicks: profileData.button_clicks || [],
     questions_asked: profileData.questions_asked || [],
     stage: profileData.stage || 'exploration',
@@ -1650,41 +1710,84 @@ export async function updateWindchasersProfile(
     }
   }
 
-  // Update all_leads with unified_context if we have phone
+  // Update all_leads with unified_context
+  // Try multiple methods to find/update the lead:
+  // 1. If session already has lead_id, use that directly (fastest)
+  // 2. If we have phone, use ensureAllLeads (creates lead if needed)
+  // 3. Otherwise, try to find lead by email
+  
+  let leadId: string | null = null;
   const phone = profileData.phone || currentSession.customer_phone;
-  if (phone) {
-    const leadId = await ensureAllLeads(
+  
+  // Method 1: Check if session already has lead_id (fastest path)
+  if (currentSession.lead_id) {
+    leadId = currentSession.lead_id;
+    console.log('[updateWindchasersProfile] Using existing lead_id from session:', leadId);
+  }
+  
+  // Method 2: Try to get/create lead via phone
+  if (!leadId && phone) {
+    leadId = await ensureAllLeads(
       profileData.name || currentSession.customer_name,
       profileData.email || currentSession.customer_email,
       phone,
       brand,
       externalSessionId
     );
-
     if (leadId) {
-      // Update all_leads.unified_context.windchasers
-      const { data: leadData } = await supabase
+      console.log('[updateWindchasersProfile] Created/found lead via phone:', leadId);
+    }
+  }
+  
+  // Method 3: Try to find lead by email if no phone
+  if (!leadId && currentSession.customer_email) {
+    const { data: leadByEmail } = await supabase
+      .from('all_leads')
+      .select('id')
+      .eq('brand', brand)
+      .eq('email', currentSession.customer_email)
+      .maybeSingle();
+    
+    if (leadByEmail?.id) {
+      leadId = leadByEmail.id;
+      console.log('[updateWindchasersProfile] Found lead by email:', leadId);
+    }
+  }
+
+  // Update all_leads.unified_context.windchasers if we found a lead
+  if (leadId) {
+    const { data: leadData } = await supabase
+      .from('all_leads')
+      .select('unified_context')
+      .eq('id', leadId)
+      .maybeSingle();
+
+    if (leadData) {
+      const existingContext = leadData.unified_context || {};
+      const updatedContext = {
+        ...existingContext,
+        windchasers: {
+          ...(existingContext.windchasers || {}),
+          ...windchasersContext,
+        },
+      };
+
+      const { error: updateError } = await supabase
         .from('all_leads')
-        .select('unified_context')
-        .eq('id', leadId)
-        .maybeSingle();
-
-      if (leadData) {
-        const existingContext = leadData.unified_context || {};
-        const updatedContext = {
-          ...existingContext,
-          windchasers: {
-            ...(existingContext.windchasers || {}),
-            ...windchasersContext,
-          },
-        };
-
-        await supabase
-          .from('all_leads')
-          .update({ unified_context: updatedContext })
-          .eq('id', leadId);
+        .update({ 
+          unified_context: updatedContext,
+          last_interaction_at: getISTTimestamp()
+        })
+        .eq('id', leadId);
+      
+      if (updateError) {
+        console.error('[updateWindchasersProfile] Failed to update lead unified_context:', updateError);
+      } else {
+        console.log('[updateWindchasersProfile] Successfully updated lead unified_context.windchasers:', leadId, windchasersContext);
       }
     }
+  } else {
+    console.warn('[updateWindchasersProfile] No lead found to update windchasers data. Session:', externalSessionId, 'Phone:', phone ? 'present' : 'missing');
   }
 }
 

@@ -18,6 +18,7 @@ interface Booking {
   first_touchpoint?: string | null
   last_touchpoint?: string | null
   metadata?: any
+  unified_context?: any
 }
 
 interface CalendarViewProps {
@@ -648,6 +649,83 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
                     </div>
                   </div>
                 </div>
+
+                {/* Course Interest */}
+                {(selectedBooking.metadata?.courseInterest || selectedBooking.unified_context?.windchasers?.course_interest) && (
+                  <div>
+                    <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Course Interest</div>
+                    <div className="text-base text-gray-900 dark:text-white">
+                      {(() => {
+                        const courseInterest = selectedBooking.metadata?.courseInterest || selectedBooking.unified_context?.windchasers?.course_interest;
+                        const courseNameMap: Record<string, string> = {
+                          'pilot': 'Pilot Training',
+                          'helicopter': 'Helicopter Training',
+                          'drone': 'Drone Training',
+                          'cabin': 'Cabin Crew Training',
+                        };
+                        return courseNameMap[courseInterest?.toLowerCase()] || courseInterest || '-';
+                      })()}
+                    </div>
+                  </div>
+                )}
+
+                {/* Session Type */}
+                {(selectedBooking.metadata?.sessionType) && (
+                  <div>
+                    <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Session Type</div>
+                    <div className="text-base text-gray-900 dark:text-white">
+                      {selectedBooking.metadata.sessionType === 'offline' ? 'Offline / Facility Visit' : 
+                       selectedBooking.metadata.sessionType === 'online' ? 'Online Session' : 
+                       selectedBooking.metadata.sessionType}
+                    </div>
+                  </div>
+                )}
+
+                {/* Conversation Summary */}
+                {(selectedBooking.metadata?.conversationSummary || selectedBooking.metadata?.conversation_summary || selectedBooking.unified_context?.web?.conversation_summary) && (
+                  <div>
+                    <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Summary</div>
+                    <div className="text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-[#262626] p-3 rounded-md max-h-32 overflow-y-auto">
+                      {selectedBooking.metadata?.conversationSummary || 
+                       selectedBooking.metadata?.conversation_summary || 
+                       selectedBooking.unified_context?.web?.conversation_summary || '-'}
+                    </div>
+                  </div>
+                )}
+
+                {/* Description (shorter unified description) */}
+                {selectedBooking.metadata?.description && (
+                  <div>
+                    <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Details</div>
+                    <div className="text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-[#262626] p-3 rounded-md max-h-40 overflow-y-auto whitespace-pre-wrap">
+                      {(() => {
+                        const fullDescription = selectedBooking.metadata.description;
+                        // Extract key details for shorter display
+                        const lines = fullDescription.split('\n');
+                        const keyLines: string[] = [];
+                        let inDetails = false;
+                        
+                        for (const line of lines) {
+                          const trimmed = line.trim();
+                          if (trimmed.includes('Candidate Information:') || trimmed.includes('Course Interest:') || 
+                              trimmed.includes('Session Type:') || trimmed.includes('Booking Details:')) {
+                            inDetails = true;
+                            continue;
+                          }
+                          if (trimmed && inDetails && !trimmed.includes('Windchasers Aviation Academy')) {
+                            keyLines.push(trimmed);
+                          }
+                        }
+                        
+                        // If we found key lines, use them; otherwise use first 300 chars
+                        if (keyLines.length > 0) {
+                          return keyLines.join('\n');
+                        }
+                        return fullDescription.length > 300 ? fullDescription.substring(0, 300) + '...' : fullDescription;
+                      })()}
+                    </div>
+                  </div>
+                )}
 
                 <div>
                   <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Source</div>

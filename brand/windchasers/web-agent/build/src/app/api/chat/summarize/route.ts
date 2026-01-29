@@ -46,12 +46,13 @@ export async function POST(request: NextRequest) {
       .map((entry) => `${entry.role === 'user' ? 'User' : 'Assistant'}: ${entry.content}`)
       .join('\n');
 
-    const systemPrompt = `You are an AI conversation summarizer. Create a CRISP, concise summary (1-2 sentences, max ~80 tokens) focusing ONLY on:
-- User's intent/pain point (what they want and why)
-- Key user data (industry, business size, timeline if mentioned)
-- Important decisions/actions (bookings scheduled, information shared)
+    const systemPrompt = `You are an AI conversation summarizer. Create a SHORT, focused summary (1 sentence, max ~50 tokens) focusing ONLY on:
+- User's intent (what they want)
+- Next steps (what action is needed or in progress)
+- Booking status (if they have booked something: date/time/status)
+- Topic/question category (what the question is related to)
 
-Be BRIEF and to the point. Preserve key context from previous summary and merge with new info. Do NOT explain products. Focus on USER behavior only. Strip all filler words.`;
+Do NOT explain what the bot said or what the user said back. Do NOT describe the conversation flow. Just state: intent, next steps, booking status (if any), and topic. Be extremely concise.`;
 
     const prompt = `Previous summary:
 ${previousSummary || '(none)'}
@@ -59,11 +60,11 @@ ${previousSummary || '(none)'}
 New conversation:
 ${formattedHistory}
 
-Create a crisp, concise summary (1-2 sentences max). Preserve key context from previous summary, add new important info. Focus on: user intent, key data points, decisions made. Be brief and to the point.`;
+Create a very short summary (1 sentence max). Focus ONLY on: intent, next steps, booking status (if booked), and what the question relates to. Do NOT explain the conversation flow or what was said.`;
 
     const summaryResponse = await anthropic.messages.create({
       model: 'claude-sonnet-4-20250514',
-      max_tokens: 100,
+      max_tokens: 60,
       temperature: 0,
       system: systemPrompt,
       messages: [

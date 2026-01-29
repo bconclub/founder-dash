@@ -460,6 +460,10 @@ export async function POST(request: NextRequest) {
             name: name,
             email: email,
             phone: phone,
+            courseInterest: courseInfo || undefined,
+            sessionType: detectedSessionType || undefined,
+            description: description,
+            conversationSummary: conversationSummary || undefined,
           },
           brand as 'windchasers'
         );
