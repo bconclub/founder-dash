@@ -1,0 +1,7 @@
+{
+  "buildCommand": "cd brand/windchasers/dashboard/build && npm run build",
+  "outputDirectory": "brand/windchasers/dashboard/build/.next",
+  "installCommand": "cd brand/windchasers/dashboard/build && npm ci",
+  "framework": "nextjs",
+  "rootDirectory": "brand/windchasers/dashboard/build"
+}
