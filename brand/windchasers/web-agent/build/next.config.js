@@ -30,10 +30,10 @@ const nextConfig = {
     outputFileTracingIncludes: {
       '/api/**/*': ['./node_modules/**/*.wasm'],
     },
-    // Optimize package imports
-    optimizePackageImports: ['@supabase/supabase-js', 'recharts', 'lottie-react'],
-    // Exclude client-only packages from server bundles (only ogl, lottie-react is optimized/transpiled)
-    serverComponentsExternalPackages: ['ogl'],
+    // Optimize package imports (removed lottie-react to avoid conflict with serverComponentsExternalPackages)
+    optimizePackageImports: ['@supabase/supabase-js', 'recharts'],
+    // Exclude client-only packages from server bundles
+    serverComponentsExternalPackages: ['ogl', 'lottie-react'],
   },
   
   // Webpack optimizations
