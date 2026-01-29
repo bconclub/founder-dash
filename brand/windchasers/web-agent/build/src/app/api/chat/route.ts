@@ -806,7 +806,7 @@ export async function POST(request: NextRequest) {
             });
             
             try {
-              const updateResult = await updateSessionProfile(
+              const updateResultLeadId = await updateSessionProfile(
                 externalSessionId,
                 {
                   userName: userName, // Map user.name to userName for API
@@ -818,13 +818,16 @@ export async function POST(request: NextRequest) {
               );
               
               console.log('[Chat API] updateSessionProfile completed', {
-                hasResult: !!updateResult,
+                hasResult: !!updateResultLeadId,
+                leadId: updateResultLeadId,
                 externalSessionId
               });
-              console.log('[Chat API] updateSessionProfile completed successfully', {
-                result: updateResult,
-                externalSessionId
-              });
+              
+              // Use leadId from updateSessionProfile if available
+              if (updateResultLeadId) {
+                leadId = updateResultLeadId;
+                console.log('[Chat API] ✓ Got leadId from updateSessionProfile:', leadId);
+              }
             } catch (err: any) {
               console.error('[Chat API] Failed to update session profile:', {
                 error: err,

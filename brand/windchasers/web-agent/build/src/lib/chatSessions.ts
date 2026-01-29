@@ -789,7 +789,7 @@ export async function updateSessionProfile(
   externalSessionId: string,
   profile: { userName?: string; phone?: string | null; email?: string | null; websiteUrl?: string | null },
   brand: 'proxe' | 'windchasers' = 'proxe'
-) {
+): Promise<string | null> {
   console.log('[updateSessionProfile] Called', { externalSessionId, brand, profile });
   
   // Use service role client for profile updates (bypasses RLS, more reliable)
@@ -993,6 +993,7 @@ export async function updateSessionProfile(
             leadId,
             externalSessionId
           });
+          return null;
         } else {
           console.log('[updateSessionProfile] Successfully updated web_sessions with lead_id', {
             leadId,
@@ -1000,6 +1001,8 @@ export async function updateSessionProfile(
             updatedRows: updateData?.length,
             verifiedLeadId: updateData?.[0]?.lead_id
           });
+          // Return leadId so caller can use it directly
+          return leadId;
         }
       } else {
         console.warn('[updateSessionProfile] ensureAllLeads returned null - no lead created', {
@@ -1009,6 +1012,7 @@ export async function updateSessionProfile(
           phone: mergedProfile.phone,
           reason: 'ensureAllLeads may have failed or phone normalization failed'
         });
+        return null;
       }
     } else {
       console.log('[updateSessionProfile] Skipping lead creation - phone number is required but missing', {
@@ -1016,10 +1020,15 @@ export async function updateSessionProfile(
         hasEmail: !!mergedProfile.email,
         hasPhone: !!mergedProfile.phone
       });
+      return null;
     }
   } else {
     console.warn('[updateSessionProfile] Could not fetch updated session', { externalSessionId });
+    return null;
   }
+  
+  // Return null if no updates were made
+  return null;
 }
 
 export async function addUserInput(
