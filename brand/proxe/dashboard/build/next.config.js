@@ -1,6 +1,13 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  webpack: (config, { isServer }) => {
+    if (isServer) {
+      // Externalize Supabase to reduce serverless function size
+      config.externals = ['@supabase/supabase-js', ...(config.externals || [])]
+    }
+    return config
+  },
   async headers() {
     return [
       {
