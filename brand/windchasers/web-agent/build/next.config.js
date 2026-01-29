@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'standalone',
+  // Use 'standalone' for VPS deployments, default for Vercel
+  ...(process.env.VERCEL !== '1' && { output: 'standalone' }),
   reactStrictMode: true,
   
   // Optimize build performance
