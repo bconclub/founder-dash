@@ -426,12 +426,15 @@ export async function POST(request: NextRequest) {
     const externalSessionId = sessionMetadata.externalId || sessionMetadata.externalSessionId || sessionMetadata.sessionId || null;
     
     // Debug: Log profile data received
+    // NOTE: Client sends user.name, user.email, user.phone (not userName)
     console.log('[Chat API] Profile data received from client:', {
       hasUserProfile: !!userProfile,
-      userName: userProfile?.userName,
+      name: userProfile?.name,
+      userName: userProfile?.userName, // Legacy field name
       email: userProfile?.email,
       phone: userProfile?.phone,
       userProfileKeys: Object.keys(userProfile || {}),
+      fullUserProfile: userProfile,
       externalSessionId
     });
     const summary: string = typeof memoryMetadata.summary === 'string' ? memoryMetadata.summary : '';
@@ -782,17 +785,22 @@ export async function POST(request: NextRequest) {
           // Update session profile with client-provided data (if any)
           // This ensures profile data is saved to database and lead_id is created/updated
           // CRITICAL: This must happen BEFORE lead_id fetch to ensure data is saved
-          if (externalSessionId && (userProfile?.userName || userProfile?.email || userProfile?.phone)) {
+          // NOTE: Client sends user.name (not userName), so check both
+          const userName = userProfile?.name || userProfile?.userName;
+          const userEmail = userProfile?.email;
+          const userPhone = userProfile?.phone;
+          
+          if (externalSessionId && (userName || userEmail || userPhone)) {
             console.log('[Chat API] ✓ Updating session profile with client data:', {
-              hasName: !!userProfile?.userName,
-              hasEmail: !!userProfile?.email,
-              hasPhone: !!userProfile?.phone,
-              name: userProfile?.userName,
-              email: userProfile?.email,
-              phone: userProfile?.phone,
-              phoneLength: userProfile?.phone?.length,
-              emailLength: userProfile?.email?.length,
-              nameLength: userProfile?.userName?.length,
+              hasName: !!userName,
+              hasEmail: !!userEmail,
+              hasPhone: !!userPhone,
+              name: userName,
+              email: userEmail,
+              phone: userPhone,
+              phoneLength: userPhone?.length,
+              emailLength: userEmail?.length,
+              nameLength: userName?.length,
               fullUserProfile: userProfile,
               externalSessionId
             });
@@ -801,9 +809,9 @@ export async function POST(request: NextRequest) {
               const updateResult = await updateSessionProfile(
                 externalSessionId,
                 {
-                  userName: userProfile?.userName,
-                  email: userProfile?.email,
-                  phone: userProfile?.phone,
+                  userName: userName, // Map user.name to userName for API
+                  email: userEmail,
+                  phone: userPhone,
                   websiteUrl: userProfile?.websiteUrl
                 },
                 brand as 'windchasers'
@@ -829,9 +837,10 @@ export async function POST(request: NextRequest) {
           } else {
             console.log('[Chat API] Skipping updateSessionProfile - no profile data or session ID', {
               hasExternalSessionId: !!externalSessionId,
-              hasUserName: !!userProfile?.userName,
+              hasName: !!(userProfile?.name || userProfile?.userName),
               hasEmail: !!userProfile?.email,
-              hasPhone: !!userProfile?.phone
+              hasPhone: !!userProfile?.phone,
+              userProfileKeys: Object.keys(userProfile || {})
             });
           }
 
@@ -868,7 +877,8 @@ export async function POST(request: NextRequest) {
                   
                   // If no lead_id but we have profile data, try to ensure/create the lead
                   // Use database data first, fallback to client profile data
-                  const profileName = session?.customer_name || userProfile?.userName || null;
+                  // NOTE: Client sends user.name (not userName)
+                  const profileName = session?.customer_name || userProfile?.name || userProfile?.userName || null;
                   const profileEmail = session?.customer_email || userProfile?.email || null;
                   const profilePhone = session?.customer_phone || userProfile?.phone || null;
                   

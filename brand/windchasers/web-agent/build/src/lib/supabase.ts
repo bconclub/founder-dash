@@ -43,13 +43,28 @@ export function getSupabaseClient(): SupabaseClient | null {
 
 // Service role client for server-side operations
 export function getSupabaseServiceClient(): SupabaseClient | null {
-  const serviceKey = process.env.WINDCHASERS_SUPABASE_SERVICE_KEY;
+  // Check both possible environment variable names
+  const serviceKey = process.env.WINDCHASERS_SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
   
   if (!windchasersSupabaseUrl || !serviceKey) {
     if (process.env.NODE_ENV !== 'production') {
-      console.warn('[Supabase Windchasers Service] Missing Supabase URL or service key.');
+      console.warn('[Supabase Windchasers Service] Missing Supabase URL or service key.', {
+        hasUrl: !!windchasersSupabaseUrl,
+        hasServiceKey: !!serviceKey,
+        envVars: {
+          WINDCHASERS_SUPABASE_SERVICE_KEY: process.env.WINDCHASERS_SUPABASE_SERVICE_KEY ? 'SET' : 'NOT SET',
+          SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY ? 'SET' : 'NOT SET',
+        }
+      });
     }
     return null;
+  }
+
+  if (process.env.NODE_ENV !== 'production') {
+    console.log('[Supabase Windchasers Service] Creating service role client', {
+      url: windchasersSupabaseUrl.replace(/(https?:\/\/)|\..*/g, '$1***'),
+      hasServiceKey: !!serviceKey,
+    });
   }
 
   return createClient(windchasersSupabaseUrl, serviceKey, {
