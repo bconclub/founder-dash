@@ -107,100 +107,33 @@ jobs:
             fi
             echo "✅ Supabase environment variables found in .env.local"
             
-            # VPS-side caching setup
-            echo "📦 Setting up build cache..."
-            CACHE_DIR="/var/cache/windchasers-web-agent"
-            mkdir -p "$CACHE_DIR/node_modules" "$CACHE_DIR/.next-cache"
+            # Clean install - remove old build artifacts
+            echo "🧹 Cleaning previous build..."
+            rm -rf node_modules .next
             
-            # Clean existing node_modules to avoid conflicts
-            if [ -d "node_modules" ]; then
-              echo "🧹 Cleaning existing node_modules..."
-              rm -rf node_modules
-            fi
-            
-            # Check if node_modules cache exists and is valid
-            if [ -d "$CACHE_DIR/node_modules" ] && [ -f "$CACHE_DIR/node_modules/.cache-valid" ]; then
-              CACHE_LOCK_HASH=$(cat "$CACHE_DIR/node_modules/.cache-valid" 2>/dev/null || echo "")
-              CURRENT_LOCK_HASH=$(md5sum package-lock.json 2>/dev/null | cut -d' ' -f1 || sha256sum package-lock.json 2>/dev/null | cut -d' ' -f1 || echo "")
-              
-              if [ "$CACHE_LOCK_HASH" = "$CURRENT_LOCK_HASH" ] && [ -n "$CURRENT_LOCK_HASH" ]; then
-                echo "✅ Using cached node_modules (lockfile unchanged)"
-                cp -r "$CACHE_DIR/node_modules" ./ || {
-                  echo "⚠️  Cache copy failed, will reinstall"
-                  rm -rf node_modules
-                }
-              else
-                echo "⚠️  Cache invalid (lockfile changed), will reinstall"
-                rm -rf "$CACHE_DIR/node_modules" 2>/dev/null || true
-              fi
-            fi
-            
-            # Install dependencies with optimizations
+            # Install dependencies
             echo "📦 Installing dependencies..."
             echo "⏱️  Start time: $(date +%H:%M:%S)"
             INSTALL_START=$(date +%s)
             
-            # Set production environment variables (but keep devDeps for build)
-            export NODE_ENV=production
-            export NEXT_TELEMETRY_DISABLED=1
-            unset NPM_CONFIG_PRODUCTION  # Remove to avoid warning, we need devDeps
-            
-            # Use npm ci for faster, reliable installs
-            # Clean install to avoid conflicts
-            if [ ! -d "node_modules" ] || [ ! -f "node_modules/.package-lock.json" ]; then
-              echo "📥 Running npm ci..."
-              npm ci --prefer-offline --no-audit --no-fund --loglevel=warn 2>&1 | grep -v "warn config production" || {
-                echo "⚠️  npm ci failed, cleaning and retrying..."
-                rm -rf node_modules package-lock.json
-                npm install --package-lock-only --prefer-offline --no-audit --no-fund --loglevel=warn 2>&1 | grep -v "warn config production" || true
-                npm ci --prefer-offline --no-audit --no-fund --loglevel=warn 2>&1 | grep -v "warn config production" || {
-                  echo "⚠️  npm ci failed again, using npm install..."
-                  npm install --prefer-offline --no-audit --no-fund --loglevel=warn 2>&1 | grep -v "warn config production"
-                }
-              }
-            else
-              echo "✅ Using existing node_modules"
-            fi
-            
-            # Cache node_modules if install succeeded
-            if [ -d "node_modules" ]; then
-              echo "💾 Caching node_modules..."
-              rm -rf "$CACHE_DIR/node_modules"
-              cp -r node_modules "$CACHE_DIR/" || echo "⚠️  Cache save failed"
-              CURRENT_LOCK_HASH=$(md5sum package-lock.json 2>/dev/null | cut -d' ' -f1 || sha256sum package-lock.json 2>/dev/null | cut -d' ' -f1 || echo "")
-              echo "$CURRENT_LOCK_HASH" > "$CACHE_DIR/node_modules/.cache-valid" || true
-            fi
+            npm ci --prefer-offline --no-audit --no-fund --loglevel=warn
             
             INSTALL_DURATION=$(($(date +%s) - INSTALL_START))
             echo "✅ Dependencies installed in ${INSTALL_DURATION}s"
             
-            # Restore .next cache if available
-            if [ -d "$CACHE_DIR/.next-cache" ] && [ "$(ls -A $CACHE_DIR/.next-cache 2>/dev/null)" ]; then
-              echo "💾 Restoring .next cache..."
-              mkdir -p .next
-              cp -r "$CACHE_DIR/.next-cache"/* .next/ 2>/dev/null || echo "⚠️  Cache restore failed"
-            fi
-            
-            # Build the application with timing
+            # Build the application
             echo "🏗️  Building Next.js application..."
             echo "⏱️  Build start time: $(date +%H:%M:%S)"
             BUILD_START=$(date +%s)
             
-            # Set NODE_OPTIONS and environment variables for optimal builds
+            # Set environment variables for optimal builds
             export NODE_OPTIONS="--max-old-space-size=4096"
             export NODE_ENV=production
             export NEXT_TELEMETRY_DISABLED=1
             export SKIP_TYPE_CHECK=true
             
-            # Use optimized build script with timing
+            # Build with production optimizations
             npm run build:production || npm run build
-            
-            # Cache .next/cache directory for faster subsequent builds
-            if [ -d ".next/cache" ]; then
-              echo "💾 Caching .next/cache..."
-              rm -rf "$CACHE_DIR/.next-cache"
-              cp -r .next/cache "$CACHE_DIR/.next-cache" 2>/dev/null || echo "⚠️  Cache save failed"
-            fi
             
             BUILD_DURATION=$(($(date +%s) - BUILD_START))
             echo "✅ Build completed in ${BUILD_DURATION}s"
