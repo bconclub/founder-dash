@@ -3,5 +3,10 @@
   "outputDirectory": ".next",
   "installCommand": "npm ci --include=dev",
   "framework": "nextjs",
-  "version": 2
+  "version": 2,
+  "functions": {
+    "src/app/api/**/*.ts": {
+      "maxDuration": 10
+    }
+  }
 }

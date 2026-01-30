@@ -18,8 +18,20 @@ const nextConfig = {
         ...config.optimization,
         splitChunks: false, // Disable chunk splitting for server-side to avoid @ symbol issues
       }
-      // Externalize Supabase to reduce serverless function size
-      config.externals = ['@supabase/supabase-js', ...(config.externals || [])]
+      // Externalize large dependencies to reduce serverless function size
+      config.externals = [
+        '@supabase/supabase-js',
+        '@supabase/ssr',
+        'fs',
+        'path',
+        'crypto',
+        ...(config.externals || [])
+      ]
+      // Prevent bundling of parent directories
+      config.resolve.modules = [
+        'node_modules',
+        require('path').resolve(__dirname, 'src'),
+      ]
     }
     // Ensure @ alias resolves correctly
     config.resolve.alias = {

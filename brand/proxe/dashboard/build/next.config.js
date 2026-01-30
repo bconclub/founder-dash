@@ -3,8 +3,20 @@ const nextConfig = {
   reactStrictMode: true,
   webpack: (config, { isServer }) => {
     if (isServer) {
-      // Externalize Supabase to reduce serverless function size
-      config.externals = ['@supabase/supabase-js', ...(config.externals || [])]
+      // Externalize large dependencies to reduce serverless function size
+      config.externals = [
+        '@supabase/supabase-js',
+        '@supabase/ssr',
+        'fs',
+        'path',
+        'crypto',
+        ...(config.externals || [])
+      ]
+      // Prevent bundling of parent directories
+      config.resolve.modules = [
+        'node_modules',
+        require('path').resolve(__dirname, 'src'),
+      ]
     }
     return config
   },

@@ -1,10 +1,20 @@
 # Exclude Supabase node_modules to reduce function size
 node_modules/@supabase/**
 
+# Exclude parent directories (critical - prevents bundling entire repo)
+../../
+../../brand/
+../../brand/master/
+../../brand/master/dashboard/supabase/
+../../brand/master/docs/
+../../.github/
+../../scripts/
+
 # Exclude documentation
 *.md
 docs/
 README.md
+**/docs/**
 
 # Exclude test files
 **/*.test.*
@@ -18,3 +28,11 @@ README.md
 
 # Exclude build artifacts that aren't needed
 .next/cache/**
+
+# Exclude migrations and database files
+supabase/
+**/supabase/migrations/**
+
+# Exclude other brand directories
+../../brand/windchasers/
+../../brand/proxe/
