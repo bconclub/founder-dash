@@ -9,7 +9,7 @@ export async function GET() {
   // Create button
   const button = document.createElement('button');
   button.id = 'windchasers-chat-button';
-  button.innerHTML = '💬';
+  button.innerHTML = '<img src="https://pilot.windchasers.in/Windchasers Icon.png" width="30" alt="Windchasers" style="border-radius: 50%;">';
   button.title = 'Chat with Windchasers';
   button.onclick = toggleWindchasersWidget;
   Object.assign(button.style, {
@@ -19,14 +19,18 @@ export async function GET() {
     width: '60px',
     height: '60px',
     borderRadius: '50%',
-    background: '#FF6B35',
+    background: '#C5A572',
     color: 'white',
     border: 'none',
     cursor: 'pointer',
     boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
     zIndex: '10000',
     fontSize: '24px',
-    transition: 'transform 0.2s'
+    transition: 'transform 0.2s',
+    padding: '0',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center'
   });
   
   button.onmouseover = () => button.style.transform = 'scale(1.1)';
@@ -66,8 +70,8 @@ export async function GET() {
       btn.style.background = '#333';
     } else {
       widget.style.display = 'none';
-      btn.innerHTML = '💬';
-      btn.style.background = '#FF6B35';
+      btn.innerHTML = '<img src="https://pilot.windchasers.in/Windchasers Icon.png" width="30" alt="Windchasers" style="border-radius: 50%;">';
+      btn.style.background = '#C5A572';
     }
   }
   
