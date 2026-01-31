@@ -851,21 +851,23 @@ export default function InboxPage() {
                         <span className={`text-[13px] font-bold truncate ${isSelected ? 'text-amber-600 dark:text-amber-500' : 'text-gray-900 dark:text-gray-100'}`}>
                           {conv.lead_name || conv.lead_phone || 'Unknown'}
                         </span>
-                        <span className="text-[10px] font-medium opacity-60 ml-2 whitespace-nowrap">
-                          {timeAgo(conv.last_message_at)}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-0.5">
+                            {['web', 'whatsapp', 'voice', 'social'].map((ch) => (
+                              conv.channels.includes(ch) && (
+                                <div key={ch} className="opacity-80">
+                                  <ChannelIcon channel={ch} size={12} active={true} />
+                                </div>
+                              )
+                            ))}
+                          </div>
+                          <span className="text-[10px] font-medium opacity-60 whitespace-nowrap">
+                            {timeAgo(conv.last_message_at)}
+                          </span>
+                        </div>
                       </div>
 
                       <div className="flex items-center gap-2">
-                        <div className="flex items-center gap-0.5">
-                          {ALL_CHANNELS.map((ch) => (
-                            conv.channels.includes(ch) && (
-                              <div key={ch} className="opacity-80">
-                                <ChannelIcon channel={ch} size={10} active={true} />
-                              </div>
-                            )
-                          ))}
-                        </div>
                         <p className="text-[12px] truncate opacity-60 flex-1">
                           {conv.last_message}
                         </p>
