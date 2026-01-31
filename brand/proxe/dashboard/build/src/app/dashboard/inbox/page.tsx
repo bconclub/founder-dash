@@ -856,7 +856,7 @@ export default function InboxPage() {
                         </span>
                         <div className="flex items-center gap-2">
                           <div className="flex items-center gap-0.5">
-                            {['web', 'whatsapp', 'voice', 'social'].map((ch) => (
+                            {ALL_CHANNELS.map((ch) => (
                               conv.channels.includes(ch) && (
                                 <div key={ch} className="opacity-80">
                                   <ChannelIcon channel={ch} size={12} active={true} />
