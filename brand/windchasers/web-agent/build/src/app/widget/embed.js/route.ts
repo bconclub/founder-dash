@@ -16,9 +16,9 @@ export async function GET() {
   // Desktop: fixed size for bubble + chatbox
   // Mobile: full viewport size for fullscreen chat
   if (isMobile) {
-    iframe.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;border:none;background:transparent;z-index:2147483647;pointer-events:none;';
+    iframe.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;border:none;background:transparent;z-index:2147483647;';
   } else {
-    iframe.style.cssText = 'position:fixed;bottom:0;right:0;width:450px;height:650px;border:none;background:transparent;z-index:2147483647;pointer-events:none;';
+    iframe.style.cssText = 'position:fixed;bottom:0;right:0;width:450px;height:650px;border:none;background:transparent;z-index:2147483647;';
   }
 
   // Handle resize to switch between mobile/desktop
