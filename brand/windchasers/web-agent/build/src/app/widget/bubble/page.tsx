@@ -21,16 +21,16 @@ export default function BubblePage() {
 
   return (
     <div style={{
+      background: 'transparent',
+      width: '100%',
+      height: '100%',
       position: 'fixed',
       bottom: 0,
       right: 0,
       zIndex: 999999,
-      background: 'transparent',
       margin: 0,
       padding: 0,
       border: 'none',
-      width: '100%',
-      height: '100%',
       overflow: 'visible',
       pointerEvents: 'auto'
     }}>
