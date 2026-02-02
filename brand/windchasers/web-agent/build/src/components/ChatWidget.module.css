@@ -1910,17 +1910,15 @@
   width: 64px;
   height: 64px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: #1A0F0A;
+  border: 2px solid #C9A961;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 
-    0 10px 30px rgba(0, 0, 0, 0.35),
-    0 0 24px rgba(0, 0, 0, 0.25);
+  box-shadow:
+    0 10px 30px rgba(0, 0, 0, 0.5),
+    0 0 20px rgba(201, 169, 97, 0.3);
   z-index: 2147483647;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   padding: 0;
