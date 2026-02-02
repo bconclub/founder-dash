@@ -2036,6 +2036,16 @@
   box-shadow: none !important;
 }
 
+/* Hide header in bubble mode */
+.chatboxBubble .chatHeader {
+  display: none !important;
+}
+
+/* Hide animations/effects in bubble mode */
+.chatboxBubble .chatboxResponding::after {
+  display: none !important;
+}
+
 @keyframes slideUpBubble {
   from {
     opacity: 0;
