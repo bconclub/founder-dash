@@ -10,18 +10,34 @@ export async function GET() {
   iframe.src = 'https://agent.windchasers.in/widget/bubble';
   iframe.setAttribute('allowtransparency', 'true');
 
-  // Fixed size iframe - small enough to just contain the bubble button area
-  // This ensures clicks pass through to the host page everywhere except the bubble
-  iframe.style.cssText = 'position:fixed;bottom:0;right:0;width:100px;height:100px;border:none;background:transparent;z-index:999999;';
+  // Check if mobile
+  var isMobile = window.innerWidth <= 768;
 
-  // Listen for messages from iframe to resize for chat modal
-  window.addEventListener('message', function(e) {
-    if (e.data === 'wc-chat-open') {
+  // Desktop: fixed size for bubble + chatbox
+  // Mobile: full viewport size for fullscreen chat
+  if (isMobile) {
+    iframe.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;border:none;background:transparent;z-index:2147483647;pointer-events:none;';
+  } else {
+    iframe.style.cssText = 'position:fixed;bottom:0;right:0;width:450px;height:650px;border:none;background:transparent;z-index:2147483647;pointer-events:none;';
+  }
+
+  // Handle resize to switch between mobile/desktop
+  window.addEventListener('resize', function() {
+    var nowMobile = window.innerWidth <= 768;
+    if (nowMobile) {
+      iframe.style.top = '0';
+      iframe.style.left = '0';
+      iframe.style.bottom = 'auto';
+      iframe.style.right = 'auto';
+      iframe.style.width = '100%';
+      iframe.style.height = '100%';
+    } else {
+      iframe.style.top = 'auto';
+      iframe.style.left = 'auto';
+      iframe.style.bottom = '0';
+      iframe.style.right = '0';
       iframe.style.width = '450px';
-      iframe.style.height = '700px';
-    } else if (e.data === 'wc-chat-close') {
-      iframe.style.width = '100px';
-      iframe.style.height = '100px';
+      iframe.style.height = '650px';
     }
   });
 

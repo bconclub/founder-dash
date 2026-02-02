@@ -15,6 +15,10 @@ export default function BubbleLayout({
         html, body {
           background: transparent !important;
           background-color: transparent !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          overflow: hidden !important;
+          pointer-events: none !important;
         }
       `}</style>
       {children}
