@@ -2026,6 +2026,7 @@
   max-width: calc(100vw - 48px) !important;
   height: 520px !important;
   max-height: calc(100vh - 120px) !important;
+  z-index: 2147483000 !important;
   animation: slideUpBubble 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   background: rgba(8, 10, 22, 0.92) !important;
   backdrop-filter: blur(20px) saturate(140%) !important;

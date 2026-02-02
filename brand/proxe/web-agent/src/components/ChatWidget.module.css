@@ -1887,14 +1887,15 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 
+  box-shadow:
     0 10px 30px rgba(0, 0, 0, 0.35),
     0 0 24px rgba(0, 0, 0, 0.25);
-  z-index: 10001;
+  z-index: 2147483647;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   padding: 0;
   overflow: visible;
   isolation: isolate;
+  pointer-events: auto !important;
 }
 
 .bubbleButton:hover {
@@ -1985,7 +1986,7 @@
 /* Chatbox container for bubble style */
 .chatboxBubble {
   position: fixed !important;
-  bottom: 100px !important;
+  bottom: 96px !important;
   right: 24px !important;
   top: auto !important;
   left: auto !important;
@@ -1993,8 +1994,9 @@
   -webkit-transform: none !important;
   width: 400px !important;
   max-width: calc(100vw - 48px) !important;
-  max-height: 500px !important;
-  height: auto !important;
+  height: 520px !important;
+  max-height: calc(100vh - 120px) !important;
+  z-index: 2147483000 !important;
   animation: slideUpBubble 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 

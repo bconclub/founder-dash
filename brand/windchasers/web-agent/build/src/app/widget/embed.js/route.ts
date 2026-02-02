@@ -10,15 +10,18 @@ export async function GET() {
   iframe.src = 'https://agent.windchasers.in/widget/bubble';
   iframe.setAttribute('allowtransparency', 'true');
 
-  // Fixed size iframe - pointer-events handled inside the iframe
-  iframe.style.cssText = 'position:fixed;bottom:0;right:0;width:450px;height:700px;border:none;background:transparent;z-index:999999;pointer-events:none;';
+  // Fixed size iframe - small enough to just contain the bubble button area
+  // This ensures clicks pass through to the host page everywhere except the bubble
+  iframe.style.cssText = 'position:fixed;bottom:0;right:0;width:100px;height:100px;border:none;background:transparent;z-index:999999;';
 
-  // Listen for messages from iframe to enable/disable pointer events
+  // Listen for messages from iframe to resize for chat modal
   window.addEventListener('message', function(e) {
     if (e.data === 'wc-chat-open') {
-      iframe.style.pointerEvents = 'auto';
+      iframe.style.width = '450px';
+      iframe.style.height = '700px';
     } else if (e.data === 'wc-chat-close') {
-      iframe.style.pointerEvents = 'none';
+      iframe.style.width = '100px';
+      iframe.style.height = '100px';
     }
   });
 

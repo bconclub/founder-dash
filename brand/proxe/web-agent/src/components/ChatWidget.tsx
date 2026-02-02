@@ -202,6 +202,10 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     setIsExpanded(false);
     setShowQuickButtons(false);
     setIsInputActive(true);
+    // Notify parent iframe to expand for chat modal
+    if (window.parent !== window) {
+      window.parent.postMessage('wc-chat-open', '*');
+    }
   }, []);
 
   // Once chat opens, keep widget in docked bubble mode so it docks right as a bubble
@@ -681,6 +685,10 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
     setExploreButtons(null);
     // Don't reset hasRestoredMessagesRef - we want to restore conversations when reopening
     // Only reset if user explicitly resets the chat
+    // Notify parent iframe to shrink back to bubble size
+    if (window.parent !== window) {
+      window.parent.postMessage('wc-chat-close', '*');
+    }
   }, [closeCalendarWidget, closeVideoWidget, closeDeployForm]);
 
   const handleRequestCloseChat = useCallback(() => {
@@ -3264,7 +3272,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
         className={styles.bubbleButton}
         onClick={isOpen ? handleCloseChat : handleOpenChat}
         aria-label={isOpen ? "Close chat" : "Open chat"}
-        style={{ zIndex: 10001 }}
+        data-brand={brand}
       >
         <div className={styles.bubbleIcon}>
           {isOpen ? ICONS.chevronDown : (brand === 'proxe' ? <PROXELogo /> : ICONS.ai(brand, config))}
