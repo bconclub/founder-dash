@@ -3277,7 +3277,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       </div>
       </div>
     </div>
-    {isDesktop && (
+    {(isDesktop || widgetStyle === 'bubble') && (
       <button
         className={styles.bubbleButton}
         onClick={isOpen ? handleCloseChat : handleOpenChat}
