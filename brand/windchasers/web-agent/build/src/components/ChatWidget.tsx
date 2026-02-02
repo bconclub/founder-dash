@@ -3290,7 +3290,6 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
         className={styles.bubbleButton}
         onClick={isOpen ? handleCloseChat : handleOpenChat}
         aria-label={isOpen ? "Close chat" : "Open chat"}
-        style={{ zIndex: 10001 }}
       >
         <div className={styles.bubbleIcon}>
           {isOpen ? ICONS.chevronDown : ICONS.ai(brand, config)}
