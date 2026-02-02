@@ -27,9 +27,10 @@ export async function GET() {
         iframe.style.width = '100%';
         iframe.style.height = '100%';
       } else {
-        // Desktop: sized for chatbox + bubble
+        // Desktop: chatbox is 520px at bottom:96px, bubble is 77px at bottom:24px
+        // Total needed: 520 + 96 = 616px, adding buffer for safety
         iframe.style.width = '450px';
-        iframe.style.height = '700px';
+        iframe.style.height = '650px';
       }
     } else if (e.data === 'wc-chat-close') {
       // Shrink back to bubble size
