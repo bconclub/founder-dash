@@ -140,6 +140,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [showPrivacyNotice, setShowPrivacyNotice] = useState(true);
   const [isDesktop, setIsDesktop] = useState(false);
+  const [isParentMobile, setIsParentMobile] = useState<boolean | null>(null);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [sessionRecord, setSessionRecord] = useState<SessionRecord | null>(null);
   const [externalSessionId, setExternalSessionId] = useState<string | null>(null);
@@ -214,6 +215,20 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       setIsDockedBubble(true);
     }
   }, [isOpen]);
+
+  // Listen for viewport info from parent (for embed widget)
+  useEffect(() => {
+    if (widgetStyle !== 'bubble') return;
+
+    const handleMessage = (e: MessageEvent) => {
+      if (e.data && e.data.type === 'wc-viewport') {
+        setIsParentMobile(e.data.isMobile);
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [widgetStyle]);
 
   useEffect(() => {
     let cancelled = false;
@@ -3285,7 +3300,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       </div>
       </div>
     </div>
-    {(isDesktop || (widgetStyle === 'bubble' && !isMobileViewport)) && (
+    {(isDesktop || (widgetStyle === 'bubble' && isParentMobile === false)) && (
       <button
         className={styles.bubbleButton}
         onClick={isOpen ? handleCloseChat : handleOpenChat}

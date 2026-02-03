@@ -18,7 +18,8 @@ export async function GET() {
   window.addEventListener('message', function(e) {
     if (e.data === 'wc-chat-open') {
       // Expand for chat modal
-      if (window.innerWidth <= 768) {
+      var isMobile = window.innerWidth <= 768;
+      if (isMobile) {
         // Mobile: fullscreen
         iframe.style.top = '0';
         iframe.style.left = '0';
@@ -32,6 +33,8 @@ export async function GET() {
         iframe.style.width = '450px';
         iframe.style.height = '650px';
       }
+      // Tell widget whether parent is mobile
+      iframe.contentWindow.postMessage({ type: 'wc-viewport', isMobile: isMobile }, '*');
     } else if (e.data === 'wc-chat-close') {
       // Shrink back to bubble size
       iframe.style.top = 'auto';
