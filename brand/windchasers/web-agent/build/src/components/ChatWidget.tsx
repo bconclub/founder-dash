@@ -3285,11 +3285,12 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar' }: ChatWidgetProp
       </div>
       </div>
     </div>
-    {(isDesktop || widgetStyle === 'bubble') && (
+    {(isDesktop || (widgetStyle === 'bubble' && !isMobileViewport)) && (
       <button
-        className={`${styles.bubbleButton} ${isOpen && !isDesktop ? styles.bubbleButtonHidden : ''}`}
+        className={styles.bubbleButton}
         onClick={isOpen ? handleCloseChat : handleOpenChat}
         aria-label={isOpen ? "Close chat" : "Open chat"}
+        data-brand={brand}
       >
         <div className={styles.bubbleIcon}>
           {isOpen ? ICONS.chevronDown : ICONS.ai(brand, config)}
