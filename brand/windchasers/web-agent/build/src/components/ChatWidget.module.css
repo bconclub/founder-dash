@@ -1917,8 +1917,8 @@
   align-items: center;
   justify-content: center;
   box-shadow:
-    0 10px 30px rgba(0, 0, 0, 0.5),
-    0 0 20px rgba(201, 169, 97, 0.3);
+    0 4px 15px rgba(0, 0, 0, 0.4),
+    0 0 10px rgba(201, 169, 97, 0.25);
   z-index: 2147482999;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   padding: 0;
@@ -1933,10 +1933,10 @@
 }
 
 .bubbleButton:hover {
-  transform: scale(1.1);
-  box-shadow: 
-    0 6px 30px rgba(0, 0, 0, 0.4),
-    0 0 40px rgba(255,255,255,0.25);
+  transform: scale(1.05);
+  box-shadow:
+    0 6px 20px rgba(0, 0, 0, 0.4),
+    0 0 15px rgba(201, 169, 97, 0.4);
 }
 
 .bubbleButton:active {
@@ -2030,7 +2030,7 @@
   width: 400px !important;
   max-width: calc(100vw - 48px) !important;
   height: 520px !important;
-  max-height: calc(100vh - 120px) !important;
+  max-height: calc(100vh - 140px) !important;
   z-index: 2147483000 !important;
   pointer-events: auto !important;
   animation: slideUpBubble 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -2086,7 +2086,7 @@
   left: auto !important;
   width: 400px !important;
   height: 520px !important;
-  max-height: calc(100vh - 130px) !important;
+  max-height: calc(100vh - 140px) !important;
   border-radius: 24px !important;
 }
 

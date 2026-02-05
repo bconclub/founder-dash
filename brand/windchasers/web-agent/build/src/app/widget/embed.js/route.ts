@@ -29,10 +29,10 @@ export async function GET() {
         iframe.style.height = '100%';
       } else {
         // Desktop: chat modal is 520px at bottom:110px, bubble is 69px at bottom:24px
-        // Total needed: 520 + 110 = 630px + buffer = 660px
-        // Width: 400px modal + 24px right margin + buffer = 450px
+        // Modal top edge = 110 + 520 = 630px from bottom
+        // 700px iframe gives 70px clearance above for border-radius + box-shadow
         iframe.style.width = '450px';
-        iframe.style.height = '660px';
+        iframe.style.height = '700px';
       }
       // Tell widget whether parent is mobile
       iframe.contentWindow.postMessage({ type: 'wc-viewport', isMobile: isMobile }, '*');
