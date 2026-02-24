@@ -80,6 +80,11 @@ export interface KnowledgeBaseItem {
   title: string
   source_url: string | null
   content: string | null
+  question: string | null
+  answer: string | null
+  category: string | null
+  subcategory: string | null
+  tags: string[]
   file_name: string | null
   file_size: number | null
   file_type: string | null

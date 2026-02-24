@@ -10,17 +10,25 @@ const BRAND = process.env.NEXT_PUBLIC_BRAND || 'proxe'
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { title, content } = body
+    const { title, content, question, answer, category, subcategory, tags } = body
 
-    if (!title || !title.trim()) {
-      return NextResponse.json({ error: 'Title is required' }, { status: 400 })
+    // Support both formats: simple text (title+content) and Q&A (question+answer)
+    const effectiveTitle = (question || title || '').trim()
+    const effectiveContent = (answer || content || '').trim()
+
+    if (!effectiveTitle) {
+      return NextResponse.json({ error: 'Title or question is required' }, { status: 400 })
     }
-    if (!content || !content.trim()) {
-      return NextResponse.json({ error: 'Content is required' }, { status: 400 })
+    if (!effectiveContent) {
+      return NextResponse.json({ error: 'Content or answer is required' }, { status: 400 })
     }
 
-    const trimmedContent = content.trim()
-    const chunks = chunkText(trimmedContent)
+    // For search, combine question + answer as the full content
+    const searchableContent = question && answer
+      ? `${effectiveTitle}\n\n${effectiveContent}`
+      : effectiveContent
+
+    const chunks = chunkText(searchableContent)
 
     const supabase = await createClient()
 
@@ -29,14 +37,19 @@ export async function POST(request: NextRequest) {
       .insert({
         brand: BRAND,
         type: 'text' as const,
-        title: title.trim(),
-        content: trimmedContent,
+        title: effectiveTitle,
+        content: searchableContent,
+        question: question?.trim() || null,
+        answer: answer?.trim() || null,
+        category: category?.trim() || null,
+        subcategory: subcategory?.trim() || null,
+        tags: Array.isArray(tags) ? tags : [],
         chunks,
         embeddings_status: 'ready' as const,
         metadata: {
           totalChunks: chunks.length,
-          totalCharacters: trimmedContent.length,
-          estimatedTokens: Math.ceil(trimmedContent.length / 4),
+          totalCharacters: searchableContent.length,
+          estimatedTokens: Math.ceil(searchableContent.length / 4),
           extractionMethod: 'manual',
         },
       })

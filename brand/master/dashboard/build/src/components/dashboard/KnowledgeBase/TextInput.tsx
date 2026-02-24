@@ -7,9 +7,22 @@ interface TextInputProps {
   onSubmit: () => void
 }
 
+const CATEGORIES = [
+  'what_is_proxe',
+  'features',
+  'pricing',
+  'how_it_works',
+  'faq',
+  'comparison',
+  'philosophy',
+]
+
 export default function TextInput({ onSubmit }: TextInputProps) {
-  const [title, setTitle] = useState('')
-  const [content, setContent] = useState('')
+  const [question, setQuestion] = useState('')
+  const [answer, setAnswer] = useState('')
+  const [category, setCategory] = useState('')
+  const [subcategory, setSubcategory] = useState('')
+  const [tagsInput, setTagsInput] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
@@ -19,24 +32,32 @@ export default function TextInput({ onSubmit }: TextInputProps) {
     setError(null)
     setSuccess(false)
 
-    if (!title.trim()) {
-      setError('Title is required')
+    if (!question.trim()) {
+      setError('Question is required')
       return
     }
-    if (!content.trim()) {
-      setError('Content is required')
+    if (!answer.trim()) {
+      setError('Answer is required')
       return
     }
 
     setSubmitting(true)
+
+    const tags = tagsInput
+      .split(',')
+      .map(t => t.trim())
+      .filter(t => t.length > 0)
 
     try {
       const res = await fetch('/api/knowledge-base/text', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          title: title.trim(),
-          content: content.trim(),
+          question: question.trim(),
+          answer: answer.trim(),
+          category: category || null,
+          subcategory: subcategory.trim() || null,
+          tags,
         }),
       })
 
@@ -46,8 +67,11 @@ export default function TextInput({ onSubmit }: TextInputProps) {
         return
       }
 
-      setTitle('')
-      setContent('')
+      setQuestion('')
+      setAnswer('')
+      setCategory('')
+      setSubcategory('')
+      setTagsInput('')
       setSuccess(true)
       onSubmit()
       setTimeout(() => setSuccess(false), 2000)
@@ -58,62 +82,109 @@ export default function TextInput({ onSubmit }: TextInputProps) {
     }
   }
 
+  const inputStyle = {
+    background: 'var(--bg-tertiary)',
+    color: 'var(--text-primary)',
+    border: '1px solid var(--border-primary)',
+  }
+
   return (
     <form onSubmit={handleSubmit}>
       <div className="space-y-4">
-        {/* Title */}
+        {/* Question */}
         <div>
           <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>
-            Title
+            Question
           </label>
           <input
             type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="e.g., Pricing Information, Return Policy"
+            value={question}
+            onChange={(e) => setQuestion(e.target.value)}
+            placeholder="e.g., How much does it cost?"
             className="w-full px-4 py-2.5 rounded-lg text-sm outline-none"
-            style={{
-              background: 'var(--bg-tertiary)',
-              color: 'var(--text-primary)',
-              border: '1px solid var(--border-primary)',
-            }}
+            style={inputStyle}
           />
         </div>
 
-        {/* Content Textarea */}
+        {/* Answer */}
         <div>
           <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>
-            Content
+            Answer
           </label>
           <textarea
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            placeholder="Paste or type your knowledge content here..."
-            rows={8}
+            value={answer}
+            onChange={(e) => setAnswer(e.target.value)}
+            placeholder="The complete answer your AI agent should give..."
+            rows={5}
             className="w-full px-4 py-2.5 rounded-lg text-sm outline-none resize-y"
-            style={{
-              background: 'var(--bg-tertiary)',
-              color: 'var(--text-primary)',
-              border: '1px solid var(--border-primary)',
-            }}
+            style={inputStyle}
           />
-          <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
-            {content.length > 0 ? `${content.length.toLocaleString()} characters` : 'Enter text that your AI agent should know'}
-          </p>
+          {answer.length > 0 && (
+            <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
+              {answer.length.toLocaleString()} characters
+            </p>
+          )}
         </div>
 
-        {/* Submit Button */}
+        {/* Category + Subcategory */}
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+              Category
+            </label>
+            <select
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              className="w-full px-4 py-2.5 rounded-lg text-sm outline-none"
+              style={inputStyle}
+            >
+              <option value="">Select category...</option>
+              {CATEGORIES.map(cat => (
+                <option key={cat} value={cat}>{cat.replace(/_/g, ' ')}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+              Subcategory
+            </label>
+            <input
+              type="text"
+              value={subcategory}
+              onChange={(e) => setSubcategory(e.target.value)}
+              placeholder="e.g., plans, setup, speed"
+              className="w-full px-4 py-2.5 rounded-lg text-sm outline-none"
+              style={inputStyle}
+            />
+          </div>
+        </div>
+
+        {/* Tags */}
+        <div>
+          <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+            Tags <span style={{ color: 'var(--text-tertiary)' }}>(comma-separated)</span>
+          </label>
+          <input
+            type="text"
+            value={tagsInput}
+            onChange={(e) => setTagsInput(e.target.value)}
+            placeholder="pricing, cost, plans, subscription"
+            className="w-full px-4 py-2.5 rounded-lg text-sm outline-none"
+            style={inputStyle}
+          />
+        </div>
+
+        {/* Submit */}
         <button
           type="submit"
-          disabled={submitting || !title.trim() || !content.trim()}
+          disabled={submitting || !question.trim() || !answer.trim()}
           className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium text-white transition-opacity disabled:opacity-50"
           style={{ background: 'var(--accent-primary)' }}
         >
           <MdAdd size={18} />
-          {submitting ? 'Saving...' : 'Add Text'}
+          {submitting ? 'Saving...' : 'Add Q&A Entry'}
         </button>
 
-        {/* Error */}
         {error && (
           <div
             className="p-3 rounded-lg text-sm"
@@ -123,13 +194,12 @@ export default function TextInput({ onSubmit }: TextInputProps) {
           </div>
         )}
 
-        {/* Success */}
         {success && (
           <div
             className="p-3 rounded-lg text-sm"
             style={{ background: 'var(--accent-subtle)', color: 'var(--accent-primary)' }}
           >
-            Text entry saved successfully!
+            Q&A entry saved successfully!
           </div>
         )}
       </div>
