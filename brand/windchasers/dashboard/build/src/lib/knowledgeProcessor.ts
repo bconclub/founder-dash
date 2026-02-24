@@ -3,6 +3,43 @@
  * Extracts text from PDFs and DOCX files, then chunks for RAG retrieval.
  */
 
+// ---------- Polyfills for pdf.js in Node.js ----------
+// pdfjs-dist expects browser globals (DOMMatrix, Path2D) that don't exist server-side
+
+if (typeof globalThis.DOMMatrix === 'undefined') {
+  // Minimal DOMMatrix polyfill — pdf.js uses it for transform calculations
+  class DOMMatrixPolyfill {
+    m11 = 1; m12 = 0; m13 = 0; m14 = 0
+    m21 = 0; m22 = 1; m23 = 0; m24 = 0
+    m31 = 0; m32 = 0; m33 = 1; m34 = 0
+    m41 = 0; m42 = 0; m43 = 0; m44 = 1
+    a = 1; b = 0; c = 0; d = 1; e = 0; f = 0
+    is2D = true; isIdentity = true
+    inverse() { return new DOMMatrixPolyfill() }
+    multiply() { return new DOMMatrixPolyfill() }
+    translate() { return new DOMMatrixPolyfill() }
+    scale() { return new DOMMatrixPolyfill() }
+    rotate() { return new DOMMatrixPolyfill() }
+    transformPoint() { return { x: 0, y: 0, z: 0, w: 1 } }
+  }
+  globalThis.DOMMatrix = DOMMatrixPolyfill as any
+}
+
+if (typeof globalThis.Path2D === 'undefined') {
+  class Path2DPolyfill {
+    moveTo() {}
+    lineTo() {}
+    bezierCurveTo() {}
+    quadraticCurveTo() {}
+    arc() {}
+    arcTo() {}
+    ellipse() {}
+    rect() {}
+    closePath() {}
+  }
+  globalThis.Path2D = Path2DPolyfill as any
+}
+
 // ---------- Types ----------
 
 export interface TextChunk {
