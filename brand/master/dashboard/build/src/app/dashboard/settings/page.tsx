@@ -4,16 +4,16 @@ import { useState, useEffect } from 'react';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 
 const ACCENT_THEMES = [
-  { id: 'master', name: 'Master Gray', color: '#666666', darkColor: '#666666' },
-  { id: 'black', name: 'Black', color: '#000000', darkColor: '#000000' },
-  { id: 'white', name: 'White', color: '#FFFFFF', darkColor: '#FFFFFF' },
+  { id: 'windchasers', name: 'Windchasers Gold', color: '#C9A961', darkColor: '#C9A961' },
+  { id: 'gold', name: 'Electric Lime', color: '#afd510', darkColor: '#afd510' },
+  { id: 'orange', name: 'Sunset Orange', color: '#fc7301', darkColor: '#fc7301' },
   { id: 'grey', name: 'Neutral Grey', color: '#6B7280', darkColor: '#9CA3AF' },
 ];
 
 type WidgetStyle = 'searchbar' | 'bubble';
 
 export default function SettingsPage() {
-  const [selectedTheme, setSelectedTheme] = useState('master');
+  const [selectedTheme, setSelectedTheme] = useState('windchasers');
   const [saved, setSaved] = useState(false);
   const [widgetStyle, setWidgetStyle] = useState<WidgetStyle>('searchbar');
   const [widgetStyleSaved, setWidgetStyleSaved] = useState(false);
@@ -22,13 +22,13 @@ export default function SettingsPage() {
 
   // Load saved theme on mount
   useEffect(() => {
-    const savedTheme = localStorage.getItem('master-accent-theme');
+    const savedTheme = localStorage.getItem('windchasers-accent-theme');
     if (savedTheme) {
       setSelectedTheme(savedTheme);
       applyTheme(savedTheme);
     } else {
-      // Default to Master theme
-      applyTheme('master');
+      // Default to Windchasers theme
+      applyTheme('windchasers');
     }
   }, []);
 
@@ -66,7 +66,7 @@ export default function SettingsPage() {
   function handleThemeSelect(themeId: string) {
     setSelectedTheme(themeId);
     applyTheme(themeId);
-    localStorage.setItem('master-accent-theme', themeId);
+    localStorage.setItem('windchasers-accent-theme', themeId);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   }

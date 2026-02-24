@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
-import { createClient } from '@/lib/supabase/client'
+import { createClient } from '../../../lib/supabase/client'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -136,7 +136,7 @@ export default function LoginPage() {
       if (process.env.NODE_ENV === 'development') {
         console.log('🔍 Login attempt:', {
           email,
-          supabaseUrl: process.env.NEXT_PUBLIC_BRAND_SUPABASE_URL?.substring(0, 30) + '...',
+          supabaseUrl: process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL?.substring(0, 30) + '...',
           timestamp: new Date().toISOString(),
         })
       }
@@ -343,14 +343,14 @@ export default function LoginPage() {
 
   return (
     <div className={`login-page min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 ${
-      darkMode ? 'bg-[#0a0a0a]' : 'bg-[#f6f6f6]'
+      darkMode ? 'bg-[#1A0F0A]' : 'bg-[#f6f6f6]'
     }`}>
       {/* Dark Mode Toggle */}
       <button
         onClick={toggleDarkMode}
         className={`login-page-theme-toggle fixed top-4 right-4 p-2 rounded-full transition-colors ${
           darkMode 
-            ? 'bg-[#2a2a2a] text-white hover:bg-[#3a3a3a] border border-[#3a3a3a]' 
+            ? 'bg-[#2A1F1A] text-white hover:bg-[#3A2F2A] border border-[#3A2F2A]' 
             : 'bg-[#ececec] text-black hover:bg-[#d0d0d0]'
         }`}
         aria-label="Toggle dark mode"
@@ -359,21 +359,22 @@ export default function LoginPage() {
       </button>
 
       <div className={`login-page-card max-w-md w-full rounded-2xl shadow-xl p-8 ${
-        darkMode ? 'bg-[#0a0a0a] border border-[#3a3a3a]' : 'bg-[#ffffff] border-2 border-[#d0d0d0]'
+        darkMode ? 'bg-[#1A0F0A] border border-[#3A2F2A]' : 'bg-[#ffffff] border-2 border-[#d0d0d0]'
       }`}>
         <div className="login-page-card-content space-y-8">
           {/* Logo and Title */}
           <div className="login-page-header text-center">
             <div className="login-page-logo-container mx-auto w-16 h-16 mb-4 flex items-center justify-center">
-              {/* Master Logo - Star Icon */}
-              <img 
-                src="/star.svg"
-                alt="Master"
-                className="w-full h-full"
+              {/* Windchasers Logo - Using text-based logo for now */}
+              <div 
+                className="login-page-logo w-full h-full flex items-center justify-center rounded-full font-bold text-2xl"
                 style={{ 
-                  filter: darkMode ? 'brightness(0) invert(1)' : 'brightness(0)',
+                  backgroundColor: '#C9A961',
+                  color: '#1A0F0A'
                 }}
-              />
+              >
+                W
+              </div>
             </div>
             <h2 className={`login-page-title text-3xl font-normal font-exo-2 ${
               darkMode ? 'text-white' : 'text-black'
@@ -381,9 +382,9 @@ export default function LoginPage() {
               Sign in
             </h2>
             <p className={`login-page-subtitle mt-2 text-sm font-zen-dots ${
-              darkMode ? 'text-gray-400' : 'text-gray-600'
+              darkMode ? 'text-[#C9A961]' : 'text-[#b8964f]'
             }`}>
-              Master
+              WindChasers Aviation Academy
             </p>
           </div>
 
@@ -391,7 +392,7 @@ export default function LoginPage() {
             {error && (
               <div className={`login-page-error-message rounded-lg p-4 border ${
                 darkMode 
-                  ? 'bg-[#0a0a0a] border-red-500/50' 
+                  ? 'bg-[#1A0F0A] border-red-500/50' 
                   : 'bg-red-50 border-red-200'
               }`}>
                 <div className={`login-page-error-content text-sm flex items-start gap-2 ${
@@ -436,8 +437,8 @@ export default function LoginPage() {
                 required
                 className={`login-page-form-input-email w-full px-4 py-3 rounded-lg border focus:outline-none focus:ring-2 transition-colors ${
                   darkMode
-                    ? 'bg-[#0a0a0a] border-[#3a3a3a] text-white placeholder-gray-500 focus:ring-gray-500 focus:border-gray-500'
-                    : 'bg-[#ffffff] border-[#d0d0d0] text-black placeholder-gray-500 focus:ring-gray-500 focus:border-gray-500'
+                    ? 'bg-[#1A0F0A] border-[#3A2F2A] text-white placeholder-gray-500 focus:ring-[#C9A961] focus:border-[#C9A961]'
+                    : 'bg-[#ffffff] border-[#d0d0d0] text-black placeholder-gray-500 focus:ring-[#C9A961] focus:border-[#C9A961]'
                 }`}
                 placeholder="demo@test.com"
                 value={email}
@@ -486,7 +487,7 @@ export default function LoginPage() {
               disabled={loading || rateLimited}
               className={`login-page-form-submit-button w-full py-3 px-4 font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 ${
                 darkMode
-                  ? 'bg-gray-600 text-white hover:bg-gray-700 focus:ring-gray-500'
+                  ? 'bg-[#C9A961] text-[#1A0F0A] hover:bg-[#b8964f] focus:ring-[#C9A961]'
                   : 'bg-[#C9A961] text-[#1A0F0A] hover:bg-[#b8964f] focus:ring-[#C9A961]'
               }`}
             >
@@ -502,7 +503,7 @@ export default function LoginPage() {
           <div className="login-page-divider relative">
             <div className="login-page-divider-line absolute inset-0 flex items-center">
               <div className={`w-full border-t ${
-                darkMode ? 'border-[#3a3a3a]' : 'border-[#d0d0d0]'
+                darkMode ? 'border-[#3A2F2A]' : 'border-[#d0d0d0]'
               }`}></div>
             </div>
             <div className="login-page-divider-text relative flex justify-center text-sm">
@@ -551,14 +552,14 @@ export default function LoginPage() {
             }`}>
               New? Visit{' '}
               <a
-                href="#"
+                href="https://windchasers.in"
                 target="_blank"
                 rel="noopener noreferrer"
                 className={`login-page-footer-link hover:underline ${
-                  darkMode ? 'text-gray-400 hover:text-gray-300' : 'text-gray-600 hover:text-gray-800'
+                  darkMode ? 'text-[#C9A961] hover:text-[#E8D5B7]' : 'text-[#b8964f] hover:text-[#C9A961]'
                 }`}
               >
-                Master
+                WindChasers Aviation Academy
               </a>
             </p>
           </div>

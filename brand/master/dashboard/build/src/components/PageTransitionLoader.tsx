@@ -32,7 +32,7 @@ export default function PageTransitionLoader() {
       }}
     >
       <div className="page-transition-loader-content flex flex-col items-center">
-        {/* Master Icon with Animation */}
+        {/* Windchasers Icon with Animation */}
         <div className="page-transition-loader-icon-container relative">
           {/* Pulse effect with transparent accent color */}
           <div
@@ -45,13 +45,13 @@ export default function PageTransitionLoader() {
             }}
           />
           <div className="page-transition-loader-icon-wrapper relative animate-pulse">
-            <img
-              src="/star.svg"
-              alt="Master"
+            <Image
+              src="/windchasers-icon.png"
+              alt="Windchasers"
               width={80}
               height={80}
               className="page-transition-loader-icon drop-shadow-lg"
-              style={{ filter: 'brightness(0) invert(1)' }}
+              priority
             />
           </div>
         </div>

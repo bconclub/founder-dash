@@ -62,6 +62,7 @@ const navigation: NavItem[] = [
     icon: MdSettings,
     children: [
       { name: 'Web Agent', href: '/dashboard/settings/web-agent', icon: MdChatBubbleOutline },
+      { name: 'Knowledge Base', href: '/dashboard/settings/knowledge-base', icon: MdMenuBook },
     ]
   },
   { name: 'Billing', href: '/dashboard/billing', icon: MdCreditCard, comingSoon: true },

@@ -177,7 +177,6 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
           booking_date: lead.booking_date || selectedBooking.booking_date,
           booking_time: lead.booking_time || selectedBooking.booking_time,
           metadata: lead.metadata,
-          unified_context: lead.unified_context,
         }
         setSelectedLead(modalLead)
         setIsLeadModalOpen(true)
@@ -194,7 +193,6 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
           booking_date: selectedBooking.booking_date,
           booking_time: selectedBooking.booking_time,
           metadata: selectedBooking.metadata,
-          unified_context: selectedBooking.unified_context,
         }
         setSelectedLead(modalLead)
         setIsLeadModalOpen(true)
@@ -213,7 +211,6 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
         booking_date: selectedBooking.booking_date,
         booking_time: selectedBooking.booking_time,
         metadata: selectedBooking.metadata,
-        unified_context: selectedBooking.unified_context,
       }
       setSelectedLead(modalLead)
       setIsLeadModalOpen(true)
@@ -653,6 +650,37 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
                   </div>
                 </div>
 
+                {/* Course Interest */}
+                {(selectedBooking.metadata?.courseInterest || selectedBooking.unified_context?.windchasers?.course_interest) && (
+                  <div>
+                    <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Course Interest</div>
+                    <div className="text-base text-gray-900 dark:text-white">
+                      {(() => {
+                        const courseInterest = selectedBooking.metadata?.courseInterest || selectedBooking.unified_context?.windchasers?.course_interest;
+                        const courseNameMap: Record<string, string> = {
+                          'pilot': 'Pilot Training',
+                          'helicopter': 'Helicopter Training',
+                          'drone': 'Drone Training',
+                          'cabin': 'Cabin Crew Training',
+                        };
+                        return courseNameMap[courseInterest?.toLowerCase()] || courseInterest || '-';
+                      })()}
+                    </div>
+                  </div>
+                )}
+
+                {/* Session Type */}
+                {(selectedBooking.metadata?.sessionType) && (
+                  <div>
+                    <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Session Type</div>
+                    <div className="text-base text-gray-900 dark:text-white">
+                      {selectedBooking.metadata.sessionType === 'offline' ? 'Offline / Facility Visit' : 
+                       selectedBooking.metadata.sessionType === 'online' ? 'Online Session' : 
+                       selectedBooking.metadata.sessionType}
+                    </div>
+                  </div>
+                )}
+
                 {/* Conversation Summary */}
                 {(selectedBooking.metadata?.conversationSummary || selectedBooking.metadata?.conversation_summary || selectedBooking.unified_context?.web?.conversation_summary) && (
                   <div>
@@ -684,7 +712,7 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
                             inDetails = true;
                             continue;
                           }
-                          if (trimmed && inDetails) {
+                          if (trimmed && inDetails && !trimmed.includes('Windchasers Aviation Academy')) {
                             keyLines.push(trimmed);
                           }
                         }

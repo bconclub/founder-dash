@@ -32,7 +32,7 @@ export default function PageTransitionLoader() {
       }}
     >
       <div className="page-transition-loader-content flex flex-col items-center">
-        {/* PROXe Icon with Animation */}
+        {/* Windchasers Icon with Animation */}
         <div className="page-transition-loader-icon-container relative">
           {/* Pulse effect with transparent accent color */}
           <div
@@ -46,8 +46,8 @@ export default function PageTransitionLoader() {
           />
           <div className="page-transition-loader-icon-wrapper relative animate-pulse">
             <Image
-              src="/PROXE Icon.svg"
-              alt="PROXe"
+              src="/windchasers-icon.png"
+              alt="Windchasers"
               width={80}
               height={80}
               className="page-transition-loader-icon drop-shadow-lg"

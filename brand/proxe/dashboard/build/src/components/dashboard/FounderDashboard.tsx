@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
+import { createClient } from '../../lib/supabase/client'
+import Image from 'next/image'
 import { MdTrendingUp, MdTrendingDown, MdRemove, MdCheckCircle, MdSchedule, MdMessage, MdWarning, MdArrowForward, MdLocalFireDepartment, MdSpeed, MdPeople, MdEvent, MdRefresh, MdCancel, MdTrendingUp as MdScoreUp, MdSwapHoriz, MdPhoneDisabled, MdArrowUpward, MdShowChart, MdFlashOn, MdChatBubble, MdCalendarToday, MdArrowDropDown, MdWhatsapp, MdLanguage, MdEventBusy, MdNotifications } from 'react-icons/md'
 import LeadDetailsModal from './LeadDetailsModal'
 import type { Lead } from '@/types'
@@ -81,14 +82,7 @@ export default function FounderDashboard() {
   })
   const [showThresholdDropdown, setShowThresholdDropdown] = useState(false)
 
-  useEffect(() => {
-    loadMetrics()
-    // Refresh every 30 seconds
-    const interval = setInterval(loadMetrics, 30000)
-    return () => clearInterval(interval)
-  }, [hotLeadThreshold])
-
-  const loadMetrics = async () => {
+  const loadMetrics = useCallback(async () => {
     try {
       const response = await fetch(`/api/dashboard/founder-metrics?hotLeadThreshold=${hotLeadThreshold}`)
       if (response.ok) {
@@ -105,7 +99,35 @@ export default function FounderDashboard() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [hotLeadThreshold])
+
+  useEffect(() => {
+    // Initial load
+    loadMetrics()
+    
+    // Only poll when component is visible
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        loadMetrics()
+      }
+    }
+    
+    // Poll every 60 seconds (1 minute) instead of 30 seconds
+    const interval = setInterval(() => {
+      // Only poll if page is visible
+      if (document.visibilityState === 'visible') {
+        loadMetrics()
+      }
+    }, 60000)
+    
+    // Listen for visibility changes
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    
+    return () => {
+      clearInterval(interval)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [hotLeadThreshold, loadMetrics])
 
   const formatTimeAgo = (dateString: string) => {
     const date = new Date(dateString)
@@ -136,9 +158,25 @@ export default function FounderDashboard() {
       }
 
       if (lead) {
-        // Type assertion for lead data to fix TypeScript inference issue
-        const typedLead = lead as any
-        
+        const typedLead = lead as {
+          id?: string
+          customer_name?: string | null
+          email?: string | null
+          phone?: string | null
+          created_at?: string | null
+          last_interaction_at?: string | null
+          lead_score?: number | null
+          lead_stage?: string | null
+          sub_stage?: string | null
+          status?: string | null
+          first_touchpoint?: string | null
+          last_touchpoint?: string | null
+          metadata?: any
+          unified_context?: {
+            web?: { booking?: any; booking_date?: any; booking_time?: any }
+            whatsapp?: { booking?: any; booking_date?: any; booking_time?: any }
+          }
+        }
         console.log('✅ Lead fetched:', typedLead.customer_name || 'Unknown')
         // Get booking data from unified_context
         const unifiedContext = typedLead.unified_context || {}
@@ -160,8 +198,8 @@ export default function FounderDashboard() {
           null
 
         // Convert to Lead type expected by LeadDetailsModal
-        const modalLead = {
-          id: typedLead.id,
+        const modalLead: Lead = {
+          id: typedLead.id || '',
           name: typedLead.customer_name || 'Unknown',
           email: typedLead.email || '',
           phone: typedLead.phone || '',
@@ -173,8 +211,8 @@ export default function FounderDashboard() {
           booking_date: bookingDate,
           booking_time: bookingTime,
           unified_context: typedLead.unified_context || null,
-          metadata: {},
-        } as Lead
+          metadata: typedLead.metadata || {},
+        }
 
         console.log('✅ Setting selected lead and opening modal')
         setSelectedLead(modalLead)
@@ -261,8 +299,31 @@ export default function FounderDashboard() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-pulse" style={{ color: 'var(--text-secondary)' }}>Loading dashboard...</div>
+      <div className="flex items-center justify-center min-h-screen" style={{ backgroundColor: 'var(--bg-primary)' }}>
+        <div className="flex flex-col items-center gap-4">
+          <div className="relative">
+            <div
+              className="absolute inset-0 rounded-full animate-ping opacity-30"
+              style={{
+                backgroundColor: 'var(--accent-primary)',
+                width: '100px',
+                height: '100px',
+                margin: '-10px',
+              }}
+            />
+            <div className="relative animate-pulse">
+              <Image
+                src="/windchasers-icon.png"
+                alt="Windchasers"
+                width={80}
+                height={80}
+                className="drop-shadow-lg"
+                priority
+              />
+            </div>
+          </div>
+          <div className="animate-pulse text-sm" style={{ color: 'var(--text-secondary)' }}>Loading dashboard...</div>
+        </div>
       </div>
     )
   }
@@ -518,8 +579,8 @@ export default function FounderDashboard() {
         <div 
           className="rounded-lg p-4 sm:p-6 border transition-all hover:shadow-lg flex flex-col"
           style={{ 
-            backgroundColor: 'rgba(139, 92, 246, 0.05)',
-            borderColor: 'rgba(139, 92, 246, 0.2)',
+            backgroundColor: 'rgba(201, 169, 97, 0.05)',
+            borderColor: 'rgba(201, 169, 97, 0.2)',
             justifyContent: 'space-between'
           }}
         >
@@ -734,7 +795,7 @@ export default function FounderDashboard() {
           <h3 className="text-sm font-semibold mb-4" style={{ color: 'var(--text-secondary)' }}>Upcoming Events</h3>
           {/* 2. Big Number */}
           <p className="text-3xl sm:text-4xl font-bold mb-2" style={{ color: 'var(--text-primary)' }}>
-            {Math.min(2, metrics.upcomingBookings.length)}
+            {metrics.upcomingBookings.length}
           </p>
           {/* 3. Event Items List */}
           {metrics.upcomingBookings.length > 0 ? (
@@ -789,7 +850,7 @@ export default function FounderDashboard() {
           {/* 4. Action Link */}
           <div className="mt-auto">
             <button 
-              onClick={() => router.push('/dashboard/calendar')}
+              onClick={() => router.push('/dashboard/bookings')}
               className="text-xs font-medium flex items-center gap-1 hover:underline"
               style={{ color: '#3B82F6' }}
             >

@@ -20,8 +20,8 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey, {
 })
 
 async function createAdminUser() {
-  const email = 'admin@master.com'
-  const password = 'masterpass'
+  const email = 'proxeadmin@proxe.com'
+  const password = 'proxepass'
 
   try {
     // Create user in Supabase Auth
@@ -30,7 +30,7 @@ async function createAdminUser() {
       password,
       email_confirm: true, // Auto-confirm email
       user_metadata: {
-        full_name: 'Master Admin'
+        full_name: 'PROXe Admin'
       }
     })
 

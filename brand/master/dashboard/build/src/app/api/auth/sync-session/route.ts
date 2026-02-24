@@ -19,9 +19,9 @@ export async function POST(request: NextRequest) {
       )
     }
     
-    // Master Supabase configuration
-    const supabaseUrl = process.env.NEXT_PUBLIC_BRAND_SUPABASE_URL
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_BRAND_SUPABASE_ANON_KEY
+    // Windchasers Supabase configuration
+    const supabaseUrl = process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_ANON_KEY
     
     // Log in development to help debug
     if (process.env.NODE_ENV === 'development') {
@@ -175,9 +175,9 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
-    // Master Supabase configuration
-    const supabaseUrl = process.env.NEXT_PUBLIC_BRAND_SUPABASE_URL || 'https://placeholder.supabase.co'
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_BRAND_SUPABASE_ANON_KEY || 'placeholder-key'
+    // Windchasers Supabase configuration
+    const supabaseUrl = process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL || 'https://placeholder.supabase.co'
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_ANON_KEY || 'placeholder-key'
     
     const cookieStore = await cookies()
 

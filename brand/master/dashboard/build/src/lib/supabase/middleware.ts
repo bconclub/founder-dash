@@ -7,9 +7,9 @@ export async function updateSession(request: NextRequest) {
     request,
   })
 
-  // Master Supabase configuration
-  const supabaseUrl = process.env.NEXT_PUBLIC_BRAND_SUPABASE_URL || 'https://placeholder.supabase.co'
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_BRAND_SUPABASE_ANON_KEY || 'placeholder-key'
+  // Windchasers Supabase configuration
+  const supabaseUrl = process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL || 'https://placeholder.supabase.co'
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_ANON_KEY || 'placeholder-key'
   
   const supabase = createServerClient<Database>(
     supabaseUrl,

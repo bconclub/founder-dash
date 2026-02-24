@@ -2,22 +2,41 @@
 
 import { useState, useEffect, useRef } from 'react'
 import DashboardLayout from '@/components/dashboard/DashboardLayout'
+import {
+  MdCode,
+  MdRefresh,
+  MdContentCopy,
+  MdClose,
+  MdFiberManualRecord,
+  MdCheckCircle,
+  MdInfoOutline
+} from 'react-icons/md'
 
 export default function WebAgentSettingsClient() {
   const [isResetting, setIsResetting] = useState(false)
   const [showCodePanel, setShowCodePanel] = useState(false)
+  const [copySuccess, setCopySuccess] = useState(false)
   const iframeRef = useRef<HTMLIFrameElement>(null)
 
   // Auto-load preview when component mounts
   useEffect(() => {
-    // Determine widget URL - use environment variable or default to localhost in development
-    const widgetUrl = process.env.NEXT_PUBLIC_WEB_AGENT_URL
-      ? `${process.env.NEXT_PUBLIC_WEB_AGENT_URL}/widget`
-      : typeof window !== 'undefined' && window.location.hostname === 'localhost'
-        ? 'http://localhost:3001/widget'
-        : 'https://widget.master.in/widget'
+    const envVar = process.env.NEXT_PUBLIC_WEB_AGENT_URL || ''
+    const isLocalhost = typeof window !== 'undefined' && window.location.hostname === 'localhost'
+    const isOldPort = envVar.includes(':3001')
 
-    // Ensure iframe loads when component mounts
+    let widgetUrl: string
+    if (isLocalhost && (isOldPort || !envVar)) {
+      widgetUrl = 'http://localhost:4003/'
+    } else if (envVar && !isOldPort) {
+      widgetUrl = `${envVar}/`
+    } else if (isLocalhost) {
+      widgetUrl = 'http://localhost:4003/'
+    } else if (typeof window !== 'undefined') {
+      widgetUrl = 'https://agent.windchasers.in/'
+    } else {
+      widgetUrl = 'https://agent.windchasers.in/'
+    }
+
     if (iframeRef.current) {
       iframeRef.current.src = widgetUrl
     }
@@ -28,12 +47,11 @@ export default function WebAgentSettingsClient() {
 
     setIsResetting(true)
     try {
-      // Clear all localStorage items related to the widget
       const keysToRemove: string[] = []
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i)
         if (key && (
-          key.startsWith('master-') ||
+          key.startsWith('windchasers-') ||
           key.startsWith('chat-') ||
           key.startsWith('session-') ||
           key.includes('widget') ||
@@ -44,28 +62,32 @@ export default function WebAgentSettingsClient() {
       }
       keysToRemove.forEach(key => localStorage.removeItem(key))
 
-      // Determine widget URL
       const widgetUrl = process.env.NEXT_PUBLIC_WEB_AGENT_URL
         ? `${process.env.NEXT_PUBLIC_WEB_AGENT_URL}/widget`
         : typeof window !== 'undefined' && window.location.hostname === 'localhost'
-          ? 'http://localhost:3001/widget'
-          : 'https://widget.master.in/widget'
+          ? 'http://localhost:4003/widget'
+          : 'https://agent.windchasers.in/widget'
 
-      // Reload the iframe to reset the widget state
       if (iframeRef.current) {
         iframeRef.current.src = widgetUrl
       }
 
       setTimeout(() => {
         setIsResetting(false)
-      }, 500)
+      }, 800)
     } catch (error) {
       console.error('Error resetting widget:', error)
       setIsResetting(false)
     }
   }
 
-  const embedCode = `<script src="https://widget.master.in/widget/embed.js"></script>`
+  const handleCopyCode = () => {
+    navigator.clipboard.writeText(embedCode)
+    setCopySuccess(true)
+    setTimeout(() => setCopySuccess(false), 2000)
+  }
+
+  const embedCode = `<script src="https://proxe.windchasers.in/widget/embed.js"></script>`
 
   return (
     <DashboardLayout>
@@ -77,6 +99,7 @@ export default function WebAgentSettingsClient() {
         position: 'relative',
         display: 'flex',
         overflow: 'hidden',
+        backgroundColor: 'var(--bg-primary)',
       }}>
         {/* Installation Code Modal */}
         {showCodePanel && (
@@ -112,30 +135,40 @@ export default function WebAgentSettingsClient() {
             >
               <div style={{ padding: '32px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
-                  <h2 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
-                    Installation
-                  </h2>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <MdCode size={28} style={{ color: 'var(--accent-primary)' }} />
+                    <h2 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
+                      Installation
+                    </h2>
+                  </div>
                   <button
                     onClick={() => setShowCodePanel(false)}
                     className="p-2 rounded-full transition-colors hover:bg-white/5"
                     style={{ color: 'var(--text-secondary)' }}
                   >
-                    <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 24 24" height="24" width="24" xmlns="http://www.w3.org/2000/svg"><path fill="none" d="M0 0h24v24H0z"></path><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"></path></svg>
+                    <MdClose size={24} />
                   </button>
                 </div>
 
-                <div className="p-8 rounded-xl" style={{ background: 'var(--bg-primary)', border: '1px solid var(--border-primary)' }}>
-                  <p className="text-base mb-6 font-medium" style={{ color: 'var(--text-secondary)' }}>
-                    Add this script tag to your website to embed the chat widget:
+                <div
+                  className="p-8 rounded-2xl"
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.03)',
+                    border: '1px solid var(--border-primary)',
+                    boxShadow: 'inset 0 1px 1px rgba(255, 255, 255, 0.05)'
+                  }}
+                >
+                  <p className="text-base mb-6 font-medium" style={{ color: 'var(--text-secondary)', lineHeight: '1.6' }}>
+                    Add this script tag to your website's footer to embed the chat widget.
                   </p>
 
                   <div className="relative group">
                     <div
                       className="p-5 rounded-xl overflow-x-auto text-sm font-mono"
                       style={{
-                        backgroundColor: 'var(--bg-tertiary)',
+                        backgroundColor: 'var(--bg-primary)',
                         border: '1px solid var(--border-primary)',
-                        color: 'var(--text-primary)',
+                        color: 'var(--accent-primary)',
                         minHeight: '100px',
                         display: 'flex',
                         alignItems: 'center',
@@ -146,33 +179,36 @@ export default function WebAgentSettingsClient() {
                     </div>
 
                     <button
-                      onClick={() => {
-                        navigator.clipboard.writeText(embedCode)
-                      }}
-                      className="absolute top-1/2 -translate-y-1/2 right-3 p-2.5 rounded-lg transition-all flex items-center justify-center"
+                      onClick={handleCopyCode}
+                      className="absolute top-1/2 -translate-y-1/2 right-3 p-2.5 rounded-lg transition-all flex items-center gap-2"
                       style={{
-                        backgroundColor: 'var(--bg-hover)',
-                        color: 'var(--text-primary)',
+                        backgroundColor: copySuccess ? 'var(--accent-primary)' : 'var(--bg-tertiary)',
+                        color: copySuccess ? 'white' : 'var(--text-primary)',
                         border: '1px solid var(--border-primary)',
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)'
                       }}
                       title="Copy to clipboard"
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = 'var(--accent-subtle)'
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
-                      }}
                     >
-                      Copy
+                      {copySuccess ? <MdCheckCircle size={18} /> : <MdContentCopy size={18} />}
+                      <span className="text-xs font-medium">{copySuccess ? 'Copied' : ''}</span>
                     </button>
                   </div>
 
-                  <div className="mt-8 p-5 rounded-xl" style={{ backgroundColor: 'var(--accent-subtle)' }}>
-                    <p className="text-xs" style={{ color: 'var(--accent-primary)' }}>
-                      <strong>Note:</strong> The widget will automatically initialize when the script loads.
-                      Place this script tag before the closing &lt;/body&gt; tag.
-                    </p>
+                  <div
+                    className="mt-8 p-5 rounded-xl flex gap-3"
+                    style={{
+                      backgroundColor: 'var(--accent-subtle)',
+                      border: '1px dashed var(--accent-primary)'
+                    }}
+                  >
+                    <MdInfoOutline size={20} style={{ color: 'var(--accent-primary)', flexShrink: 0 }} />
+                    <div>
+                      <h4 className="text-xs font-bold mb-1" style={{ color: 'var(--text-primary)' }}>Integration Note</h4>
+                      <p className="text-xs opacity-80" style={{ color: 'var(--text-primary)', lineHeight: '1.5' }}>
+                        The widget will automatically initialize when the script loads.
+                        Place it before the closing <code>&lt;/body&gt;</code> tag.
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -180,78 +216,98 @@ export default function WebAgentSettingsClient() {
           </div>
         )}
 
-        {/* Full Screen Preview */}
+        {/* Main Preview Container */}
         <div
           style={{
-            width: '100%',
+            flex: 1,
             height: '100%',
             position: 'relative',
             backgroundColor: 'var(--bg-primary)',
             display: 'flex',
             flexDirection: 'column',
+            transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
           }}
         >
           {/* Header with controls */}
           <div
             style={{
-              padding: '16px 24px',
+              padding: '16px 32px',
               borderBottom: '1px solid var(--border-primary)',
-              backgroundColor: 'var(--bg-secondary)',
+              backgroundColor: 'rgba(26, 15, 10, 0.8)', // Semi-transparent dark
+              backdropFilter: 'blur(12px)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
               flexShrink: 0,
+              zIndex: 10,
             }}
           >
-            <div>
-              <h1 className="text-xl font-bold" style={{ color: 'var(--text-primary)', marginBottom: '4px' }}>
-                Widget Preview
-              </h1>
-              <p className="text-xs" style={{ color: 'var(--text-secondary)', opacity: 0.7 }}>
-                Live preview of your chat widget
-              </p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                  <h1 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>
+                    Widget Preview
+                  </h1>
+                  <span
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      padding: '2px 8px',
+                      borderRadius: '12px',
+                      fontSize: '10px',
+                      fontWeight: 'bold',
+                      textTransform: 'uppercase',
+                      backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                      color: '#22c55e',
+                      border: '1px solid rgba(34, 197, 94, 0.2)'
+                    }}
+                  >
+                    <MdFiberManualRecord size={8} className="animate-pulse" />
+                    Live
+                  </span>
+                </div>
+                <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                  Interact with your virtual agent in real-time
+                </p>
+              </div>
             </div>
+
             <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
               <button
                 onClick={() => setShowCodePanel(!showCodePanel)}
-                className="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                className="px-6 py-2.5 rounded-lg text-sm font-semibold transition-all flex items-center gap-2"
                 style={{
-                  backgroundColor: 'var(--bg-tertiary)',
-                  color: 'var(--text-primary)',
+                  backgroundColor: showCodePanel ? 'var(--accent-primary)' : 'var(--bg-tertiary)',
+                  color: showCodePanel ? 'white' : 'var(--text-primary)',
                   border: '1px solid var(--border-primary)',
                   cursor: 'pointer',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)'
+                  boxShadow: showCodePanel ? '0 0 15px rgba(201, 169, 97, 0.4)' : 'none'
                 }}
               >
-                {showCodePanel ? 'Hide Code' : 'Show Code'}
+                <MdCode size={18} />
+                {showCodePanel ? 'Code Active' : 'Show Code'}
               </button>
+
               <button
                 onClick={handleResetWidget}
                 disabled={isResetting}
-                className="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                className="px-6 py-2.5 rounded-lg text-sm font-semibold transition-all flex items-center gap-2"
                 style={{
-                  backgroundColor: isResetting ? 'var(--bg-tertiary)' : 'var(--bg-tertiary)',
+                  backgroundColor: 'var(--bg-tertiary)',
                   color: 'var(--text-primary)',
                   border: '1px solid var(--border-primary)',
                   cursor: isResetting ? 'not-allowed' : 'pointer',
                   opacity: isResetting ? 0.6 : 1,
                 }}
                 onMouseEnter={(e) => {
-                  if (!isResetting) {
-                    e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
-                  }
+                  if (!isResetting) e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
                 }}
                 onMouseLeave={(e) => {
-                  if (!isResetting) {
-                    e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)'
-                  }
+                  if (!isResetting) e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)'
                 }}
               >
+                <MdRefresh size={18} className={isResetting ? 'animate-spin' : ''} />
                 {isResetting ? 'Resetting...' : 'Reset Widget'}
               </button>
             </div>
@@ -263,16 +319,29 @@ export default function WebAgentSettingsClient() {
               flex: 1,
               position: 'relative',
               overflow: 'hidden',
-              backgroundColor: 'var(--bg-primary)',
+              backgroundColor: '#000', // Dark background for the preview area
             }}
           >
+            {/* Overlay Gradient for more premium look if needed, but the widget has its own UI */}
             <iframe
               ref={iframeRef}
-              src={process.env.NEXT_PUBLIC_WEB_AGENT_URL
-                ? `${process.env.NEXT_PUBLIC_WEB_AGENT_URL}/widget`
-                : typeof window !== 'undefined' && window.location.hostname === 'localhost'
-                  ? 'http://localhost:3001/widget'
-                  : 'https://widget.master.in/widget'}
+              src={(() => {
+                const envVar = process.env.NEXT_PUBLIC_WEB_AGENT_URL || ''
+                const isLocalhost = typeof window !== 'undefined' && window.location.hostname === 'localhost'
+                const isOldPort = envVar.includes(':3001')
+
+                if (isLocalhost && (isOldPort || !envVar)) {
+                  return 'http://localhost:4003/'
+                } else if (envVar && !isOldPort) {
+                  return `${envVar}/`
+                } else if (isLocalhost) {
+                  return 'http://localhost:4003/'
+                } else if (typeof window !== 'undefined') {
+                  return 'https://agent.windchasers.in/'
+                } else {
+                  return 'https://agent.windchasers.in/'
+                }
+              })()}
               className="w-full h-full border-0"
               style={{
                 width: '100%',
@@ -284,9 +353,6 @@ export default function WebAgentSettingsClient() {
               allow="microphone; camera"
               onError={(e) => {
                 console.error('Widget iframe error:', e)
-              }}
-              onLoad={(e) => {
-                console.log('Widget iframe loaded')
               }}
             />
           </div>

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { createClient } from '../../../lib/supabase/client'
 import { useSearchParams } from 'next/navigation'
 import {
   MdInbox,
@@ -33,7 +33,7 @@ const ChannelIcon = ({ channel, size = 16, active = false }: { channel: string; 
   }
 };
 
-const ALL_CHANNELS = ['web', 'whatsapp', 'voice', 'social'];
+const ALL_CHANNELS = ['web', 'whatsapp'];
 
 // Types
 interface Conversation {
@@ -58,10 +58,12 @@ interface Message {
   created_at: string
 }
 
-// Helper to clean message content by removing metadata
-function cleanMessageContent(content: string | undefined | null): string {
-  if (!content) return '';
-  return content.replace(/\[User's name is.*?\]/g, '').trim();
+
+function cleanMessageContent(text: string): string {
+  if (!text) return '';
+
+  // Remove [User's name is ...] metadata
+  return text.replace(/\[User's name is [^\]]+\]\s*/g, '').trim();
 }
 
 function renderMarkdown(text: string) {
@@ -74,7 +76,11 @@ function renderMarkdown(text: string) {
   const parts = cleanedText.split(/(\*\*.*?\*\*)/g);
   return parts.map((part, i) => {
     if (part.startsWith('**') && part.endsWith('**')) {
-      return <strong key={i} className="font-bold" style={{ color: 'inherit' }}>{part.slice(2, -2)}</strong>;
+      return (
+        <strong key={i} className="font-bold" style={{ color: 'inherit' }}>
+          {part.slice(2, -2)}
+        </strong>
+      );
     }
     return part;
   });
@@ -410,6 +416,13 @@ export default function InboxPage() {
           unread_count: 0
         }
 
+        console.log('Adding conversation:', {
+          lead_id: conversation.lead_id,
+          lead_name: conversation.lead_name,
+          channels: conversation.channels,
+          last_message: conversation.last_message?.substring(0, 50)
+        })
+
         conversationsArray.push(conversation)
       }
 
@@ -419,6 +432,8 @@ export default function InboxPage() {
       )
 
       console.log('Final conversations array:', conversationsArray.length)
+      console.log('Sample conversation:', conversationsArray[0])
+      console.log('Setting conversations state...')
       setConversations(conversationsArray)
       console.log('Conversations state set. Array length:', conversationsArray.length)
 
@@ -719,42 +734,43 @@ export default function InboxPage() {
       >
         {/* Header */}
         <div className="p-4 border-b" style={{ borderColor: 'var(--border-primary)' }}>
-          <h1 className="text-xl font-semibold mb-3" style={{ color: 'var(--text-primary)' }}>
-            Inbox
+          <h1 className="text-2xl font-black tracking-tight mb-3" style={{ color: 'var(--accent-primary)' }}>
+            INBOX
           </h1>
 
           {/* Search */}
           <div
-            className="flex items-center gap-2 px-3 py-2 rounded-lg"
+            className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-transparent transition-all focus-within:border-amber-500/50 mb-4"
             style={{ background: 'var(--bg-tertiary)' }}
           >
             <span style={{ color: 'var(--text-secondary)' }}>
-              <MdSearch size={20} />
+              <MdSearch size={18} />
             </span>
             <input
               type="text"
               placeholder="Search conversations..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="bg-transparent border-none outline-none flex-1 text-sm"
+              className="bg-transparent border-none outline-none flex-1 text-sm font-medium"
               style={{ color: 'var(--text-primary)' }}
             />
           </div>
 
           {/* Channel Filter */}
-          <div className="flex gap-2 mt-3">
+          <div className="flex flex-wrap gap-2">
             {['all', 'web', 'whatsapp'].map((ch) => (
               <button
                 key={ch}
                 onClick={() => setChannelFilter(ch)}
-                className="px-3 py-1 rounded-full text-xs font-medium transition-colors border"
+                className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all border`}
                 style={{
                   background: channelFilter === ch ? 'var(--accent-primary)' : 'transparent',
-                  color: channelFilter === ch ? '#fff' : 'var(--text-secondary)',
-                  borderColor: channelFilter === ch ? 'var(--accent-primary)' : 'var(--border-primary)'
+                  borderColor: channelFilter === ch ? 'var(--accent-primary)' : 'var(--border-primary)',
+                  color: channelFilter === ch ? 'white' : 'var(--text-secondary)',
+                  boxShadow: channelFilter === ch ? '0 4px 14px 0 rgba(0,0,0,0.1)' : 'none'
                 }}
               >
-                {ch === 'all' ? 'All' : ch.charAt(0).toUpperCase() + ch.slice(1)}
+                {ch}
               </button>
             ))}
           </div>
@@ -795,41 +811,76 @@ export default function InboxPage() {
               </p>
             </div>
           ) : (
-            filteredConversations.map((conv) => (
-              <div
-                key={conv.lead_id}
-                onClick={() => {
-                  setSelectedLeadId(conv.lead_id);
-                  if (conv.channels && conv.channels.length > 0) {
-                    setSelectedChannel(conv.channels[0]);
-                  } else {
-                    setSelectedChannel('');
-                  }
-                }}
-                className="p-4 cursor-pointer border-b transition-colors"
-                style={{
-                  background: selectedLeadId === conv.lead_id ? 'var(--accent-subtle)' : 'transparent',
-                  borderColor: 'var(--border-primary)'
-                }}
-              >
-                <div className="flex items-start justify-between mb-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium text-sm" style={{ color: 'var(--text-primary)' }}>
-                      {conv.lead_name || conv.lead_phone || 'Unknown'}
-                    </span>
-                  </div>
-                    />
-                  ))}
-                </div>
+            filteredConversations.map((conv) => {
+              const isSelected = selectedLeadId === conv.lead_id;
+              const initials = (conv.lead_name || 'U').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
 
-                <p
-                  className="text-sm truncate"
-                  style={{ color: 'var(--text-secondary)' }}
+              return (
+                <div
+                  key={conv.lead_id}
+                  onClick={() => {
+                    setSelectedLeadId(conv.lead_id);
+                    if (conv.channels && conv.channels.length > 0) {
+                      setSelectedChannel(conv.channels[0]);
+                    } else {
+                      setSelectedChannel('');
+                    }
+                  }}
+                  className={`p-4 cursor-pointer transition-all duration-300 relative border-b ${isSelected ? '' : 'hover:bg-gray-50 dark:hover:bg-white/5'
+                    }`}
+                  style={{
+                    borderColor: 'var(--border-primary)',
+                    background: isSelected ? 'var(--accent-subtle)' : 'transparent'
+                  }}
                 >
-                  {conv.last_message}
-                </p>
-              </div>
-            ))
+                  {isSelected && (
+                    <div className="absolute left-0 top-0 bottom-0 w-1" style={{ background: 'var(--accent-primary)' }} />
+                  )}
+
+                  <div className="flex items-center gap-3">
+                    {/* Avatar */}
+                    <div
+                      className={`w-10 h-10 rounded-xl flex items-center justify-center text-xs font-bold transition-transform duration-300 ${isSelected ? 'scale-110' : 'scale-100'
+                        }`}
+                      style={{
+                        background: isSelected ? 'var(--accent-primary)' : 'var(--bg-tertiary)',
+                        color: isSelected ? 'white' : 'var(--text-secondary)',
+                      }}
+                    >
+                      {initials}
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-0.5">
+                        <span className={`text-[13px] font-bold truncate ${isSelected ? '' : 'text-gray-900 dark:text-gray-100'}`} style={{ color: isSelected ? 'var(--accent-primary)' : 'var(--text-primary)' }}>
+                          {conv.lead_name || conv.lead_phone || 'Unknown'}
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-0.5">
+                            {['web', 'whatsapp', 'voice', 'social'].map((ch) => (
+                              conv.channels.includes(ch) && (
+                                <div key={ch} className="opacity-80">
+                                  <ChannelIcon channel={ch} size={12} active={true} />
+                                </div>
+                              )
+                            ))}
+                          </div>
+                          <span className="text-[10px] font-medium opacity-60 whitespace-nowrap">
+                            {timeAgo(conv.last_message_at)}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <p className="text-[12px] truncate opacity-60 flex-1">
+                          {conv.last_message}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )
+            })
           )}
         </div>
       </div>
@@ -965,7 +1016,13 @@ export default function InboxPage() {
             )}
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            <div
+              className="flex-1 overflow-y-auto p-6 space-y-6 relative"
+              style={{
+                backgroundImage: 'radial-gradient(circle at 2px 2px, var(--bg-tertiary) 1px, transparent 0)',
+                backgroundSize: '24px 24px'
+              }}
+            >
               {messagesLoading ? (
                 <div className="text-center" style={{ color: 'var(--text-secondary)' }}>
                   Loading messages...
@@ -981,28 +1038,44 @@ export default function InboxPage() {
                     className={`flex ${msg.sender === 'customer' ? 'justify-start' : 'justify-end'}`}
                   >
                     <div
-                      className="max-w-[95%] rounded-lg px-4 py-2"
+                      className={`max-w-[85%] rounded-2xl px-4 py-3 shadow-sm border ${msg.sender === 'customer'
+                        ? 'bg-white dark:bg-[#2A1F1A] border-gray-200 dark:border-[#3A2F2A]'
+                        : ''
+                        }`}
                       style={{
-                        background: msg.sender === 'customer' ? 'var(--bg-tertiary)' : 'var(--accent-primary)',
-                        color: 'var(--text-primary)'
+                        position: 'relative',
+                        background: msg.sender === 'agent' || msg.sender === 'system' ? 'var(--accent-subtle)' : undefined,
+                        borderColor: msg.sender === 'agent' || msg.sender === 'system' ? 'var(--accent-primary)' : undefined,
+                        borderWidth: '1px'
                       }}
                     >
                       {/* Message header - show sender name and channel */}
-                      <div className="flex items-center gap-2 mb-1">
-                        <ChannelIcon channel={msg.channel} size={12} active={true} />
-                        <span className="text-xs font-medium" style={{ color: msg.sender === 'customer' ? 'var(--text-secondary)' : 'rgba(255,255,255,0.8)' }}>
-                          {msg.sender === 'customer' ? selectedConversation?.lead_name || 'Customer' : 'PROXe'}
+                      <div className="flex items-center justify-between gap-4 mb-1.5">
+                        <div className="flex items-center gap-1.5">
+                          <ChannelIcon channel={msg.channel} size={10} active={true} />
+                          <span
+                            className="text-[10px] font-bold uppercase tracking-wider"
+                            style={{
+                              color: msg.sender === 'customer' ? 'var(--text-secondary)' : 'var(--accent-primary)'
+                            }}
+                          >
+                            {msg.sender === 'customer' ? selectedConversation?.lead_name || 'Customer' : 'PROXe AI'}
+                          </span>
+                        </div>
+                        <span
+                          className="text-[9px] font-medium"
+                          style={{ color: 'var(--text-muted)' }}
+                        >
+                          {formatTime(msg.created_at)}
                         </span>
                       </div>
 
-                      <p className="text-sm">{msg.content}</p>
-
-                      <p
-                        className="text-xs mt-1 text-right"
-                        style={{ color: msg.sender === 'customer' ? 'var(--text-muted)' : 'rgba(255,255,255,0.7)' }}
+                      <div
+                        className="text-sm leading-relaxed"
+                        style={{ color: 'var(--text-primary)' }}
                       >
-                        {formatTime(msg.created_at)}
-                      </p>
+                        {renderMarkdown(msg.content)}
+                      </div>
                     </div>
                   </div>
                 ))

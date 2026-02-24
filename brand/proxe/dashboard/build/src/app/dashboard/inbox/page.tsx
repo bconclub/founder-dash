@@ -58,6 +58,7 @@ interface Message {
   created_at: string
 }
 
+
 function cleanMessageContent(text: string): string {
   if (!text) return '';
 
@@ -733,7 +734,7 @@ export default function InboxPage() {
       >
         {/* Header */}
         <div className="p-4 border-b" style={{ borderColor: 'var(--border-primary)' }}>
-          <h1 className="text-2xl font-black tracking-tight font-zen-dots mb-3" style={{ color: 'var(--accent-primary)' }}>
+          <h1 className="text-2xl font-black tracking-tight mb-3" style={{ color: 'var(--accent-primary)' }}>
             INBOX
           </h1>
 
@@ -856,7 +857,7 @@ export default function InboxPage() {
                         </span>
                         <div className="flex items-center gap-2">
                           <div className="flex items-center gap-0.5">
-                            {ALL_CHANNELS.map((ch) => (
+                            {['web', 'whatsapp', 'voice', 'social'].map((ch) => (
                               conv.channels.includes(ch) && (
                                 <div key={ch} className="opacity-80">
                                   <ChannelIcon channel={ch} size={12} active={true} />

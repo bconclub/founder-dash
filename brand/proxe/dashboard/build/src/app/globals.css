@@ -6,30 +6,30 @@
   --foreground-rgb: 0, 0, 0;
   --background-start-rgb: 214, 219, 220;
   --background-end-rgb: 255, 255, 255;
-
+  
   /* Light mode theme variables */
   --bg-primary: #f6f6f6;
   --bg-secondary: #ffffff;
   --bg-tertiary: rgba(0, 0, 0, 0.02);
   --bg-hover: #ececec;
   --border-primary: #d0d0d0;
-  --accent-primary: #8B5CF6;
-  --accent-light: #8B5CF6;
-  --accent-subtle: #8B5CF620;
+  --accent-primary: #C9A961;
+  --accent-light: #C9A961;
+  --accent-subtle: #C9A96120;
   --text-primary: #1a1a1a;
   --text-secondary: #666666;
 }
 
 .dark {
   /* Dark mode theme variables */
-  --bg-primary: #0D0D0D;
-  --bg-secondary: #111111;
+  --bg-primary: #1A0F0A;
+  --bg-secondary: #1A0F0A;
   --bg-tertiary: rgba(255, 255, 255, 0.02);
-  --bg-hover: #1A1A1A;
-  --border-primary: #262626;
-  --accent-primary: #8B5CF6;
-  --accent-light: #8B5CF6;
-  --accent-subtle: #8B5CF620;
+  --bg-hover: #2A1F1A;
+  --border-primary: #3A2F2A;
+  --accent-primary: #C9A961;
+  --accent-light: #C9A961;
+  --accent-subtle: #C9A96120;
   --text-primary: #ffffff;
   --text-secondary: #999999;
 }
@@ -61,9 +61,9 @@ body:not(.dark) {
   .text-balance {
     text-wrap: balance;
   }
-
+  
   .font-inter {
-    font-family: var(--font-inter), sans-serif;
+    font-family: var(--font-inter), -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   }
 }
 
@@ -622,3 +622,5 @@ body:not(.dark) .channel-icon {
 .lead-tabpanel-container {
   /* Tab panel container */
 }
+
+

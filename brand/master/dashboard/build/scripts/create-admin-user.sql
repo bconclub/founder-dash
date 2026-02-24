@@ -3,8 +3,8 @@
 
 -- Step 1: First, create the user in Supabase Auth Dashboard:
 -- Go to Authentication > Users > Add User
--- Email: admin@master.com (or your domain)
--- Password: masterpass
+-- Email: proxeadmin@proxe.com (or your domain)
+-- Password: proxepass
 -- Create User
 
 -- Step 2: After creating the user, find their user ID from Authentication > Users
@@ -13,7 +13,7 @@
 -- Update the user to admin role
 UPDATE dashboard_users 
 SET role = 'admin' 
-WHERE email = 'admin@master.com';
+WHERE email = 'proxeadmin@proxe.com';
 
 -- Or if you know the user ID:
 -- UPDATE dashboard_users 
@@ -21,5 +21,5 @@ WHERE email = 'admin@master.com';
 -- WHERE id = 'USER_ID_HERE';
 
 -- To verify:
--- SELECT id, email, role FROM dashboard_users WHERE email = 'admin@master.com';
+-- SELECT id, email, role FROM dashboard_users WHERE email = 'proxeadmin@proxe.com';
 

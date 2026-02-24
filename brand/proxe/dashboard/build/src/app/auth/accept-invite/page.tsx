@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
+import { createClient } from '../../../lib/supabase/client'
 
 function AcceptInviteForm() {
   const router = useRouter()
@@ -37,7 +37,15 @@ function AcceptInviteForm() {
       }
 
       // Type assertion for invitation data
-      const invitationData = data as any
+      const invitationData = data as {
+        id: string
+        email: string
+        token: string
+        role: string
+        accepted_at: string | null
+        expires_at: string
+        created_at: string
+      }
 
       if (invitationData.accepted_at) {
         setError('This invitation has already been accepted')
@@ -93,25 +101,21 @@ function AcceptInviteForm() {
 
     // Mark invitation as accepted
     if (authData.user) {
-      // Type assertion for update operations - cast supabase client to any to bypass strict typing
-      const updateQuery = (supabase as any)
+      // Type assertion needed due to missing type definitions for user_invitations table
+      const { error: updateError } = await (supabase as any)
         .from('user_invitations')
         .update({ accepted_at: new Date().toISOString() })
         .eq('token', token)
-      
-      const { error: updateError } = await updateQuery
 
       if (updateError) {
         console.error('Error updating invitation:', updateError)
       }
 
-      // Update dashboard_user role
-      const roleUpdateQuery = (supabase as any)
+      // Type assertion needed due to missing type definitions for dashboard_users table
+      const { error: roleError } = await (supabase as any)
         .from('dashboard_users')
-        .update({ role: (invitation as any).role })
+        .update({ role: invitation.role })
         .eq('id', authData.user.id)
-      
-      const { error: roleError } = await roleUpdateQuery
 
       if (roleError) {
         console.error('Error updating role:', roleError)
@@ -124,10 +128,10 @@ function AcceptInviteForm() {
 
   if (!token) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center dark:bg-[#1A0F0A] bg-gray-50">
         <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-900">Invalid Invitation</h2>
-          <p className="mt-2 text-gray-600">This invitation link is invalid.</p>
+          <h2 className="text-2xl font-bold dark:text-white text-gray-900">Invalid Invitation</h2>
+          <p className="mt-2 dark:text-gray-400 text-gray-600">This invitation link is invalid.</p>
         </div>
       </div>
     )
@@ -135,23 +139,37 @@ function AcceptInviteForm() {
 
   if (!invitation) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center dark:bg-[#1A0F0A] bg-gray-50">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Verifying invitation...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#C9A961] mx-auto"></div>
+          <p className="mt-4 dark:text-gray-400 text-gray-600">Verifying invitation...</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex items-center justify-center dark:bg-[#1A0F0A] bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+          <div className="text-center mb-4">
+            <div 
+              className="mx-auto w-16 h-16 flex items-center justify-center rounded-full font-bold text-2xl mb-4"
+              style={{ 
+                backgroundColor: '#C9A961',
+                color: '#1A0F0A'
+              }}
+            >
+              W
+            </div>
+          </div>
+          <h2 className="mt-6 text-center text-3xl font-extrabold dark:text-white text-gray-900">
             Accept Invitation
           </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
+          <p className="mt-2 text-center text-sm dark:text-[#C9A961] text-gray-600">
+            WindChasers Aviation Academy
+          </p>
+          <p className="mt-1 text-center text-sm dark:text-gray-400 text-gray-500">
             Create your account to access the dashboard
           </p>
         </div>
@@ -227,7 +245,7 @@ function AcceptInviteForm() {
             <button
               type="submit"
               disabled={loading}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-[#1A0F0A] bg-[#C9A961] hover:bg-[#b8964f] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#C9A961] disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? 'Creating account...' : 'Accept Invitation & Sign Up'}
             </button>
@@ -241,10 +259,10 @@ function AcceptInviteForm() {
 export default function AcceptInvitePage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center dark:bg-[#1A0F0A] bg-gray-50">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#C9A961] mx-auto"></div>
+          <p className="mt-4 dark:text-gray-400 text-gray-600">Loading...</p>
         </div>
       </div>
     }>

@@ -10,13 +10,13 @@ export function createClient() {
     return supabaseClient
   }
 
-  // Support both PROXE-prefixed and standard variable names
-  const supabaseUrl = process.env.NEXT_PUBLIC_PROXE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co'
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_PROXE_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-key'
+  // Windchasers Supabase configuration
+  const supabaseUrl = process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL || 'https://placeholder.supabase.co'
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_ANON_KEY || 'placeholder-key'
   
   // Enhanced error checking
-  const hasUrl = !!(process.env.NEXT_PUBLIC_PROXE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL)
-  const hasKey = !!(process.env.NEXT_PUBLIC_PROXE_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
+  const hasUrl = !!process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL
+  const hasKey = !!process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_ANON_KEY
   
   if (!hasUrl || !hasKey) {
     console.error('❌ Supabase environment variables are not set!')
@@ -24,8 +24,8 @@ export function createClient() {
       url: !hasUrl,
       anonKey: !hasKey,
     })
-    console.error('   Please configure NEXT_PUBLIC_PROXE_SUPABASE_URL and NEXT_PUBLIC_PROXE_SUPABASE_ANON_KEY (or NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY) in your .env.local file')
-    console.error('   Check: http://localhost:3000/api/status for connection diagnostics')
+    console.error('   Please configure NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL and NEXT_PUBLIC_WINDCHASERS_SUPABASE_ANON_KEY in your .env.local file')
+    console.error('   Check: http://localhost:4001/api/status for connection diagnostics')
   } else {
     // Validate URL format
     if (!supabaseUrl.startsWith('https://') || !supabaseUrl.includes('.supabase.co')) {
@@ -47,28 +47,14 @@ export function createClient() {
     }
   }
   
-  // AUTHENTICATION DISABLED - Clear any rate limit flags
-  if (typeof window !== 'undefined') {
-    // Clear rate limit flags since auth is disabled
-    localStorage.removeItem('authRateLimitUntil')
-    // Clear any auth tokens
-    const projectRef = supabaseUrl.split('//')[1]?.split('.')[0]
-    if (projectRef) {
-      // Clear all Supabase auth-related localStorage items
-      Object.keys(localStorage).forEach(key => {
-        if (key.includes('sb-') && key.includes('auth')) {
-          localStorage.removeItem(key)
-        }
-      })
-    }
-  }
-
   supabaseClient = createSupabaseClient<Database>(
     supabaseUrl,
     supabaseAnonKey,
     {
       auth: {
-        persistSession: false
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true
       }
     }
   )

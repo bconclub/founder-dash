@@ -62,6 +62,7 @@ const navigation: NavItem[] = [
     icon: MdSettings,
     children: [
       { name: 'Web Agent', href: '/dashboard/settings/web-agent', icon: MdChatBubbleOutline },
+      { name: 'Knowledge Base', href: '/dashboard/settings/knowledge-base', icon: MdMenuBook },
     ]
   },
   { name: 'Billing', href: '/dashboard/billing', icon: MdCreditCard, comingSoon: true },
@@ -386,8 +387,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             />
             <div className="dashboard-layout-auth-loader-icon-wrapper relative animate-pulse mx-auto" style={{ width: '80px', height: '80px' }}>
               <img
-                src="/proxe-icon.png"
-                alt="PROXe"
+                src="/windchasers-icon.png"
+                alt="Windchasers"
                 className="w-full h-full object-contain drop-shadow-lg"
               />
             </div>
@@ -430,7 +431,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         >
           {!isCollapsed && (
             <>
-              <h1 className="dashboard-layout-sidebar-logo text-xl font-black font-zen-dots tracking-tighter" style={{ color: 'var(--accent-primary)' }}>PROXe</h1>
+              <h1 className="dashboard-layout-sidebar-logo text-xl font-black tracking-tight" style={{ color: 'var(--accent-primary)' }}>Windchasers</h1>
               {!isMobile && (
                 <button
                   onClick={toggleSidebar}
@@ -481,8 +482,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               title="Click to expand sidebar"
             >
               <img
-                src="/proxe-icon.png"
-                alt="PROXe"
+                src="/windchasers-icon.png"
+                alt="Windchasers"
                 className="w-full h-full object-contain"
                 style={{ maxWidth: '40px', maxHeight: '40px' }}
               />

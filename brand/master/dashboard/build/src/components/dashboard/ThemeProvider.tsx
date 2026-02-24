@@ -9,15 +9,13 @@ export default function ThemeProvider({
 }) {
   // Load saved accent theme on mount
   useEffect(() => {
-    const savedTheme = localStorage.getItem('master-accent-theme');
+    const savedTheme = localStorage.getItem('windchasers-accent-theme');
     if (savedTheme) {
       const themes: Record<string, string> = {
-        'master': '#666666', // Master gray
-        'black': '#000000',
-        'white': '#FFFFFF',
-        'grey': '#666666',
-        'light-gray': '#999999',
-        'dark-gray': '#333333',
+        'windchasers': '#C9A961', // Windchasers gold
+        'gold': '#C9A961',
+        'orange': '#fc7301',
+        'grey': '#6B7280',
       };
       const color = themes[savedTheme];
       if (color) {
@@ -26,8 +24,8 @@ export default function ThemeProvider({
         document.documentElement.style.setProperty('--accent-subtle', `${color}20`);
       }
     } else {
-      // Default to Master gray if no theme saved
-      const defaultColor = '#666666';
+      // Default to Windchasers gold if no theme saved
+      const defaultColor = '#C9A961';
       document.documentElement.style.setProperty('--accent-primary', defaultColor);
       document.documentElement.style.setProperty('--accent-light', defaultColor);
       document.documentElement.style.setProperty('--accent-subtle', `${defaultColor}20`);

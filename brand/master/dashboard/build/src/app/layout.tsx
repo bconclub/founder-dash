@@ -6,15 +6,16 @@ import './globals.css'
 const inter = Inter({
   subsets: ['latin'],
   variable: '--font-inter',
+  weight: ['400', '500', '600', '700', '800', '900'],
 })
 
 export const metadata: Metadata = {
-  title: 'Master Dashboard',
-  description: 'Master Dashboard - Dashboard for managing leads, bookings, and metrics',
+  title: 'WindChasers Dashboard',
+  description: 'WindChasers Aviation Academy - Dashboard for managing leads, bookings, and metrics',
   icons: {
-    icon: '/star.svg',
-    shortcut: '/star.svg',
-    apple: '/star.svg',
+    icon: '/windchasers-icon.png',
+    shortcut: '/windchasers-icon.png',
+    apple: '/windchasers-icon.png',
   },
 }
 
@@ -24,8 +25,8 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" suppressHydrationWarning data-brand="master" data-theme="default">
-      <body className={inter.className} suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning data-brand="windchasers" data-theme="aviation-gold">
+      <body className={`${inter.className} ${inter.variable}`} suppressHydrationWarning>
         <Script
           id="theme-init"
           strategy="beforeInteractive"

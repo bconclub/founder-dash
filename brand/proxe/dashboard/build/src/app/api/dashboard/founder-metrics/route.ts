@@ -3,10 +3,39 @@ import { createClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
 
+// In-memory cache for metrics (30 seconds TTL)
+interface CachedMetrics {
+  data: any
+  timestamp: number
+  hotLeadThreshold: number
+}
+
+let metricsCache: CachedMetrics | null = null
+const CACHE_TTL = 30000 // 30 seconds in milliseconds
+
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient()
     const searchParams = request.nextUrl.searchParams
+    const hotLeadThreshold = parseInt(searchParams.get('hotLeadThreshold') || '70', 10)
+    
+    // Check cache
+    const cacheNow = Date.now()
+    if (
+      metricsCache &&
+      metricsCache.hotLeadThreshold === hotLeadThreshold &&
+      (cacheNow - metricsCache.timestamp) < CACHE_TTL
+    ) {
+      // Return cached data
+      return NextResponse.json(metricsCache.data, {
+        headers: {
+          'X-Cache': 'HIT',
+          'Cache-Control': 'private, max-age=30',
+        },
+      })
+    }
+
+    // Cache miss - proceed with database queries
+    const supabase = await createClient()
     
     // Get all leads with full data (booking_date/booking_time don't exist in all_leads)
     const { data: leads, error: leadsError } = await supabase
@@ -245,7 +274,7 @@ export async function GET(request: NextRequest) {
     console.log(`  - Previous 7D: ${previous7DUniqueConversations} (for trend: ${trend7D}%)`)
 
     // 1. Hot Leads (score >= threshold, default 70)
-    const hotLeadThreshold = parseInt(searchParams.get('hotLeadThreshold') || '70', 10)
+    // hotLeadThreshold already defined at the top of the function
     const hotLeads = safeLeads.filter(lead => (lead.lead_score || 0) >= hotLeadThreshold)
 
     // 2. Today's Activity
@@ -265,45 +294,46 @@ export async function GET(request: NextRequest) {
     })
 
     // 3. Response Health (avg response time in seconds)
-    let totalResponseTime = 0
-    let responseCount = 0
+    // Calculate from conversations table using input_to_output_gap_ms
+    // Filter: channel IN ('web', 'whatsapp') AND sender = 'agent'
+    // SQL equivalent: SELECT AVG((metadata->>'input_to_output_gap_ms')::numeric / 1000) as avg_response_seconds
+    //                 FROM conversations
+    //                 WHERE channel IN ('web', 'whatsapp') AND sender = 'agent'
+    //                 AND metadata->>'input_to_output_gap_ms' IS NOT NULL
+    let avgResponseTimeSeconds = 0
     
-    if (messages) {
-      messages.forEach((msg: any) => {
-        if (msg.sender === 'agent' && msg.metadata?.response_time_ms) {
-          const responseTimeMs = typeof msg.metadata.response_time_ms === 'number' 
-            ? msg.metadata.response_time_ms 
-            : parseInt(msg.metadata.response_time_ms, 10)
-          if (!isNaN(responseTimeMs) && responseTimeMs > 0) {
-            totalResponseTime += responseTimeMs / 1000 // Convert to seconds
-            responseCount++
-          }
-        }
-      })
+    try {
+      const { data: conversationsForResponse, error: convError } = await supabase
+        .from('conversations')
+        .select('metadata')
+        .in('channel', ['web', 'whatsapp'])
+        .eq('sender', 'agent')
+        .not('metadata->input_to_output_gap_ms', 'is', null)
       
-      // Fallback to timestamp calculation
-      if (responseCount === 0) {
-        const leadMessages: Record<string, any[]> = {}
-        messages.forEach((msg: any) => {
-          if (!leadMessages[msg.lead_id]) leadMessages[msg.lead_id] = []
-          leadMessages[msg.lead_id].push(msg)
-        })
+      if (!convError && conversationsForResponse && conversationsForResponse.length > 0) {
+        let totalGapMs = 0
+        let validCount = 0
         
-        Object.values(leadMessages).forEach((leadMsgs: any[]) => {
-          for (let i = 0; i < leadMsgs.length - 1; i++) {
-            if (leadMsgs[i].sender === 'customer' && leadMsgs[i + 1].sender === 'agent') {
-              const timeDiff = (new Date(leadMsgs[i + 1].created_at).getTime() - new Date(leadMsgs[i].created_at).getTime()) / 1000
-              if (timeDiff > 0) {
-                totalResponseTime += timeDiff
-                responseCount++
-              }
+        conversationsForResponse.forEach((conv: any) => {
+          const gapMs = conv.metadata?.input_to_output_gap_ms
+          if (gapMs !== null && gapMs !== undefined) {
+            const gapMsNum = typeof gapMs === 'number' ? gapMs : parseFloat(gapMs)
+            if (!isNaN(gapMsNum) && gapMsNum > 0) {
+              totalGapMs += gapMsNum
+              validCount++
             }
           }
         })
+        
+        if (validCount > 0) {
+          avgResponseTimeSeconds = (totalGapMs / validCount) / 1000 // Convert ms to seconds
+        }
+      } else if (convError) {
+        console.warn('Error fetching conversations for response time:', convError)
       }
+    } catch (error) {
+      console.warn('Error calculating avg response time:', error)
     }
-    
-    const avgResponseTimeSeconds = responseCount > 0 ? totalResponseTime / responseCount : 0
 
     // 5. Leads Needing Attention (high score, recent interaction)
     const leadsNeedingAttention = safeLeads
@@ -719,20 +749,23 @@ export async function GET(request: NextRequest) {
       hotLeadsTrend.push({ value: dayHotLeads })
       
       // Response time trend (daily average)
+      // Use input_to_output_gap_ms from conversations table
       const dayMessages = messages?.filter(m => {
         const msgDate = new Date(m.created_at).toISOString().split('T')[0]
-        return msgDate === dateStr && m.sender === 'agent'
+        return msgDate === dateStr && 
+               m.sender === 'agent' && 
+               (m.channel === 'web' || m.channel === 'whatsapp')
       }) || []
       
       let dayTotalResponse = 0
       let dayResponseCount = 0
       dayMessages.forEach((msg: any) => {
-        if (msg.metadata?.response_time_ms) {
-          const responseTimeMs = typeof msg.metadata.response_time_ms === 'number' 
-            ? msg.metadata.response_time_ms 
-            : parseInt(msg.metadata.response_time_ms, 10)
-          if (!isNaN(responseTimeMs) && responseTimeMs > 0) {
-            dayTotalResponse += responseTimeMs / 1000
+        if (msg.metadata?.input_to_output_gap_ms) {
+          const gapMs = typeof msg.metadata.input_to_output_gap_ms === 'number' 
+            ? msg.metadata.input_to_output_gap_ms 
+            : parseFloat(msg.metadata.input_to_output_gap_ms)
+          if (!isNaN(gapMs) && gapMs > 0) {
+            dayTotalResponse += gapMs / 1000 // Convert ms to seconds
             dayResponseCount++
           }
         }
@@ -807,9 +840,55 @@ export async function GET(request: NextRequest) {
     //
     // The final score is capped at 100 and stored in all_leads.lead_score
     // This metric shows the average health/quality of all leads in the system.
-    const avgScore = safeLeads.length > 0
-      ? Math.round(safeLeads.reduce((sum, l) => sum + (l.lead_score || 0), 0) / safeLeads.length)
+    //
+    // IMPORTANT: If lead_score is null/undefined, calculate it on-the-fly using database function
+    // This ensures scores are always available, especially when there's only one lead
+    let totalScore = 0
+    let leadsWithScores = 0
+    
+    for (const lead of safeLeads) {
+      let score = lead.lead_score
+      
+      // If score is null/undefined, try to calculate it using database function
+      if (score === null || score === undefined) {
+        try {
+          const { data: calculatedScore, error: scoreError } = await supabase.rpc('calculate_lead_score', {
+            lead_uuid: lead.id
+          })
+          
+          if (!scoreError && calculatedScore !== null && calculatedScore !== undefined) {
+            score = typeof calculatedScore === 'number' ? calculatedScore : parseFloat(calculatedScore)
+            // Update the lead's score in memory for later use
+            lead.lead_score = score
+          } else {
+            // If calculation fails, default to 0
+            score = 0
+          }
+        } catch (error) {
+          console.warn(`Failed to calculate score for lead ${lead.id}:`, error)
+          score = 0
+        }
+      }
+      
+      totalScore += score || 0
+      leadsWithScores++
+    }
+    
+    const avgScore = leadsWithScores > 0
+      ? Math.round(totalScore / leadsWithScores)
       : 0
+    
+    // Debug logging for score calculation
+    console.log('📊 Average Score Calculation:')
+    console.log(`  - Total leads: ${safeLeads.length}`)
+    console.log(`  - Leads with scores: ${leadsWithScores}`)
+    console.log(`  - Total score sum: ${totalScore}`)
+    console.log(`  - Average score: ${avgScore}`)
+    console.log(`  - Sample lead scores:`, safeLeads.slice(0, 5).map(l => ({
+      id: l.id,
+      name: l.customer_name,
+      score: l.lead_score ?? 'null'
+    })))
     
     // ----------------------------------------------------------------------------
     // 2. RESPONSE RATE (0-100%)
@@ -1009,15 +1088,22 @@ export async function GET(request: NextRequest) {
         : 0
 
       // Daily avg response time
+      // Use input_to_output_gap_ms from conversations table
+      // Filter: channel IN ('web', 'whatsapp') AND sender = 'agent'
+      const dailyAgentMessages = dailyMessages.filter((msg: any) => 
+        msg.sender === 'agent' && 
+        (msg.channel === 'web' || msg.channel === 'whatsapp')
+      )
+      
       let dailyTotalResponseTime = 0
       let dailyResponseCount = 0
-      dailyMessages.forEach((msg: any) => {
-        if (msg.sender === 'agent' && msg.metadata?.response_time_ms) {
-          const responseTimeMs = typeof msg.metadata.response_time_ms === 'number'
-            ? msg.metadata.response_time_ms
-            : parseInt(msg.metadata.response_time_ms, 10)
-          if (!isNaN(responseTimeMs) && responseTimeMs > 0) {
-            dailyTotalResponseTime += responseTimeMs / 1000 // Convert to seconds
+      dailyAgentMessages.forEach((msg: any) => {
+        if (msg.metadata?.input_to_output_gap_ms) {
+          const gapMs = typeof msg.metadata.input_to_output_gap_ms === 'number'
+            ? msg.metadata.input_to_output_gap_ms
+            : parseFloat(msg.metadata.input_to_output_gap_ms)
+          if (!isNaN(gapMs) && gapMs > 0) {
+            dailyTotalResponseTime += gapMs / 1000 // Convert ms to seconds
             dailyResponseCount++
           }
         }
@@ -1032,7 +1118,8 @@ export async function GET(request: NextRequest) {
       dailyTrends.avgResponseTime.push({ date: dateStr, value: Math.round(dailyAvgResponseTime * 10) / 10 }) // Round to 1 decimal
     }
 
-    return NextResponse.json({
+    // Prepare response data
+    const responseData = {
       hotLeads: {
         count: hotLeads.length,
         leads: hotLeads.slice(0, 5).map(l => ({ id: l.id, name: l.customer_name || 'Unknown', score: l.lead_score || 0 })),
@@ -1116,6 +1203,20 @@ export async function GET(request: NextRequest) {
         responseRate: dailyTrends.responseRate.map(d => ({ value: d.value })),
         bookingRate: dailyTrends.bookingRate.map(d => ({ value: d.value })),
         avgResponseTime: dailyTrends.avgResponseTime.map(d => ({ value: d.value })),
+      },
+    }
+    
+    // Cache the response
+    metricsCache = {
+      data: responseData,
+      timestamp: Date.now(),
+      hotLeadThreshold,
+    }
+    
+    return NextResponse.json(responseData, {
+      headers: {
+        'X-Cache': 'MISS',
+        'Cache-Control': 'private, max-age=30',
       },
     })
   } catch (error) {

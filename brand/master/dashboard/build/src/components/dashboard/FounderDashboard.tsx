@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
+import { createClient } from '../../lib/supabase/client'
 import Image from 'next/image'
 import { MdTrendingUp, MdTrendingDown, MdRemove, MdCheckCircle, MdSchedule, MdMessage, MdWarning, MdArrowForward, MdLocalFireDepartment, MdSpeed, MdPeople, MdEvent, MdRefresh, MdCancel, MdTrendingUp as MdScoreUp, MdSwapHoriz, MdPhoneDisabled, MdArrowUpward, MdShowChart, MdFlashOn, MdChatBubble, MdCalendarToday, MdArrowDropDown, MdWhatsapp, MdLanguage, MdEventBusy, MdNotifications } from 'react-icons/md'
 import LeadDetailsModal from './LeadDetailsModal'
@@ -312,13 +312,13 @@ export default function FounderDashboard() {
               }}
             />
             <div className="relative animate-pulse">
-              <img
-                src="/star.svg"
-                alt="Master"
+              <Image
+                src="/windchasers-icon.png"
+                alt="Windchasers"
                 width={80}
                 height={80}
                 className="drop-shadow-lg"
-                style={{ filter: 'brightness(0) invert(1)' }}
+                priority
               />
             </div>
           </div>
@@ -579,8 +579,8 @@ export default function FounderDashboard() {
         <div 
           className="rounded-lg p-4 sm:p-6 border transition-all hover:shadow-lg flex flex-col"
           style={{ 
-            backgroundColor: 'rgba(139, 92, 246, 0.05)',
-            borderColor: 'rgba(139, 92, 246, 0.2)',
+            backgroundColor: 'rgba(201, 169, 97, 0.05)',
+            borderColor: 'rgba(201, 169, 97, 0.2)',
             justifyContent: 'space-between'
           }}
         >

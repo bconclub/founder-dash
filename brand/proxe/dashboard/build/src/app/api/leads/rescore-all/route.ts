@@ -90,18 +90,44 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Update days_inactive for all leads using RPC function
-    // Note: days_inactive is updated per-lead via update_lead_metrics RPC during scoring
-    // If you need a bulk update, create an RPC function in Supabase:
-    // CREATE OR REPLACE FUNCTION bulk_update_days_inactive()
-    // RETURNS void AS $$
-    // UPDATE all_leads
-    // SET days_inactive = GREATEST(0, EXTRACT(EPOCH FROM (NOW() - COALESCE(last_interaction_at, created_at))) / 86400)::INTEGER
-    // WHERE lead_stage NOT IN ('converted', 'closed_lost');
-    // $$ LANGUAGE sql;
-    
-    // For now, days_inactive is updated during the per-lead scoring process above
-    // via the update_lead_metrics RPC function
+    // Bulk update days_inactive for all leads
+    // Fetch leads with dates to calculate days_inactive
+    const { data: leadsWithDates, error: datesError } = await supabase
+      .from('all_leads')
+      .select('id, last_interaction_at, created_at, lead_stage')
+      .not('lead_stage', 'in', '(converted,closed_lost)')
+
+    if (datesError) {
+      console.error('Error fetching leads for days_inactive update:', datesError)
+    } else if (leadsWithDates && leadsWithDates.length > 0) {
+      // Calculate and update days_inactive in batches
+      const updateBatchSize = 50
+      for (let i = 0; i < leadsWithDates.length; i += updateBatchSize) {
+        const batch = leadsWithDates.slice(i, i + updateBatchSize)
+        
+        await Promise.all(
+          batch.map(async (lead) => {
+            const lastInteraction = lead.last_interaction_at || lead.created_at
+            if (!lastInteraction) return
+
+            const now = new Date()
+            const lastInteractionDate = new Date(lastInteraction)
+            const diffMs = now.getTime() - lastInteractionDate.getTime()
+            const daysInactive = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)))
+
+            const { error: updateError } = await supabase
+              .from('all_leads')
+              .update({ days_inactive: daysInactive })
+              .eq('id', lead.id)
+
+            if (updateError) {
+              console.error(`Error updating days_inactive for lead ${lead.id}:`, updateError)
+            }
+          })
+        )
+      }
+      console.log(`Updated days_inactive for ${leadsWithDates.length} leads`)
+    }
 
     return NextResponse.json({
       success: true,

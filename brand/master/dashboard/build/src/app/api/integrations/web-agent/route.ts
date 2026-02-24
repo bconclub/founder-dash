@@ -4,7 +4,7 @@ import { createClient as createServerClient } from '@/lib/supabase/server'
 
 // Service role client for webhooks (bypasses RLS)
 const getServiceClient = () => {
-  const supabaseUrl = process.env.NEXT_PUBLIC_BRAND_SUPABASE_URL!
+  const supabaseUrl = process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL!
   return createClient(
     supabaseUrl,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -35,7 +35,7 @@ async function updateWebContext(
     customer_name?: string
     customer_email?: string
     customer_phone?: string
-    master_data?: {
+    windchasers_data?: {
       user_type?: string
       course_interest?: string
       timeline?: string
@@ -68,7 +68,7 @@ async function updateWebContext(
 
     const existingContext = lead?.unified_context || {}
     const existingWeb = existingContext.web || {}
-    const existingMaster = existingContext.master || {}
+    const existingWindchasers = existingContext.windchasers || {}
 
     // Use provided last_interaction timestamp or current time
     const lastInteractionTimestamp = contextData.last_interaction || new Date().toISOString()
@@ -115,19 +115,19 @@ async function updateWebContext(
           : existingWeb.customer_phone || null,
     }
 
-    // Merge Master brand-specific data
-    const updatedMasterContext = contextData.master_data
+    // Merge Windchasers aviation-specific data
+    const updatedWindchasersContext = contextData.windchasers_data
       ? {
-          ...existingMaster,
-          ...contextData.master_data,
+          ...existingWindchasers,
+          ...contextData.windchasers_data,
         }
-      : existingMaster
+      : existingWindchasers
 
     // Build updated unified_context
     const updatedContext = {
       ...existingContext,
       web: updatedWebContext,
-      master: updatedMasterContext,
+      windchasers: updatedWindchasersContext,
     }
 
     // Update all_leads
@@ -150,7 +150,7 @@ async function updateWebContext(
     console.log('✅ Updated unified_context.web for lead:', leadId, {
       message_count: updatedWebContext.message_count,
       has_summary: !!updatedWebContext.conversation_summary,
-      has_master_data: Object.keys(updatedMasterContext).length > 0,
+      has_windchasers_data: Object.keys(updatedWindchasersContext).length > 0,
     })
 
     return updatedLead
@@ -210,7 +210,7 @@ export async function POST(request: NextRequest) {
       email,
       phone,
       // Session data
-      brand = 'master',
+      brand = 'windchasers',
       external_session_id,
       chat_session_id,
       website_url,
@@ -227,8 +227,8 @@ export async function POST(request: NextRequest) {
       user_inputs_summary,
       message_count,
       last_message_at,
-      // Master brand-specific data
-      master_data,
+      // Windchasers aviation-specific data
+      windchasers_data,
       // Metadata
       metadata,
       // Action type
@@ -286,7 +286,7 @@ export async function POST(request: NextRequest) {
         // Update unified_context if we have any initial data
         if (metadata) {
           await updateWebContext(supabase, leadId || '', {
-            master_data: master_data,
+            windchasers_data: windchasers_data,
           })
         }
       }
@@ -337,7 +337,7 @@ export async function POST(request: NextRequest) {
                 message_count: 0,
                 last_interaction: new Date().toISOString(),
               },
-              master: master_data || {},
+              windchasers: windchasers_data || {},
             },
           })
           .select('id')
@@ -414,7 +414,7 @@ export async function POST(request: NextRequest) {
         webSessionId = newSession.id
       }
 
-      // Update unified_context with profile and Master data
+      // Update unified_context with profile and Windchasers data
       if (!leadId) {
         throw new Error('Lead ID is required but was not found')
       }
@@ -422,7 +422,7 @@ export async function POST(request: NextRequest) {
         customer_name: name,
         customer_email: email,
         customer_phone: phone,
-        master_data: master_data,
+        windchasers_data: windchasers_data,
       })
 
       // Insert system message about profile collection
@@ -592,7 +592,7 @@ export async function POST(request: NextRequest) {
       if (leadId) {
         await updateWebContext(supabase, leadId, {
           user_inputs_summary: updatedInputs,
-          master_data: master_data,
+          windchasers_data: windchasers_data,
         })
 
         // Insert button click as system message
@@ -778,7 +778,7 @@ export async function POST(request: NextRequest) {
       booking_status: booking_status,
       booking_date: booking_date,
       booking_time: booking_time,
-      master_data: master_data,
+      windchasers_data: windchasers_data,
     })
 
     // Insert system message

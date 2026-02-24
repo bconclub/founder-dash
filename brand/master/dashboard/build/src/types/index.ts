@@ -69,4 +69,24 @@ export interface DashboardUser {
   is_active: boolean
 }
 
+// Knowledge Base types
+export type KnowledgeBaseType = 'pdf' | 'doc' | 'url' | 'text'
+export type EmbeddingsStatus = 'pending' | 'processing' | 'ready' | 'error'
 
+export interface KnowledgeBaseItem {
+  id: string
+  brand: string
+  type: KnowledgeBaseType
+  title: string
+  source_url: string | null
+  content: string | null
+  file_name: string | null
+  file_size: number | null
+  file_type: string | null
+  chunks: any
+  embeddings_status: EmbeddingsStatus
+  error_message: string | null
+  metadata: any
+  created_at: string
+  updated_at: string
+}

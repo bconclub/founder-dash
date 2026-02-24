@@ -7,8 +7,17 @@ import { useRealtimeLeads } from '@/hooks/useRealtimeLeads'
 import LeadDetailsModal from './LeadDetailsModal'
 import type { Lead } from '@/types'
 import { calculateLeadScore } from '@/lib/leadScoreCalculator'
-import { MdLanguage, MdCall, MdHistory, MdPerson, MdAccessTime, MdTrendingUp, MdTrendingDown, MdRemove, MdFilterList, MdFileDownload, MdSearch } from 'react-icons/md'
-import { FaWhatsapp, FaGlobe, FaPhoneAlt, FaUser } from 'react-icons/fa'
+import {
+  MdLanguage,
+  MdChat,
+  MdCall,
+  MdPerson,
+  MdChevronRight,
+  MdHistory,
+  MdAccessTime,
+  MdOutlineInsights
+} from 'react-icons/md'
+import { FaWhatsapp } from 'react-icons/fa'
 
 const STATUS_OPTIONS = [
   'New Lead',
@@ -137,6 +146,8 @@ export default function LeadsTable({
   const [dateFilter, setDateFilter] = useState<string>('all')
   const [sourceFilter, setSourceFilter] = useState<string>(initialSourceFilter || 'all')
   const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [userTypeFilter, setUserTypeFilter] = useState<string>('all')
+  const [courseInterestFilter, setCourseInterestFilter] = useState<string>('all')
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [limit, setLimit] = useState<number>(initialLimit || 10)
@@ -190,13 +201,28 @@ export default function LeadsTable({
       filtered = filtered.filter((lead) => lead.status === statusFilter)
     }
 
+    // Apply aviation-specific filters
+    if (userTypeFilter !== 'all') {
+      filtered = filtered.filter((lead) => {
+        const windchasersData = lead.unified_context?.windchasers || {}
+        return windchasersData.user_type === userTypeFilter
+      })
+    }
+
+    if (courseInterestFilter !== 'all') {
+      filtered = filtered.filter((lead) => {
+        const windchasersData = lead.unified_context?.windchasers || {}
+        return windchasersData.course_interest === courseInterestFilter
+      })
+    }
+
     // Apply limit
     if (limit) {
       filtered = filtered.slice(0, limit)
     }
 
     setFilteredLeads(filtered as ExtendedLead[])
-  }, [leads, dateFilter, sourceFilter, statusFilter, limit])
+  }, [leads, dateFilter, sourceFilter, statusFilter, userTypeFilter, courseInterestFilter, limit])
 
   // Calculate scores for filtered leads (same calculation as modal)
   useEffect(() => {
@@ -287,7 +313,7 @@ export default function LeadsTable({
   }
 
   const exportToCSV = () => {
-    const headers = ['Name', 'Email', 'Phone', 'First Touch', 'Timeline', 'Score', 'Stage', 'Key Event']
+    const headers = ['Name', 'Email', 'Phone', 'First Touch', 'User Type', 'Course Interest', 'Timeline', 'Score', 'Stage', 'Key Event']
     const rows = filteredLeads.map((lead) => {
       const bookingDate = lead.booking_date ||
         lead.unified_context?.web?.booking_date ||
@@ -324,13 +350,18 @@ export default function LeadsTable({
           : bookingTime || '';
       const score = lead.lead_score ?? (lead as any).leadScore ?? (lead as any).score ?? null
       const stage = lead.lead_stage ?? (lead as any).leadStage ?? (lead as any).stage ?? null
-      const masterData = lead.unified_context?.master || {}
-      const timeline = masterData.plan_to_fly || masterData.timeline || ''
+      // Aviation-specific fields from unified_context
+      const windchasersData = lead.unified_context?.windchasers || {}
+      const userType = windchasersData.user_type || ''
+      const courseInterest = windchasersData.course_interest || ''
+      const timeline = windchasersData.plan_to_fly || windchasersData.timeline || ''
       return [
         lead.name || '',
         lead.email || '',
         lead.phone || '',
         lead.first_touchpoint || lead.source || '',
+        userType,
+        courseInterest,
         timeline,
         score !== null && score !== undefined ? score.toString() : '',
         stage || '',
@@ -402,7 +433,7 @@ export default function LeadsTable({
           <select
             value={dateFilter}
             onChange={(e) => setDateFilter(e.target.value)}
-            className="leads-table-filter leads-table-filter-date px-3 py-2 border border-gray-300 dark:border-[#3a3a3a] bg-white dark:bg-[#0a0a0a] text-gray-900 dark:text-white rounded-md text-sm"
+            className="leads-table-filter leads-table-filter-date px-3 py-2 border border-gray-300 dark:border-[#3A2F2A] bg-white dark:bg-[#1A0F0A] text-gray-900 dark:text-white rounded-md text-sm"
           >
             <option value="all">All Dates</option>
             <option value="today">Today</option>
@@ -414,7 +445,7 @@ export default function LeadsTable({
             <select
               value={sourceFilter}
               onChange={(e) => setSourceFilter(e.target.value)}
-              className="leads-table-filter leads-table-filter-source px-3 py-2 border border-gray-300 dark:border-[#3a3a3a] bg-white dark:bg-[#0a0a0a] text-gray-900 dark:text-white rounded-md text-sm"
+              className="leads-table-filter leads-table-filter-source px-3 py-2 border border-gray-300 dark:border-[#3A2F2A] bg-white dark:bg-[#1A0F0A] text-gray-900 dark:text-white rounded-md text-sm"
             >
               <option value="all">All Sources</option>
               <option value="web">Web</option>
@@ -427,7 +458,7 @@ export default function LeadsTable({
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="leads-table-filter leads-table-filter-status px-3 py-2 border border-gray-300 dark:border-[#3a3a3a] bg-white dark:bg-[#0a0a0a] text-gray-900 dark:text-white rounded-md text-sm"
+            className="leads-table-filter leads-table-filter-status px-3 py-2 border border-gray-300 dark:border-[#3A2F2A] bg-white dark:bg-[#1A0F0A] text-gray-900 dark:text-white rounded-md text-sm"
           >
             <option value="all">All Statuses</option>
             {STATUS_OPTIONS.map((status) => (
@@ -437,12 +468,37 @@ export default function LeadsTable({
             ))}
           </select>
 
+          {/* Aviation-specific filters */}
+          <select
+            value={userTypeFilter}
+            onChange={(e) => setUserTypeFilter(e.target.value)}
+            className="leads-table-filter leads-table-filter-user-type px-3 py-2 border border-gray-300 dark:border-[#3A2F2A] bg-white dark:bg-[#1A0F0A] text-gray-900 dark:text-white rounded-md text-sm"
+          >
+            <option value="all">All User Types</option>
+            <option value="student">Student</option>
+            <option value="parent">Parent</option>
+            <option value="professional">Professional</option>
+          </select>
+
+          <select
+            value={courseInterestFilter}
+            onChange={(e) => setCourseInterestFilter(e.target.value)}
+            className="leads-table-filter leads-table-filter-course-interest px-3 py-2 border border-gray-300 dark:border-[#3A2F2A] bg-white dark:bg-[#1A0F0A] text-gray-900 dark:text-white rounded-md text-sm"
+          >
+            <option value="all">All Courses</option>
+            <option value="DGCA">DGCA</option>
+            <option value="Flight">Flight</option>
+            <option value="Heli">Heli</option>
+            <option value="Cabin">Cabin</option>
+            <option value="Drone">Drone</option>
+          </select>
+
           <button
             onClick={exportToCSV}
             className="leads-table-export-button ml-auto px-4 py-2 text-white rounded-md text-sm transition-colors"
-            style={{ backgroundColor: '#666666' }}
-            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#555555'}
-            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#666666'}
+            style={{ backgroundColor: '#C9A961' }}
+            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#b8964f'}
+            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#C9A961'}
           >
             Export CSV
           </button>
@@ -452,7 +508,7 @@ export default function LeadsTable({
       {/* Table */}
       <div className="leads-table-container overflow-x-auto overflow-y-visible">
         <table className="leads-table-table min-w-full divide-y divide-gray-200 dark:divide-[#262626]">
-          <thead className="leads-table-thead bg-gray-50 dark:bg-[#0a0a0a]">
+          <thead className="leads-table-thead bg-gray-50 dark:bg-[#1A0F0A]">
             <tr className="leads-table-thead-row">
               <th className="leads-table-th leads-table-th-name px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 Name
@@ -465,6 +521,12 @@ export default function LeadsTable({
               </th>
               <th className="leads-table-th leads-table-th-first-touch px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 First Touch
+              </th>
+              <th className="leads-table-th leads-table-th-user-type px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                User Type
+              </th>
+              <th className="leads-table-th leads-table-th-course-interest px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                Course Interest
               </th>
               <th className="leads-table-th leads-table-th-timeline px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 Timeline
@@ -480,10 +542,10 @@ export default function LeadsTable({
               </th>
             </tr>
           </thead>
-          <tbody className="leads-table-tbody bg-white dark:bg-[#0a0a0a] divide-y divide-gray-200 dark:divide-[#3a3a3a]">
+          <tbody className="leads-table-tbody bg-white dark:bg-[#1A0F0A] divide-y divide-gray-200 dark:divide-[#3A2F2A]">
             {filteredLeads.length === 0 ? (
               <tr className="leads-table-empty-row">
-                <td colSpan={8} className="leads-table-empty-cell px-6 py-4 text-center text-gray-500 dark:text-gray-400">
+                <td colSpan={10} className="leads-table-empty-cell px-6 py-4 text-center text-gray-500 dark:text-gray-400">
                   No leads found
                 </td>
               </tr>
@@ -516,19 +578,60 @@ export default function LeadsTable({
                       const active = config[source] || config.unknown
                       const Icon = active.icon
                       return (
-                        <div className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md ${active.bg}`} >
+                        <div className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md ${active.bg}`}>
                           <Icon className={active.color} size={14} />
-                          <span className={`text-[10px] uppercase font-bold ${active.color}`} >
+                          <span className={`text-[10px] uppercase font-bold ${active.color}`}>
                             {active.label}
                           </span>
                         </div>
                       )
                     })()}
                   </td>
+                  <td className="leads-table-cell leads-table-cell-user-type px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                    {(() => {
+                      const windchasersData = lead.unified_context?.windchasers || {}
+                      const userType = windchasersData.user_type
+                      if (!userType) return '-'
+                      return (
+                        <span
+                          className="px-2 py-0.5 inline-flex text-[10px] uppercase font-bold tracking-wider rounded-md border"
+                          style={{
+                            backgroundColor: 'var(--accent-subtle)',
+                            color: 'var(--accent-primary)',
+                            borderColor: 'var(--accent-primary)',
+                            opacity: 0.9
+                          }}
+                        >
+                          {userType}
+                        </span>
+                      )
+                    })()}
+                  </td>
+                  <td className="leads-table-cell leads-table-cell-course-interest px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                    {(() => {
+                      const windchasersData = lead.unified_context?.windchasers || {}
+                      const courseInterest = windchasersData.course_interest
+                      if (!courseInterest) return '-'
+                      return (
+                        <span
+                          className="px-2 py-0.5 inline-flex text-[10px] uppercase font-bold tracking-wider rounded-md border"
+                          style={{
+                            backgroundColor: 'var(--accent-subtle)',
+                            color: 'var(--accent-primary)',
+                            borderColor: 'var(--accent-primary)',
+                            opacity: 0.9
+                          }}
+                        >
+                          {courseInterest}
+                        </span>
+                      )
+                    })()}
+                  </td>
                   <td className="leads-table-cell leads-table-cell-timeline px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                     {(() => {
-                      const masterData = lead.unified_context?.master || {}
-                      const timeline = masterData.plan_to_fly
+                      const windchasersData = lead.unified_context?.windchasers || {}
+                      // Check both plan_to_fly and timeline for backward compatibility
+                      const timeline = windchasersData.plan_to_fly || windchasersData.timeline
                       if (!timeline) return '-'
                       // Format timeline for display
                       const timelineMap: Record<string, string> = {
@@ -537,7 +640,12 @@ export default function LeadsTable({
                         '6+mo': '6+ Months',
                         '1yr+': '1 Year+'
                       }
-                      return timelineMap[timeline] || timeline
+                      const displayTimeline = timelineMap[timeline] || timeline
+                      return (
+                        <span className="text-gray-700 dark:text-gray-300 font-medium">
+                          {displayTimeline}
+                        </span>
+                      )
                     })()}
                   </td>
                   <td className="leads-table-cell leads-table-cell-score px-6 py-4 whitespace-nowrap text-sm">
@@ -560,8 +668,7 @@ export default function LeadsTable({
                             style={{ backgroundColor: badgeStyle.hex }}
                           ></div>
                           <div className="flex items-center justify-center">
-                            <span className={`leads-table-score-value font-extrabold text-base ${badgeStyle.textColor}`}
-                            >
+                            <span className={`leads-table-score-value font-extrabold text-base ${badgeStyle.textColor}`}>
                               {score !== null && score !== undefined ? score : '--'}
                             </span>
                             {(lead.stage_override || (lead as any).stageOverride) && (
@@ -572,7 +679,7 @@ export default function LeadsTable({
                       )
                     })()}
                   </td>
-                  <td className="leads-table-cell leads-table-cell-stage px-6 py-4 whitespace-nowrap text-sm">
+                  <td className="leads-table-cell leads-table-cell-stage px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                     {(() => {
                       // Try multiple possible property names for stage
                       const stage = lead.lead_stage ?? (lead as any).leadStage ?? (lead as any).stage ?? null
@@ -582,7 +689,8 @@ export default function LeadsTable({
                       if (displayStage && displayStage !== '-') {
                         return (
                           <span
-                            className={`leads-table-stage-badge px-2.5 py-1 inline-flex text-[10px] font-bold uppercase tracking-wider rounded-full shadow-sm ${getStageColor(displayStage).bg || ''} ${getStageColor(displayStage).text || ''}`}
+                            className={`leads-table-stage-badge px-2.5 py-1 inline-flex text-[10px] font-bold uppercase tracking-wider rounded-full shadow-sm ${getStageColor(displayStage).bg || ''
+                              } ${getStageColor(displayStage).text || ''}`}
                             style={(getStageColor(displayStage) as any).style}
                           >
                             {displayStage}
@@ -595,7 +703,7 @@ export default function LeadsTable({
                       return '-'
                     })()}
                   </td>
-                  <td className="leads-table-cell leads-table-cell-key-event px-6 py-4 whitespace-nowrap text-sm">
+                  <td className="leads-table-cell leads-table-cell-key-event px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                     {(() => {
                       const bookingDate = lead.booking_date ||
                         lead.unified_context?.web?.booking_date ||

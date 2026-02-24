@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
-import { createClient } from '@/lib/supabase/client'
+import { createClient } from '../../../lib/supabase/client'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -136,7 +136,7 @@ export default function LoginPage() {
       if (process.env.NODE_ENV === 'development') {
         console.log('🔍 Login attempt:', {
           email,
-          supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL?.substring(0, 30) + '...',
+          supabaseUrl: process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL?.substring(0, 30) + '...',
           timestamp: new Date().toISOString(),
         })
       }
@@ -213,7 +213,10 @@ export default function LoginPage() {
             
             // Send session to API to set cookies on server
             try {
-              const syncResponse = await fetch('/api/auth/sync-session', {
+              const syncUrl = '/api/auth/sync-session'
+              console.log('🔄 Attempting to sync session to:', syncUrl)
+              
+              const syncResponse = await fetch(syncUrl, {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
@@ -229,10 +232,26 @@ export default function LoginPage() {
                 credentials: 'include',
               })
               
+              if (!syncResponse.ok) {
+                const errorText = await syncResponse.text()
+                let errorData
+                try {
+                  errorData = JSON.parse(errorText)
+                } catch {
+                  errorData = { error: errorText || 'Unknown error' }
+                }
+                console.error('❌ Sync failed:', {
+                  status: syncResponse.status,
+                  statusText: syncResponse.statusText,
+                  error: errorData,
+                })
+                throw new Error(`Sync failed: ${errorData.error || syncResponse.statusText}`)
+              }
+              
               const result = await syncResponse.json()
               console.log('✅ Sync response:', result)
               
-              if (syncResponse.ok) {
+              if (syncResponse.ok && result.success) {
                 console.log('✅ Session synced to cookies, redirecting...')
                 console.log('✅ Sync result:', result)
                 
@@ -263,24 +282,32 @@ export default function LoginPage() {
                   }
                 }
                 
-                // Wait for cookies to be set and propagated
-                await new Promise(resolve => setTimeout(resolve, 500))
+                // Wait longer for cookies to be set and propagated
+                await new Promise(resolve => setTimeout(resolve, 1000))
                 
-                // Use window.location for full page reload to ensure cookies are read
-                // This is more reliable than router.push for auth redirects
-                window.location.href = '/dashboard'
+                // Verify session one more time before redirect
+                const { data: { user: finalVerify } } = await supabase.auth.getUser()
+                if (finalVerify) {
+                  console.log('✅ Final verification passed, redirecting...')
+                  // Use window.location for full page reload to ensure cookies are read
+                  window.location.href = '/dashboard'
+                } else {
+                  console.error('❌ Session verification failed, showing error')
+                  setError('Login successful but session not established. Please try again or use Google login.')
+                  setLoading(false)
+                }
               } else {
-                console.warn('⚠️ Sync failed:', result)
-                console.warn('⚠️ Still redirecting - client session exists, server may not have cookies yet')
-                // Wait a bit before redirecting
-                await new Promise(resolve => setTimeout(resolve, 500))
-                // Use window.location for full reload
-                window.location.href = '/dashboard'
+                console.warn('⚠️ Sync returned non-ok status:', result)
+                const errorMsg = result.error || 'Failed to sync session'
+                setError(`Login successful but session sync failed: ${errorMsg}. Please try again.`)
+                setLoading(false)
               }
-            } catch (error) {
+            } catch (error: any) {
               console.error('❌ Sync error:', error)
-              // Still redirect - client-side check will handle it
-              window.location.href = '/dashboard'
+              const errorMsg = error?.message || 'Failed to sync session to server'
+              setError(`Login successful but session sync failed: ${errorMsg}. Please try again or use Google login.`)
+              setLoading(false)
+              // Don't redirect if sync failed - user needs to see the error
             }
           } else if (data?.user) {
             // User exists but no session - redirect anyway
@@ -316,14 +343,14 @@ export default function LoginPage() {
 
   return (
     <div className={`login-page min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 ${
-      darkMode ? 'bg-[#0D0D0D]' : 'bg-[#f6f6f6]'
+      darkMode ? 'bg-[#1A0F0A]' : 'bg-[#f6f6f6]'
     }`}>
       {/* Dark Mode Toggle */}
       <button
         onClick={toggleDarkMode}
         className={`login-page-theme-toggle fixed top-4 right-4 p-2 rounded-full transition-colors ${
           darkMode 
-            ? 'bg-[#1A1A1A] text-white hover:bg-[#262626] border border-[#262626]' 
+            ? 'bg-[#2A1F1A] text-white hover:bg-[#3A2F2A] border border-[#3A2F2A]' 
             : 'bg-[#ececec] text-black hover:bg-[#d0d0d0]'
         }`}
         aria-label="Toggle dark mode"
@@ -332,19 +359,22 @@ export default function LoginPage() {
       </button>
 
       <div className={`login-page-card max-w-md w-full rounded-2xl shadow-xl p-8 ${
-        darkMode ? 'bg-[#1A1A1A] border border-[#262626]' : 'bg-[#ffffff] border-2 border-[#d0d0d0]'
+        darkMode ? 'bg-[#1A0F0A] border border-[#3A2F2A]' : 'bg-[#ffffff] border-2 border-[#d0d0d0]'
       }`}>
         <div className="login-page-card-content space-y-8">
           {/* Logo and Title */}
           <div className="login-page-header text-center">
             <div className="login-page-logo-container mx-auto w-16 h-16 mb-4 flex items-center justify-center">
-              <Image 
-                src={darkMode ? "/PROXE Icon.svg" : "/PROXE Icon Black.svg"}
-                alt="PROXe HQ" 
-                width={64}
-                height={64}
-                className="login-page-logo w-full h-full object-contain"
-              />
+              {/* Windchasers Logo - Using text-based logo for now */}
+              <div 
+                className="login-page-logo w-full h-full flex items-center justify-center rounded-full font-bold text-2xl"
+                style={{ 
+                  backgroundColor: '#C9A961',
+                  color: '#1A0F0A'
+                }}
+              >
+                W
+              </div>
             </div>
             <h2 className={`login-page-title text-3xl font-normal font-exo-2 ${
               darkMode ? 'text-white' : 'text-black'
@@ -352,9 +382,9 @@ export default function LoginPage() {
               Sign in
             </h2>
             <p className={`login-page-subtitle mt-2 text-sm font-zen-dots ${
-              darkMode ? 'text-gray-400' : 'text-gray-600'
+              darkMode ? 'text-[#C9A961]' : 'text-[#b8964f]'
             }`}>
-              PROXe HQ
+              WindChasers Aviation Academy
             </p>
           </div>
 
@@ -362,7 +392,7 @@ export default function LoginPage() {
             {error && (
               <div className={`login-page-error-message rounded-lg p-4 border ${
                 darkMode 
-                  ? 'bg-[#0D0D0D] border-red-500/50' 
+                  ? 'bg-[#1A0F0A] border-red-500/50' 
                   : 'bg-red-50 border-red-200'
               }`}>
                 <div className={`login-page-error-content text-sm flex items-start gap-2 ${
@@ -407,8 +437,8 @@ export default function LoginPage() {
                 required
                 className={`login-page-form-input-email w-full px-4 py-3 rounded-lg border focus:outline-none focus:ring-2 transition-colors ${
                   darkMode
-                    ? 'bg-[#0D0D0D] border-[#262626] text-white placeholder-gray-500 focus:ring-[#333333] focus:border-[#333333]'
-                    : 'bg-[#ffffff] border-[#d0d0d0] text-black placeholder-gray-500 focus:ring-[#d0d0d0] focus:border-[#d0d0d0]'
+                    ? 'bg-[#1A0F0A] border-[#3A2F2A] text-white placeholder-gray-500 focus:ring-[#C9A961] focus:border-[#C9A961]'
+                    : 'bg-[#ffffff] border-[#d0d0d0] text-black placeholder-gray-500 focus:ring-[#C9A961] focus:border-[#C9A961]'
                 }`}
                 placeholder="demo@test.com"
                 value={email}
@@ -432,8 +462,8 @@ export default function LoginPage() {
                   required
                   className={`login-page-form-input-password w-full px-4 py-3 pr-12 rounded-lg border focus:outline-none focus:ring-2 transition-colors ${
                     darkMode
-                      ? 'bg-[#0D0D0D] border-[#262626] text-white placeholder-gray-500 focus:ring-[#333333] focus:border-[#333333]'
-                      : 'bg-[#ffffff] border-[#d0d0d0] text-black placeholder-gray-500 focus:ring-[#d0d0d0] focus:border-[#d0d0d0]'
+                      ? 'bg-[#1A0F0A] border-[#3A2F2A] text-white placeholder-gray-500 focus:ring-[#C9A961] focus:border-[#C9A961]'
+                      : 'bg-[#ffffff] border-[#d0d0d0] text-black placeholder-gray-500 focus:ring-[#C9A961] focus:border-[#C9A961]'
                   }`}
                   placeholder="Enter your password"
                   value={password}
@@ -457,8 +487,8 @@ export default function LoginPage() {
               disabled={loading || rateLimited}
               className={`login-page-form-submit-button w-full py-3 px-4 font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 ${
                 darkMode
-                  ? 'bg-white text-black hover:bg-gray-100 focus:ring-gray-700'
-                  : 'bg-black text-white hover:bg-gray-900 focus:ring-gray-400'
+                  ? 'bg-[#C9A961] text-[#1A0F0A] hover:bg-[#b8964f] focus:ring-[#C9A961]'
+                  : 'bg-[#C9A961] text-[#1A0F0A] hover:bg-[#b8964f] focus:ring-[#C9A961]'
               }`}
             >
               {rateLimited 
@@ -473,12 +503,12 @@ export default function LoginPage() {
           <div className="login-page-divider relative">
             <div className="login-page-divider-line absolute inset-0 flex items-center">
               <div className={`w-full border-t ${
-                darkMode ? 'border-[#262626]' : 'border-[#d0d0d0]'
+                darkMode ? 'border-[#3A2F2A]' : 'border-[#d0d0d0]'
               }`}></div>
             </div>
             <div className="login-page-divider-text relative flex justify-center text-sm">
               <span className={`px-2 ${
-                darkMode ? 'bg-[#1A1A1A] text-gray-500' : 'bg-[#ffffff] text-gray-500'
+                darkMode ? 'bg-[#1A0F0A] text-gray-500' : 'bg-[#ffffff] text-gray-500'
               }`}>
                 Or continue with
               </span>
@@ -490,21 +520,25 @@ export default function LoginPage() {
             onClick={handleGoogleLogin}
             className={`login-page-google-button w-full py-3 px-4 rounded-lg border font-medium transition-colors flex items-center justify-center gap-3 ${
               darkMode
-                ? 'bg-[#0D0D0D] border-[#262626] text-white hover:bg-[#1A1A1A]'
+                ? 'bg-[#1A0F0A] border-[#3A2F2A] text-white hover:bg-[#2A1F1A]'
                 : 'bg-[#ffffff] border-[#d0d0d0] text-black hover:bg-[#f6f6f6]'
             }`}
           >
-            <svg className="login-page-google-icon w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+            <svg className="login-page-google-icon w-5 h-5" viewBox="0 0 24 24">
               <path
+                fill="#4285F4"
                 d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
               />
               <path
+                fill="#34A853"
                 d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
               />
               <path
+                fill="#FBBC05"
                 d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
               />
               <path
+                fill="#EA4335"
                 d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
               />
             </svg>
@@ -513,19 +547,19 @@ export default function LoginPage() {
 
           {/* Access Info */}
           <div className="login-page-footer text-center">
-            <p className={`login-page-footer-text text-xs font-exo-2 ${
+            <p className={`login-page-footer-text text-xs ${
               darkMode ? 'text-gray-500' : 'text-gray-500'
             }`}>
-              New? Deploy{' '}
+              New? Visit{' '}
               <a
-                href="https://goproxe.com"
+                href="https://windchasers.in"
                 target="_blank"
                 rel="noopener noreferrer"
                 className={`login-page-footer-link hover:underline ${
-                  darkMode ? 'text-gray-300 hover:text-white' : 'text-gray-700 hover:text-black'
+                  darkMode ? 'text-[#C9A961] hover:text-[#E8D5B7]' : 'text-[#b8964f] hover:text-[#C9A961]'
                 }`}
               >
-                PROXe
+                WindChasers Aviation Academy
               </a>
             </p>
           </div>

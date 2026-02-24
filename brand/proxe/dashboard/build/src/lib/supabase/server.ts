@@ -3,13 +3,13 @@ import { cookies } from 'next/headers'
 import { Database } from '@/types/database.types'
 
 export async function createClient() {
-  // Support both PROXE-prefixed and standard variable names
-  const supabaseUrl = process.env.NEXT_PUBLIC_PROXE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co'
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_PROXE_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-key'
+  // Windchasers Supabase configuration
+  const supabaseUrl = process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL || 'https://placeholder.supabase.co'
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_ANON_KEY || 'placeholder-key'
   
   // Enhanced error checking
-  const hasUrl = !!(process.env.NEXT_PUBLIC_PROXE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL)
-  const hasKey = !!(process.env.NEXT_PUBLIC_PROXE_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
+  const hasUrl = !!process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL
+  const hasKey = !!process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_ANON_KEY
   
   if (!hasUrl || !hasKey) {
     console.error('❌ [Server] Supabase environment variables are not set!')
@@ -17,7 +17,7 @@ export async function createClient() {
       url: !hasUrl,
       anonKey: !hasKey,
     })
-    console.error('   Please configure NEXT_PUBLIC_PROXE_SUPABASE_URL and NEXT_PUBLIC_PROXE_SUPABASE_ANON_KEY (or NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY) in your .env.local file')
+    console.error('   Please configure NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL and NEXT_PUBLIC_WINDCHASERS_SUPABASE_ANON_KEY in your .env.local file')
   } else {
     // Validate URL format
     if (!supabaseUrl.startsWith('https://') || !supabaseUrl.includes('.supabase.co')) {

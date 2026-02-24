@@ -265,6 +265,59 @@ export interface Database {
           metadata: Json | null
         }
       }
+      knowledge_base: {
+        Row: {
+          id: string
+          brand: string
+          type: 'pdf' | 'doc' | 'url' | 'text'
+          title: string
+          source_url: string | null
+          content: string | null
+          file_name: string | null
+          file_size: number | null
+          file_type: string | null
+          chunks: Json
+          embeddings_status: 'pending' | 'processing' | 'ready' | 'error'
+          error_message: string | null
+          metadata: Json
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          brand?: string
+          type: 'pdf' | 'doc' | 'url' | 'text'
+          title: string
+          source_url?: string | null
+          content?: string | null
+          file_name?: string | null
+          file_size?: number | null
+          file_type?: string | null
+          chunks?: Json
+          embeddings_status?: 'pending' | 'processing' | 'ready' | 'error'
+          error_message?: string | null
+          metadata?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          brand?: string
+          type?: 'pdf' | 'doc' | 'url' | 'text'
+          title?: string
+          source_url?: string | null
+          content?: string | null
+          file_name?: string | null
+          file_size?: number | null
+          file_type?: string | null
+          chunks?: Json
+          embeddings_status?: 'pending' | 'processing' | 'ready' | 'error'
+          error_message?: string | null
+          metadata?: Json
+          created_at?: string
+          updated_at?: string
+        }
+      }
     }
     Views: {
       unified_leads: {

@@ -1,91 +1,139 @@
 #!/bin/bash
-# Sync master template to brand builds
+# ============================================================
+# Sync Master Template → Brand
+# ============================================================
 # Usage: ./scripts/sync-master-to-brand.sh [brand] [product]
-# Example: ./scripts/sync-master-to-brand.sh proxe dashboard
+# Example: ./scripts/sync-master-to-brand.sh windchasers dashboard
+# Example: ./scripts/sync-master-to-brand.sh proxe web-agent
+#
+# Copies master source code into a brand directory.
+# Brand-specific files (.env.local, brand configs, logos) are preserved.
+# ============================================================
 
 set -e
 
-BRAND=$1        # proxe or windchasers
-PRODUCT=$2      # dashboard, web-agent, or whatsapp
-
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-
 cd "$REPO_ROOT"
 
+BRAND=$1
+PRODUCT=$2
+
 if [ -z "$BRAND" ] || [ -z "$PRODUCT" ]; then
-  echo "❌ Error: Brand and product name required"
-  echo "Usage: $0 [brand] [product]"
-  echo "  brand:  proxe or windchasers"
-  echo "  product: dashboard, web-agent, or whatsapp"
+  echo "Usage: ./scripts/sync-master-to-brand.sh [brand] [product]"
+  echo "  brand:   proxe, windchasers, etc."
+  echo "  product: dashboard, web-agent"
   exit 1
 fi
 
 # Validate brand
 if [ "$BRAND" != "proxe" ] && [ "$BRAND" != "windchasers" ]; then
-  echo "❌ Error: Unknown brand '$BRAND'"
-  echo "Supported brands: proxe, windchasers"
+  echo "❌ Unknown brand '$BRAND'. Supported: proxe, windchasers"
   exit 1
 fi
 
 # Validate product
-if [ "$PRODUCT" != "dashboard" ] && [ "$PRODUCT" != "web-agent" ] && [ "$PRODUCT" != "whatsapp" ]; then
-  echo "❌ Error: Unknown product '$PRODUCT'"
-  echo "Supported products: dashboard, web-agent, whatsapp"
+if [ "$PRODUCT" != "dashboard" ] && [ "$PRODUCT" != "web-agent" ]; then
+  echo "❌ Unknown product '$PRODUCT'. Supported: dashboard, web-agent"
   exit 1
 fi
 
-MASTER_DIR="brand/master/${PRODUCT}/build"
-BRAND_DIR="brand/${BRAND}/${PRODUCT}/build"
+# Resolve paths — dashboard uses build/ subdirectory, web-agent may not
+if [ "$PRODUCT" = "dashboard" ]; then
+  MASTER_PATH="brand/master/$PRODUCT/build"
+  BRAND_PATH="brand/$BRAND/$PRODUCT/build"
+else
+  # web-agent: proxe has no build/ subdir, windchasers does
+  if [ -d "brand/master/$PRODUCT/build" ]; then
+    MASTER_PATH="brand/master/$PRODUCT/build"
+  else
+    MASTER_PATH="brand/master/$PRODUCT"
+  fi
+  if [ -d "brand/$BRAND/$PRODUCT/build" ]; then
+    BRAND_PATH="brand/$BRAND/$PRODUCT/build"
+  else
+    BRAND_PATH="brand/$BRAND/$PRODUCT"
+  fi
+fi
 
-# Check if master directory exists
-if [ ! -d "$MASTER_DIR" ]; then
-  echo "❌ Error: Master template not found at $MASTER_DIR"
-  echo "Please create the master template first"
+if [ ! -d "$MASTER_PATH" ]; then
+  echo "❌ Master path not found: $MASTER_PATH"
   exit 1
 fi
 
-# Check if brand directory exists
-if [ ! -d "$BRAND_DIR" ]; then
-  echo "⚠️  Warning: Brand directory not found at $BRAND_DIR"
-  echo "Creating directory..."
-  mkdir -p "$BRAND_DIR"
+if [ ! -d "$BRAND_PATH" ]; then
+  echo "❌ Brand path not found: $BRAND_PATH"
+  echo "   Create it first or check the product name."
+  exit 1
 fi
 
-echo "🔄 Syncing master template to $BRAND/$PRODUCT..."
-echo "   Master: $MASTER_DIR"
-echo "   Brand:  $BRAND_DIR"
+echo ""
+echo "🔄 Syncing Master → $BRAND ($PRODUCT)"
+echo "   From: $MASTER_PATH/"
+echo "   To:   $BRAND_PATH/"
+echo ""
 
-# Create backup
-BACKUP_DIR="${BRAND_DIR}/.sync-backup-$(date +%Y%m%d-%H%M%S)"
+# ── Backup ──
+BACKUP_DIR="${BRAND_PATH}/.sync-backup-$(date +%Y%m%d-%H%M%S)"
 echo "📦 Creating backup at $BACKUP_DIR"
 mkdir -p "$BACKUP_DIR"
-if [ -d "${BRAND_DIR}/src" ]; then
-  cp -r "${BRAND_DIR}/src" "$BACKUP_DIR/src" 2>/dev/null || true
+if [ -d "${BRAND_PATH}/src" ]; then
+  cp -r "${BRAND_PATH}/src" "$BACKUP_DIR/src" 2>/dev/null || true
 fi
-if [ -f "${BRAND_DIR}/package.json" ]; then
-  cp "${BRAND_DIR}/package.json" "$BACKUP_DIR/" 2>/dev/null || true
+if [ -f "${BRAND_PATH}/package.json" ]; then
+  cp "${BRAND_PATH}/package.json" "$BACKUP_DIR/" 2>/dev/null || true
 fi
+echo ""
 
-# Sync files from master, excluding brand-specific directories and files
-echo "📂 Syncing files from master..."
+# ── Sync src/ ──
+echo "📂 Syncing src/ ..."
 rsync -av --delete \
-  --exclude='config/' \
-  --exclude='docs/' \
-  --exclude='supabase/' \
   --exclude='.env.local' \
-  --exclude='node_modules/' \
-  --exclude='.next/' \
-  --exclude='.git/' \
+  --exclude='node_modules' \
+  --exclude='.next' \
+  --exclude='package-lock.json' \
+  --exclude='.sync-backup-*' \
   --exclude='*.log' \
-  --exclude='.sync-backup-*/' \
-  "${MASTER_DIR}/" "${BRAND_DIR}/"
+  "$MASTER_PATH/src/" "$BRAND_PATH/src/"
 
-echo "✅ Sync complete!"
-echo "   Backup saved at: $BACKUP_DIR"
+echo ""
+
+# ── Sync public/ (preserve brand assets) ──
+if [ -d "$MASTER_PATH/public" ]; then
+  echo "📂 Syncing public/ (preserving brand logos/icons) ..."
+  rsync -av \
+    --exclude='logo.svg' \
+    --exclude='logo.png' \
+    --exclude='icon.svg' \
+    --exclude='icon.png' \
+    --exclude='favicon.ico' \
+    --exclude='*.png' \
+    "$MASTER_PATH/public/" "$BRAND_PATH/public/"
+  echo ""
+fi
+
+# ── Sync config files (non-destructive) ──
+echo "📂 Syncing config files ..."
+for CONFIG_FILE in next.config.js tailwind.config.ts tsconfig.json postcss.config.js postcss.config.mjs; do
+  if [ -f "$MASTER_PATH/$CONFIG_FILE" ]; then
+    cp "$MASTER_PATH/$CONFIG_FILE" "$BRAND_PATH/$CONFIG_FILE"
+    echo "   ✓ $CONFIG_FILE"
+  fi
+done
+echo ""
+
+# ── Summary ──
+echo "✅ Synced Master → $BRAND ($PRODUCT)"
+echo ""
+echo "⚠️  NOT synced (brand-specific):"
+echo "   • .env.local"
+echo "   • package.json (sync dependencies manually if needed)"
+echo "   • Brand logos/icons in public/"
+echo "   • supabase/migrations/"
 echo ""
 echo "📝 Next steps:"
-echo "   1. Review changes: git diff ${BRAND_DIR}"
-echo "   2. Apply brand-specific config from ${BRAND_DIR}/config/"
-echo "   3. Test build: cd ${BRAND_DIR} && npm install && npm run build"
-echo "   4. If issues, restore: cp -r $BACKUP_DIR/* ${BRAND_DIR}/"
+echo "   1. cd $BRAND_PATH"
+echo "   2. Check diff: git diff $BRAND_PATH/"
+echo "   3. npm install  (if deps changed)"
+echo "   4. npm run dev  (test it)"
+echo "   5. If broken, restore: cp -r $BACKUP_DIR/* $BRAND_PATH/"
