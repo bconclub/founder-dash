@@ -90,3 +90,16 @@ export interface KnowledgeBaseItem {
   created_at: string
   updated_at: string
 }
+
+export interface KnowledgeBaseChunk {
+  id: string
+  knowledge_base_id: string
+  brand: string
+  chunk_index: number
+  content: string
+  char_start: number | null
+  char_end: number | null
+  token_estimate: number | null
+  embedding: number[] | null
+  created_at: string
+}

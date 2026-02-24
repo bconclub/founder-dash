@@ -265,6 +265,45 @@ export interface Database {
           metadata: Json | null
         }
       }
+      knowledge_base_chunks: {
+        Row: {
+          id: string
+          knowledge_base_id: string
+          brand: string
+          chunk_index: number
+          content: string
+          char_start: number | null
+          char_end: number | null
+          token_estimate: number | null
+          embedding: number[] | null
+          fts_vector: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          knowledge_base_id: string
+          brand?: string
+          chunk_index: number
+          content: string
+          char_start?: number | null
+          char_end?: number | null
+          token_estimate?: number | null
+          embedding?: number[] | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          knowledge_base_id?: string
+          brand?: string
+          chunk_index?: number
+          content?: string
+          char_start?: number | null
+          char_end?: number | null
+          token_estimate?: number | null
+          embedding?: number[] | null
+          created_at?: string
+        }
+      }
       knowledge_base: {
         Row: {
           id: string

@@ -33,44 +33,32 @@ async function searchKnowledgeBase(query: string, limit: number = 3) {
 
     const allResults: any[] = [];
 
-    // Enhanced full-text search for knowledge_base using PostgreSQL function
+    // Chunk-level full-text search via RPC (searches knowledge_base_chunks table)
     try {
       const { data: kbResults, error: kbError } = await supabaseClient
         .rpc('search_knowledge_base', {
           query_text: query,
-          match_limit: limit * 2, // Get more results for ranking
+          match_limit: limit * 2,
+          filter_brand: BRAND,
           filter_category: null,
           filter_subcategory: null
         });
 
       if (!kbError && kbResults && Array.isArray(kbResults)) {
         kbResults.forEach((item: any) => {
-          // Format content combining question, answer, and content fields
-          let contentParts: string[] = [];
-
-          if (item.question) {
-            contentParts.push(`Q: ${item.question}`);
-          }
-          if (item.answer) {
-            contentParts.push(`A: ${item.answer}`);
-          }
-          if (item.content) {
-            contentParts.push(item.content);
-          }
-
-          const content = contentParts.length > 0
-            ? contentParts.join('\n\n')
-            : item.description || item.title || '';
+          // RPC returns chunk-level content with title from parent
+          const content = item.content || '';
 
           if (content.trim()) {
             allResults.push({
               id: item.id,
-              content: content.trim(),
+              content: `[${item.title || 'Knowledge Base'}] ${content.trim()}`,
               metadata: {
                 table: 'knowledge_base',
-                brand: item.brand || BRAND,
-                category: item.category,
-                subcategory: item.subcategory,
+                brand: BRAND,
+                source_type: item.source_type,
+                chunk_index: item.chunk_index,
+                search_method: item.search_method,
                 relevance: item.relevance || 0
               }
             });
@@ -78,44 +66,29 @@ async function searchKnowledgeBase(query: string, limit: number = 3) {
         });
       }
     } catch (kbError) {
-      console.error('[Search KB] Error in full-text search, falling back to ILIKE:', kbError);
-      // Fallback to ILIKE search if full-text search fails
+      console.error('[Search KB] Error in chunk search, falling back to ILIKE:', kbError);
+      // Fallback to ILIKE search on parent knowledge_base table
       try {
         const { data: fallbackResults } = await supabaseClient
           .from('knowledge_base')
           .select('*')
           .eq('brand', BRAND)
-          .or(`question.ilike.%${query}%,answer.ilike.%${query}%,content.ilike.%${query}%`)
+          .eq('embeddings_status', 'ready')
+          .ilike('content', `%${query}%`)
           .limit(limit * 2);
 
         if (fallbackResults && Array.isArray(fallbackResults)) {
           fallbackResults.forEach((item: any) => {
-            let contentParts: string[] = [];
-
-            if (item.question) {
-              contentParts.push(`Q: ${item.question}`);
-            }
-            if (item.answer) {
-              contentParts.push(`A: ${item.answer}`);
-            }
-            if (item.content) {
-              contentParts.push(item.content);
-            }
-
-            const content = contentParts.length > 0
-              ? contentParts.join('\n\n')
-              : item.description || item.title || '';
+            const content = item.content || item.title || '';
 
             if (content.trim()) {
               allResults.push({
                 id: item.id,
-                content: content.trim(),
+                content: `[${item.title || 'Knowledge Base'}] ${content.trim().substring(0, 2000)}`,
                 metadata: {
                   table: 'knowledge_base',
                   brand: item.brand || BRAND,
-                  category: item.category,
-                  subcategory: item.subcategory,
-                  relevance: 0.5 // Default relevance for ILIKE matches
+                  relevance: 0.5
                 }
               });
             }

@@ -70,6 +70,32 @@ export async function POST(
         throw updateError
       }
 
+      // Replace chunk rows in knowledge_base_chunks
+      await supabase
+        .from('knowledge_base_chunks')
+        .delete()
+        .eq('knowledge_base_id', id)
+
+      if (chunks.length > 0) {
+        const chunkRows = chunks.map((chunk: any, i: number) => ({
+          knowledge_base_id: id,
+          brand: BRAND,
+          chunk_index: chunk.index ?? i,
+          content: chunk.text,
+          char_start: chunk.charStart ?? null,
+          char_end: chunk.charEnd ?? null,
+          token_estimate: chunk.tokenEstimate ?? null,
+        }))
+
+        const { error: chunksError } = await supabase
+          .from('knowledge_base_chunks')
+          .insert(chunkRows)
+
+        if (chunksError) {
+          console.error('Error inserting chunks (non-fatal):', chunksError)
+        }
+      }
+
       return NextResponse.json({ data: updated, message: 'Reprocessed successfully' })
     }
 
