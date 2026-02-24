@@ -3,6 +3,8 @@ export const dynamic = 'force-dynamic'
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 
+const BRAND = process.env.NEXT_PUBLIC_BRAND || 'proxe'
+
 // GET /api/knowledge-base — List all knowledge base items
 export async function GET(request: NextRequest) {
   try {
@@ -14,7 +16,7 @@ export async function GET(request: NextRequest) {
     let query = supabase
       .from('knowledge_base')
       .select('*')
-      .eq('brand', 'proxe')
+      .eq('brand', BRAND)
       .order('created_at', { ascending: false })
 
     if (type) {

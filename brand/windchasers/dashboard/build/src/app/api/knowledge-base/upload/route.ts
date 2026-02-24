@@ -1,7 +1,10 @@
 export const dynamic = 'force-dynamic'
 
 import { createClient } from '@/lib/supabase/server'
+import { processFile } from '@/lib/knowledgeProcessor'
 import { NextRequest, NextResponse } from 'next/server'
+
+const BRAND = process.env.NEXT_PUBLIC_BRAND || 'proxe'
 
 const ALLOWED_TYPES: Record<string, string> = {
   'application/pdf': 'pdf',
@@ -39,33 +42,54 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Extract content for text files; PDF/DOC deferred to embedding pipeline
-    let content: string | null = null
-    let embeddings_status: 'pending' | 'ready' = 'pending'
+    // Extract content and chunk the file
+    const arrayBuffer = await file.arrayBuffer()
+    const buffer = Buffer.from(arrayBuffer)
 
-    if (file.type === 'text/plain') {
-      content = await file.text()
-      // Truncate to 100k chars
-      if (content.length > 100000) {
-        content = content.substring(0, 100000)
+    let content: string | null = null
+    let chunks: any[] = []
+    let embeddings_status: 'pending' | 'ready' | 'error' = 'pending'
+    let error_message: string | null = null
+    let processingMetadata: any = {}
+
+    try {
+      const result = await processFile(buffer, fileType, file.type)
+      content = result.content
+      chunks = result.chunks
+      processingMetadata = result.metadata
+
+      // Mark as ready if we got meaningful content
+      if (content && content.length > 50) {
+        embeddings_status = 'ready'
+      } else {
+        embeddings_status = 'pending'
+        error_message = 'Extracted content too short or empty'
       }
-      embeddings_status = 'ready'
+    } catch (processingError) {
+      console.error('Error processing file:', processingError)
+      // Still save the entry but mark as error
+      embeddings_status = 'error'
+      error_message = processingError instanceof Error
+        ? processingError.message
+        : 'Failed to extract content from file'
     }
-    // PDF and DOC: content extraction deferred to phase 2 (embedding pipeline)
 
     const supabase = await createClient()
 
     const { data, error } = await supabase
       .from('knowledge_base')
       .insert({
-        brand: 'proxe',
+        brand: BRAND,
         type: fileType as 'pdf' | 'doc' | 'text',
         title: file.name,
         content,
         file_name: file.name,
         file_size: file.size,
         file_type: file.type,
+        chunks,
         embeddings_status,
+        error_message,
+        metadata: processingMetadata,
       })
       .select()
       .single()

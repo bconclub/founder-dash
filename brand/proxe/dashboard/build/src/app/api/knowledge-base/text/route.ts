@@ -1,7 +1,10 @@
 export const dynamic = 'force-dynamic'
 
 import { createClient } from '@/lib/supabase/server'
+import { chunkText } from '@/lib/knowledgeProcessor'
 import { NextRequest, NextResponse } from 'next/server'
+
+const BRAND = process.env.NEXT_PUBLIC_BRAND || 'proxe'
 
 // POST /api/knowledge-base/text — Add manual text entry
 export async function POST(request: NextRequest) {
@@ -16,16 +19,26 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Content is required' }, { status: 400 })
     }
 
+    const trimmedContent = content.trim()
+    const chunks = chunkText(trimmedContent)
+
     const supabase = await createClient()
 
     const { data, error } = await supabase
       .from('knowledge_base')
       .insert({
-        brand: 'proxe',
+        brand: BRAND,
         type: 'text' as const,
         title: title.trim(),
-        content: content.trim(),
+        content: trimmedContent,
+        chunks,
         embeddings_status: 'ready' as const,
+        metadata: {
+          totalChunks: chunks.length,
+          totalCharacters: trimmedContent.length,
+          estimatedTokens: Math.ceil(trimmedContent.length / 4),
+          extractionMethod: 'manual',
+        },
       })
       .select()
       .single()

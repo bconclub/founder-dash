@@ -3,6 +3,8 @@ export const dynamic = 'force-dynamic'
 import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 
+const BRAND = process.env.NEXT_PUBLIC_BRAND || 'proxe'
+
 // GET /api/knowledge-base/[id] — Get single item
 export async function GET(
   request: NextRequest,
@@ -21,7 +23,7 @@ export async function GET(
       .from('knowledge_base')
       .select('*')
       .eq('id', id)
-      .eq('brand', 'proxe')
+      .eq('brand', BRAND)
       .single()
 
     if (error) {
@@ -64,7 +66,7 @@ export async function DELETE(
       .from('knowledge_base')
       .delete()
       .eq('id', id)
-      .eq('brand', 'proxe')
+      .eq('brand', BRAND)
 
     if (error) {
       console.error('Error deleting knowledge base item:', error)

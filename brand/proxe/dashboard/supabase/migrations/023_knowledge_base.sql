@@ -7,7 +7,7 @@
 
 CREATE TABLE IF NOT EXISTS knowledge_base (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  brand TEXT NOT NULL DEFAULT 'proxe' CHECK (brand IN ('proxe')),
+  brand TEXT NOT NULL DEFAULT 'proxe',
   type TEXT NOT NULL CHECK (type IN ('pdf', 'doc', 'url', 'text')),
   title TEXT NOT NULL,
   source_url TEXT,

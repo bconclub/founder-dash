@@ -1,7 +1,10 @@
 export const dynamic = 'force-dynamic'
 
 import { createClient } from '@/lib/supabase/server'
+import { chunkText } from '@/lib/knowledgeProcessor'
 import { NextRequest, NextResponse } from 'next/server'
+
+const BRAND = process.env.NEXT_PUBLIC_BRAND || 'proxe'
 
 // Basic HTML tag stripping for content extraction
 function stripHtmlTags(html: string): string {
@@ -44,6 +47,7 @@ export async function POST(request: NextRequest) {
 
     // Attempt basic content fetch
     let content: string | null = null
+    let chunks: any[] = []
     let status: 'pending' | 'ready' | 'error' = 'pending'
     let errorMessage: string | null = null
 
@@ -64,11 +68,16 @@ export async function POST(request: NextRequest) {
         if (contentType.includes('text/html') || contentType.includes('text/plain')) {
           const html = await response.text()
           content = stripHtmlTags(html)
-          // Truncate to 100k chars to avoid DB bloat
-          if (content.length > 100000) {
-            content = content.substring(0, 100000)
+          // Truncate to 500k chars
+          if (content.length > 500000) {
+            content = content.substring(0, 500000)
           }
-          status = content.length > 50 ? 'ready' : 'pending'
+          if (content.length > 50) {
+            chunks = chunkText(content)
+            status = 'ready'
+          } else {
+            status = 'pending'
+          }
         }
       } else {
         errorMessage = `Fetch returned status ${response.status}`
@@ -86,13 +95,20 @@ export async function POST(request: NextRequest) {
     const { data, error } = await supabase
       .from('knowledge_base')
       .insert({
-        brand: 'proxe',
+        brand: BRAND,
         type: 'url' as const,
         title: itemTitle,
         source_url: parsedUrl.toString(),
         content,
+        chunks,
         embeddings_status: status,
         error_message: errorMessage,
+        metadata: {
+          totalChunks: chunks.length,
+          totalCharacters: content?.length || 0,
+          estimatedTokens: content ? Math.ceil(content.length / 4) : 0,
+          extractionMethod: 'url-scrape',
+        },
       })
       .select()
       .single()
