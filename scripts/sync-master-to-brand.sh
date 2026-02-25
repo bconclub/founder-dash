@@ -31,7 +31,7 @@ if [ "$BRAND" != "proxe" ] && [ "$BRAND" != "windchasers" ]; then
 fi
 
 MASTER_PATH="master/agent"
-BRAND_PATH="$BRAND/agent"
+BRAND_PATH="brands/$BRAND/agent"
 
 if [ ! -d "$MASTER_PATH" ]; then
   echo "❌ Master path not found: $MASTER_PATH"
@@ -93,7 +93,7 @@ echo "⚠️  NOT synced (brand-specific):"
 echo "   • .env.local"
 echo "   • package-lock.json (run npm install if deps changed)"
 echo "   • Brand logos/icons in public/"
-echo "   • supabase/migrations/ (in $BRAND/supabase/)"
+echo "   • supabase/migrations/ (in brands/$BRAND/supabase/)"
 echo ""
 echo "📝 Next steps:"
 echo "   1. cd $BRAND_PATH"

@@ -22,7 +22,7 @@ SYNCED=0
 SKIPPED=0
 
 for BRAND in proxe windchasers; do
-  if [ -d "$BRAND/agent" ]; then
+  if [ -d "brands/$BRAND/agent" ]; then
     echo "────────────────────────────────────────"
     echo "  Brand: $BRAND"
     echo "────────────────────────────────────────"
@@ -41,7 +41,7 @@ echo "✅ Done! Synced $SYNCED brand(s), skipped $SKIPPED"
 echo ""
 echo "📝 Next: test each brand build:"
 for BRAND in proxe windchasers; do
-  if [ -d "$BRAND/agent" ]; then
+  if [ -d "brands/$BRAND/agent" ]; then
     echo "   cd $BRAND/agent && npm install && npm run build"
   fi
 done

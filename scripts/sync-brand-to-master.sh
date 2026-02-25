@@ -30,7 +30,7 @@ if [ "$BRAND" != "proxe" ] && [ "$BRAND" != "windchasers" ]; then
 fi
 
 MASTER_PATH="master/agent"
-BRAND_PATH="$BRAND/agent"
+BRAND_PATH="brands/$BRAND/agent"
 
 if [ ! -d "$BRAND_PATH" ]; then
   echo "❌ Brand path not found: $BRAND_PATH"
