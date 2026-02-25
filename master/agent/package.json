@@ -3,9 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "concurrently -n \"dashboard,web-agent\" -c \"cyan,magenta\" \"npm run dev:dashboard\" \"npm run dev:web-agent\"",
-    "dev:dashboard": "next dev -p 4002",
-    "dev:web-agent": "cd ../../web-agent/build && npm run dev",
+    "dev": "next dev -p 4002",
     "prebuild": "node scripts/set-build-time.js",
     "build": "next build",
     "start": "next start -p ${PORT:-4002}",
@@ -38,7 +36,6 @@
     "@types/node": "^20.11.0",
     "@types/react": "^18.2.48",
     "@types/react-dom": "^18.2.18",
-    "concurrently": "^9.2.1",
     "eslint": "^8.56.0",
     "eslint-config-next": "^14.2.0",
     "typescript": "^5.3.3"

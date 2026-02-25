@@ -1,12 +1,12 @@
 #!/bin/bash
 # ============================================================
-# Sync Master Template → Brand
+# Sync Master → Brand
 # ============================================================
-# Usage: ./scripts/sync-master-to-brand.sh [brand] [product]
-# Example: ./scripts/sync-master-to-brand.sh windchasers dashboard
-# Example: ./scripts/sync-master-to-brand.sh proxe web-agent
+# Usage: ./scripts/sync-master-to-brand.sh [brand]
+# Example: ./scripts/sync-master-to-brand.sh windchasers
+# Example: ./scripts/sync-master-to-brand.sh proxe
 #
-# Copies master source code into a brand directory.
+# Copies master/agent source code into a brand's agent directory.
 # Brand-specific files (.env.local, brand configs, logos) are preserved.
 # ============================================================
 
@@ -17,12 +17,10 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$REPO_ROOT"
 
 BRAND=$1
-PRODUCT=$2
 
-if [ -z "$BRAND" ] || [ -z "$PRODUCT" ]; then
-  echo "Usage: ./scripts/sync-master-to-brand.sh [brand] [product]"
-  echo "  brand:   proxe, windchasers, etc."
-  echo "  product: dashboard, web-agent"
+if [ -z "$BRAND" ]; then
+  echo "Usage: ./scripts/sync-master-to-brand.sh [brand]"
+  echo "  brand: proxe, windchasers"
   exit 1
 fi
 
@@ -32,29 +30,8 @@ if [ "$BRAND" != "proxe" ] && [ "$BRAND" != "windchasers" ]; then
   exit 1
 fi
 
-# Validate product
-if [ "$PRODUCT" != "dashboard" ] && [ "$PRODUCT" != "web-agent" ]; then
-  echo "❌ Unknown product '$PRODUCT'. Supported: dashboard, web-agent"
-  exit 1
-fi
-
-# Resolve paths — dashboard uses build/ subdirectory, web-agent may not
-if [ "$PRODUCT" = "dashboard" ]; then
-  MASTER_PATH="brand/master/$PRODUCT/build"
-  BRAND_PATH="brand/$BRAND/$PRODUCT/build"
-else
-  # web-agent: proxe has no build/ subdir, windchasers does
-  if [ -d "brand/master/$PRODUCT/build" ]; then
-    MASTER_PATH="brand/master/$PRODUCT/build"
-  else
-    MASTER_PATH="brand/master/$PRODUCT"
-  fi
-  if [ -d "brand/$BRAND/$PRODUCT/build" ]; then
-    BRAND_PATH="brand/$BRAND/$PRODUCT/build"
-  else
-    BRAND_PATH="brand/$BRAND/$PRODUCT"
-  fi
-fi
+MASTER_PATH="master/agent"
+BRAND_PATH="$BRAND/agent"
 
 if [ ! -d "$MASTER_PATH" ]; then
   echo "❌ Master path not found: $MASTER_PATH"
@@ -63,26 +40,14 @@ fi
 
 if [ ! -d "$BRAND_PATH" ]; then
   echo "❌ Brand path not found: $BRAND_PATH"
-  echo "   Create it first or check the product name."
+  echo "   Create it first or check the brand name."
   exit 1
 fi
 
 echo ""
-echo "🔄 Syncing Master → $BRAND ($PRODUCT)"
+echo "🔄 Syncing Master → $BRAND"
 echo "   From: $MASTER_PATH/"
 echo "   To:   $BRAND_PATH/"
-echo ""
-
-# ── Backup ──
-BACKUP_DIR="${BRAND_PATH}/.sync-backup-$(date +%Y%m%d-%H%M%S)"
-echo "📦 Creating backup at $BACKUP_DIR"
-mkdir -p "$BACKUP_DIR"
-if [ -d "${BRAND_PATH}/src" ]; then
-  cp -r "${BRAND_PATH}/src" "$BACKUP_DIR/src" 2>/dev/null || true
-fi
-if [ -f "${BRAND_PATH}/package.json" ]; then
-  cp "${BRAND_PATH}/package.json" "$BACKUP_DIR/" 2>/dev/null || true
-fi
 echo ""
 
 # ── Sync src/ ──
@@ -107,14 +72,13 @@ if [ -d "$MASTER_PATH/public" ]; then
     --exclude='icon.svg' \
     --exclude='icon.png' \
     --exclude='favicon.ico' \
-    --exclude='*.png' \
     "$MASTER_PATH/public/" "$BRAND_PATH/public/"
   echo ""
 fi
 
-# ── Sync config files (non-destructive) ──
+# ── Sync config files ──
 echo "📂 Syncing config files ..."
-for CONFIG_FILE in next.config.js tailwind.config.ts tsconfig.json postcss.config.js postcss.config.mjs; do
+for CONFIG_FILE in next.config.js tailwind.config.ts tsconfig.json postcss.config.js postcss.config.mjs package.json; do
   if [ -f "$MASTER_PATH/$CONFIG_FILE" ]; then
     cp "$MASTER_PATH/$CONFIG_FILE" "$BRAND_PATH/$CONFIG_FILE"
     echo "   ✓ $CONFIG_FILE"
@@ -123,17 +87,15 @@ done
 echo ""
 
 # ── Summary ──
-echo "✅ Synced Master → $BRAND ($PRODUCT)"
+echo "✅ Synced Master → $BRAND"
 echo ""
 echo "⚠️  NOT synced (brand-specific):"
 echo "   • .env.local"
-echo "   • package.json (sync dependencies manually if needed)"
+echo "   • package-lock.json (run npm install if deps changed)"
 echo "   • Brand logos/icons in public/"
-echo "   • supabase/migrations/"
+echo "   • supabase/migrations/ (in $BRAND/supabase/)"
 echo ""
 echo "📝 Next steps:"
 echo "   1. cd $BRAND_PATH"
-echo "   2. Check diff: git diff $BRAND_PATH/"
-echo "   3. npm install  (if deps changed)"
-echo "   4. npm run dev  (test it)"
-echo "   5. If broken, restore: cp -r $BACKUP_DIR/* $BRAND_PATH/"
+echo "   2. npm install  (if deps changed)"
+echo "   3. npm run dev  (test it)"

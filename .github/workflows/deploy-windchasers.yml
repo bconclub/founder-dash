@@ -1,4 +1,4 @@
-name: Deploy Windchasers Dashboard
+name: Deploy Windchasers Agent
 
 on:
   push:
@@ -6,8 +6,8 @@ on:
       - production
       - main
     paths:
-      - 'brand/windchasers/dashboard/build/**'
-      - '.github/workflows/deploy-windchasers-dashboard.yml'
+      - 'windchasers/agent/**'
+      - '.github/workflows/deploy-windchasers.yml'
   workflow_dispatch:
 
 jobs:
@@ -25,12 +25,12 @@ jobs:
         with:
           node-version: '18'  # LTS - faster and more stable
           cache: 'npm'
-          cache-dependency-path: brand/windchasers/dashboard/build/package-lock.json
+          cache-dependency-path: windchasers/agent/package-lock.json
           cache: 'npm'
-          cache-dependency-path: brand/windchasers/dashboard/build/package-lock.json
+          cache-dependency-path: windchasers/agent/package-lock.json
       
       - name: Increment build version
-        working-directory: brand/windchasers/dashboard/build
+        working-directory: windchasers/agent
         run: |
           node scripts/increment-build.js
       
@@ -38,7 +38,7 @@ jobs:
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
-          git add brand/windchasers/dashboard/build/package.json brand/windchasers/dashboard/build/.build-info
+          git add windchasers/agent/package.json windchasers/agent/.build-info
           git commit -m "chore: auto-increment build version [skip ci]" || echo "No changes to commit"
           git push || echo "Nothing to push"
       
@@ -62,14 +62,14 @@ jobs:
             --exclude='*.log' \
             --exclude='.DS_Store' \
             -e "ssh -o StrictHostKeyChecking=no" \
-            brand/windchasers/dashboard/build/ \
+            windchasers/agent/ \
             ${{ secrets.WINDCHASERS_VPS_USER }}@${{ secrets.WINDCHASERS_VPS_HOST }}:/var/www/windchasers-proxe/
       
       - name: Deploy PM2 Ecosystem Config
         run: |
           rsync -avz \
             -e "ssh -o StrictHostKeyChecking=no" \
-            brand/windchasers/dashboard/build/ecosystem.config.js \
+            windchasers/agent/ecosystem.config.js \
             ${{ secrets.WINDCHASERS_VPS_USER }}@${{ secrets.WINDCHASERS_VPS_HOST }}:/var/www/windchasers-proxe/ecosystem.config.js
       
       - name: Build and Restart on VPS

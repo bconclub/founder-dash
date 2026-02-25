@@ -1,4 +1,4 @@
-name: Deploy PROXe Dashboard
+name: Deploy PROXe Agent
 
 on:
   push:
@@ -6,8 +6,8 @@ on:
       - production
       - main
     paths:
-      - 'brand/proxe/build/**'
-      - '.github/workflows/deploy-proxe-dashboard.yml'
+      - 'proxe/agent/**'
+      - '.github/workflows/deploy-proxe.yml'
   workflow_dispatch:
 
 jobs:
@@ -26,7 +26,7 @@ jobs:
           node-version: '20'
       
       - name: Increment build version
-        working-directory: brand/proxe/build
+        working-directory: proxe/agent
         run: |
           node scripts/set-build-time.js || echo "Build time script not found, continuing..."
       
@@ -50,7 +50,7 @@ jobs:
             --exclude='*.log' \
             --exclude='.DS_Store' \
             -e "ssh -o StrictHostKeyChecking=no" \
-            brand/proxe/build/ \
+            proxe/agent/ \
             ${{ secrets.VPS_USERNAME }}@${{ secrets.VPS_HOST }}:/var/www/proxe-dashboard/
       
       - name: Build and Restart on VPS
