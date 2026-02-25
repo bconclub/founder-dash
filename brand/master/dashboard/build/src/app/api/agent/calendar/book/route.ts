@@ -34,7 +34,24 @@ export async function POST(request: NextRequest) {
       courseInterest,
       sessionType,
       brand = 'windchasers',
+      checkOnly = false,
     } = body;
+
+    // Support check-only mode for client-side booking existence checks
+    if (checkOnly) {
+      const supabase = getServiceClient() || getClient();
+      const existingBooking = await checkExistingBooking(phone, email, supabase);
+      if (existingBooking?.exists && existingBooking.bookingDate && existingBooking.bookingTime) {
+        return NextResponse.json({
+          success: false,
+          alreadyBooked: true,
+          bookingDate: existingBooking.bookingDate,
+          bookingTime: existingBooking.bookingTime,
+          bookingStatus: existingBooking.bookingStatus,
+        });
+      }
+      return NextResponse.json({ success: true, alreadyBooked: false });
+    }
 
     if (!date || !time || !name || !email || !phone) {
       return NextResponse.json(

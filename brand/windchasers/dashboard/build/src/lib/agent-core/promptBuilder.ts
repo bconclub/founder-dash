@@ -65,9 +65,7 @@ function buildSystemPrompt(
     : '';
 
   // Channel-specific adjustments
-  const channelNote = channel === 'whatsapp'
-    ? '\n\nIMPORTANT: This conversation is on WhatsApp. Use plain text only (no HTML tags like <br>). Keep responses conversational and mobile-friendly.'
-    : '';
+  const channelNote = getChannelInstructions(channel);
 
   // Cross-channel context (e.g., "This user previously chatted on web about pilot training")
   const crossChannelNote = crossChannelContext
@@ -111,16 +109,54 @@ function buildUserPrompt(params: {
     ? '\n\nGuidance: This is the third user interaction. Encourage them to schedule a call in a single sentence.'
     : '';
 
+  // Channel-specific formatting instructions
+  const formattingInstructions = channel === 'whatsapp'
+    ? 'You are a lead qualification assistant. Use plain text only — NO HTML tags, NO markdown. Use simple line breaks for spacing. Short, punchy sentences. ABSOLUTE MAXIMUM: 2 sentences per response.'
+    : 'You are a lead qualification assistant. Format ALL responses with double line breaks between paragraphs (<br><br>). Short, punchy sentences. Consistent spacing throughout. ABSOLUTE MAXIMUM: 2 sentences per response.';
+
   const instructions = [
     summaryBlock,
     historyBlock,
     bookingNote,
-    'You are a lead qualification assistant. Format ALL responses with double line breaks between paragraphs (<br><br>). Short, punchy sentences. Consistent spacing throughout. ABSOLUTE MAXIMUM: 2 sentences per response.',
+    formattingInstructions,
     firstMessageGuidance,
     thirdMessageGuidance,
   ].filter(Boolean).join('\n\n');
 
   return `${instructions}\n\nLatest user message:\n${message}\n\nCraft your reply:`;
+}
+
+/**
+ * Get channel-specific prompt instructions
+ */
+function getChannelInstructions(channel?: Channel): string {
+  if (channel === 'whatsapp') {
+    return `
+
+=================================================================================
+WHATSAPP CHANNEL RULES (MUST FOLLOW)
+=================================================================================
+This conversation is happening on WhatsApp. You MUST:
+- Use PLAIN TEXT only. No HTML tags (<br>, <b>, <a>, etc.)
+- No markdown formatting (no **, no ##, no [](), no backticks)
+- Use simple line breaks for paragraph spacing
+- Keep responses SHORT — 1-2 sentences max, mobile screens are small
+- No bullet points with special characters — use simple dashes (-) if needed
+- Be conversational and friendly, like texting a friend
+- No "click here" links — WhatsApp users can't click embedded HTML
+- If sharing a URL, paste it as plain text on its own line
+=================================================================================`;
+  }
+
+  if (channel === 'voice') {
+    return `
+
+IMPORTANT: This conversation is on a voice channel. Keep responses very brief,
+natural-sounding, and easy to speak aloud. Avoid any formatting, lists, or URLs.`;
+  }
+
+  // Web channel — default (HTML formatting is fine)
+  return '';
 }
 
 /**

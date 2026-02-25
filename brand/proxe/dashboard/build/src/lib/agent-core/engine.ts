@@ -51,18 +51,21 @@ export async function process(
 
   // 5. Generate response (non-streaming for non-web channels)
   const rawResponse = await generateResponse(systemPrompt, userPrompt);
-  const cleanedResponse = cleanResponse(rawResponse);
+  const cleanedResponse = cleanResponse(rawResponse, input.channel);
 
-  // 6. Generate follow-ups
-  const followUps = await generateFollowUps({
-    channel: input.channel,
-    userMessage: input.message,
-    assistantMessage: cleanedResponse,
-    messageCount: input.messageCount,
-    usedButtons: input.usedButtons || [],
-    hasExistingBooking: !!existingBookingMessage,
-    exploreButtons: ['Pilot Training', 'Helicopter Training', 'Drone Training', 'Cabin Crew'],
-  });
+  // 6. Generate follow-ups (skip for channels that don't support buttons)
+  let followUps: string[] = [];
+  if (input.channel === 'web') {
+    followUps = await generateFollowUps({
+      channel: input.channel,
+      userMessage: input.message,
+      assistantMessage: cleanedResponse,
+      messageCount: input.messageCount,
+      usedButtons: input.usedButtons || [],
+      hasExistingBooking: !!existingBookingMessage,
+      exploreButtons: ['Pilot Training', 'Helicopter Training', 'Drone Training', 'Cabin Crew'],
+    });
+  }
 
   return {
     response: cleanedResponse,
@@ -147,11 +150,22 @@ function formatKnowledgeContext(docs: KnowledgeResult[]): string {
   return docs.map((doc, i) => `${i + 1}. ${doc.content}`).join('\n');
 }
 
-function cleanResponse(raw: string): string {
-  return raw
+function cleanResponse(raw: string, channel?: string): string {
+  let cleaned = raw
     .replace(/^(Hi there!|Hello!|Hey!|Hi!)\s*/gi, '')
     .replace(/^(Hi|Hello|Hey),?\s*/gi, '')
     .trim();
+
+  // Strip HTML tags for non-web channels
+  if (channel && channel !== 'web') {
+    cleaned = cleaned
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<[^>]+>/g, '')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+  }
+
+  return cleaned;
 }
 
 async function checkBooking(supabase: SupabaseClient, input: AgentInput): Promise<string | null> {
