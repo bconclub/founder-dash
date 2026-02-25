@@ -19,26 +19,10 @@ export default function WebAgentSettingsClient() {
   const iframeRef = useRef<HTMLIFrameElement>(null)
 
   // Auto-load preview when component mounts
+  // Widget is served from the same unified app at /widget (same-origin)
   useEffect(() => {
-    const envVar = process.env.NEXT_PUBLIC_WEB_AGENT_URL || ''
-    const isLocalhost = typeof window !== 'undefined' && window.location.hostname === 'localhost'
-    const isOldPort = envVar.includes(':3001')
-
-    let widgetUrl: string
-    if (isLocalhost && (isOldPort || !envVar)) {
-      widgetUrl = 'http://localhost:4003/'
-    } else if (envVar && !isOldPort) {
-      widgetUrl = `${envVar}/`
-    } else if (isLocalhost) {
-      widgetUrl = 'http://localhost:4003/'
-    } else if (typeof window !== 'undefined') {
-      widgetUrl = 'https://agent.windchasers.in/'
-    } else {
-      widgetUrl = 'https://agent.windchasers.in/'
-    }
-
     if (iframeRef.current) {
-      iframeRef.current.src = widgetUrl
+      iframeRef.current.src = '/widget'
     }
   }, [])
 
@@ -62,14 +46,8 @@ export default function WebAgentSettingsClient() {
       }
       keysToRemove.forEach(key => localStorage.removeItem(key))
 
-      const widgetUrl = process.env.NEXT_PUBLIC_WEB_AGENT_URL
-        ? `${process.env.NEXT_PUBLIC_WEB_AGENT_URL}/widget`
-        : typeof window !== 'undefined' && window.location.hostname === 'localhost'
-          ? 'http://localhost:4003/widget'
-          : 'https://agent.windchasers.in/widget'
-
       if (iframeRef.current) {
-        iframeRef.current.src = widgetUrl
+        iframeRef.current.src = '/widget'
       }
 
       setTimeout(() => {
@@ -87,7 +65,8 @@ export default function WebAgentSettingsClient() {
     setTimeout(() => setCopySuccess(false), 2000)
   }
 
-  const embedCode = `<script src="https://proxe.windchasers.in/widget/embed.js"></script>`
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== 'undefined' ? window.location.origin : '')
+  const embedCode = `<script src="${appUrl}/api/widget/embed.js"></script>`
 
   return (
     <DashboardLayout>
@@ -325,23 +304,7 @@ export default function WebAgentSettingsClient() {
             {/* Overlay Gradient for more premium look if needed, but the widget has its own UI */}
             <iframe
               ref={iframeRef}
-              src={(() => {
-                const envVar = process.env.NEXT_PUBLIC_WEB_AGENT_URL || ''
-                const isLocalhost = typeof window !== 'undefined' && window.location.hostname === 'localhost'
-                const isOldPort = envVar.includes(':3001')
-
-                if (isLocalhost && (isOldPort || !envVar)) {
-                  return 'http://localhost:4003/'
-                } else if (envVar && !isOldPort) {
-                  return `${envVar}/`
-                } else if (isLocalhost) {
-                  return 'http://localhost:4003/'
-                } else if (typeof window !== 'undefined') {
-                  return 'https://agent.windchasers.in/'
-                } else {
-                  return 'https://agent.windchasers.in/'
-                }
-              })()}
+              src="/widget"
               className="w-full h-full border-0"
               style={{
                 width: '100%',
