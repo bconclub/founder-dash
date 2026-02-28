@@ -151,13 +151,13 @@ export async function POST(request: NextRequest) {
     const endHour = hour + 1
     const eventEnd = `${date}T${endHour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}:00+05:30`
 
-    const eventTitle = `BCON Strategy Call - ${name}`
+    const eventTitle = `Windchasers Demo - ${name}`
 
     const eventData = {
       summary: eventTitle,
       description:
         description ||
-        `BCON Strategy Call Booking\n\nName: ${name}\nEmail: ${email || 'N/A'}\nPhone: ${phone || 'N/A'}`,
+        `Windchasers Demo Booking\n\nName: ${name}\nEmail: ${email || 'N/A'}\nPhone: ${phone || 'N/A'}`,
       start: {
         dateTime: eventStart,
         timeZone: TIMEZONE,
@@ -254,11 +254,11 @@ export async function PUT(request: NextRequest) {
     }
 
     const eventData = {
-      summary: name ? `BCON Strategy Call - ${name}` : existingEvent.data.summary,
+      summary: name ? `Windchasers Demo - ${name}` : existingEvent.data.summary,
       description:
         description ||
         existingEvent.data.description ||
-        `BCON Strategy Call Booking\n\nName: ${name || 'N/A'}\nEmail: ${email || 'N/A'}\nPhone: ${phone || 'N/A'}`,
+        `Windchasers Demo Booking\n\nName: ${name || 'N/A'}\nEmail: ${email || 'N/A'}\nPhone: ${phone || 'N/A'}`,
       start: {
         dateTime: eventStart,
         timeZone: TIMEZONE,

@@ -132,7 +132,7 @@ export async function ensureOrUpdateLead(
             booking_time: sessionData.booking_time || null,
             user_inputs: userInputs,
           },
-          ...(Object.keys(brandData).length > 0 ? { bcon: brandData } : {}),
+          ...(Object.keys(brandData).length > 0 ? { windchasers: brandData } : {}),
         };
       }
     }
@@ -176,9 +176,9 @@ export async function ensureOrUpdateLead(
           ...(existingCtx[channel] || {}),
           ...(unifiedContext[channel] || {}),
         },
-        bcon: {
-          ...(existingCtx.bcon || {}),
-          ...(unifiedContext.bcon || {}),
+        windchasers: {
+          ...(existingCtx.windchasers || {}),
+          ...(unifiedContext.windchasers || {}),
         },
       };
 

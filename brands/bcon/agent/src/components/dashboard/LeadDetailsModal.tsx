@@ -686,15 +686,15 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
     try {
       const supabase = createClient()
       const { data: history } = await supabase
-        .from('stage_history')
-        .select('score_at_change, changed_at')
+        .from('lead_stage_changes')
+        .select('new_score, created_at')
         .eq('lead_id', lead.id)
-        .order('changed_at', { ascending: false })
+        .order('created_at', { ascending: false })
         .limit(2)
 
       if (history && Array.isArray(history) && history.length > 1) {
         const prev = history[1] as any
-        setPreviousScore(prev.score_at_change)
+        setPreviousScore(prev.new_score)
       }
     } catch (error) {
       console.error('Error loading score history:', error)
@@ -760,7 +760,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
   const getStageDuration = () => {
     try {
       const supabase = createClient()
-      // This would need to fetch from stage_history, simplified for now
+      // This would need to fetch from lead_stage_changes, simplified for now
       return daysInPipeline
     } catch {
       return daysInPipeline
@@ -1472,14 +1472,14 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                         )}
 
                         {/* Divider Line */}
-                        {(summaryData?.keyInfo?.budget || summaryData?.keyInfo?.serviceInterest) && currentLead.unified_context?.bcon && (
+                        {(summaryData?.keyInfo?.budget || summaryData?.keyInfo?.serviceInterest) && currentLead.unified_context?.windchasers && (
                           <div className="h-px bg-gray-100 dark:bg-gray-800 w-full" />
                         )}
 
                         {/* Lead Profile Group */}
                         {(() => {
-                          const bconData = currentLead.unified_context?.bcon || {};
-                          const hasData = Object.keys(bconData).length > 0;
+                          const windchasersData = currentLead.unified_context?.windchasers || {};
+                          const hasData = Object.keys(windchasersData).length > 0;
                           if (!hasData) return null;
 
                           return (
@@ -1489,29 +1489,29 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                                 Lead Profile
                               </h4>
                               <div className="flex flex-wrap gap-x-8 gap-y-3">
-                                {bconData.user_type && (
+                                {windchasersData.user_type && (
                                   <div className="flex items-center gap-2 group">
                                     <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-800/50 flex items-center justify-center text-gray-500 dark:text-gray-400 group-hover:bg-amber-500 group-hover:text-white transition-all">
                                       <MdPerson size={14} />
                                     </div>
                                     <div>
                                       <p className="text-[9px] font-medium text-gray-500 uppercase tracking-tight">Type</p>
-                                      <p className="text-xs font-semibold text-gray-900 dark:text-gray-200 capitalize">{bconData.user_type}</p>
+                                      <p className="text-xs font-semibold text-gray-900 dark:text-gray-200 capitalize">{windchasersData.user_type}</p>
                                     </div>
                                   </div>
                                 )}
-                                {bconData.course_interest && (
+                                {windchasersData.course_interest && (
                                   <div className="flex items-center gap-2 group">
                                     <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-800/50 flex items-center justify-center text-gray-500 dark:text-gray-400 group-hover:bg-amber-500 group-hover:text-white transition-all">
                                       <MdFlightTakeoff size={14} />
                                     </div>
                                     <div>
                                       <p className="text-[9px] font-medium text-gray-500 uppercase tracking-tight">Course</p>
-                                      <p className="text-xs font-semibold text-gray-900 dark:text-gray-200 capitalize">{bconData.course_interest}</p>
+                                      <p className="text-xs font-semibold text-gray-900 dark:text-gray-200 capitalize">{windchasersData.course_interest}</p>
                                     </div>
                                   </div>
                                 )}
-                                {(bconData.plan_to_fly || bconData.timeline) && (
+                                {(windchasersData.plan_to_fly || windchasersData.timeline) && (
                                   <div className="flex items-center gap-2 group">
                                     <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-800/50 flex items-center justify-center text-gray-500 dark:text-gray-400 group-hover:bg-amber-500 group-hover:text-white transition-all">
                                       <MdSchedule size={14} />
@@ -1520,7 +1520,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                                       <p className="text-[9px] font-medium text-gray-500 uppercase tracking-tight">Timeline</p>
                                       <p className="text-xs font-semibold text-gray-900 dark:text-gray-200">
                                         {(() => {
-                                          const t = bconData.plan_to_fly || bconData.timeline;
+                                          const t = windchasersData.plan_to_fly || windchasersData.timeline;
                                           const map: any = { 'asap': 'ASAP', '1-3mo': '1-3m', '6+mo': '6m+', '1yr+': '1y+' };
                                           return map[t] || t;
                                         })()}
@@ -1528,14 +1528,14 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                                     </div>
                                   </div>
                                 )}
-                                {bconData.education && (
+                                {windchasersData.education && (
                                   <div className="flex items-center gap-2 group">
                                     <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-800/50 flex items-center justify-center text-gray-500 dark:text-gray-400 group-hover:bg-amber-500 group-hover:text-white transition-all">
                                       <MdSchool size={14} />
                                     </div>
                                     <div>
                                       <p className="text-[9px] font-medium text-gray-500 uppercase tracking-tight">Edu</p>
-                                      <p className="text-xs font-semibold text-gray-900 dark:text-gray-200 capitalize">{bconData.education.replace('_', ' ')}</p>
+                                      <p className="text-xs font-semibold text-gray-900 dark:text-gray-200 capitalize">{windchasersData.education.replace('_', ' ')}</p>
                                     </div>
                                   </div>
                                 )}

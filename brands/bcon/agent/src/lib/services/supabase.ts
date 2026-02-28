@@ -7,7 +7,7 @@
  * Lookup order (URL example):
  *   1. NEXT_PUBLIC_{BRAND}_SUPABASE_URL   (e.g. NEXT_PUBLIC_BCON_SUPABASE_URL)
  *   2. NEXT_PUBLIC_SUPABASE_URL           (generic)
- *   3. NEXT_PUBLIC_BCON_SUPABASE_URL (legacy fallback)
+ *   3. NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL (legacy fallback)
  *
  * Extracted from: web-agent/src/lib/supabase.ts (getSupabaseServiceClient)
  */
@@ -18,9 +18,9 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 let serviceClient: SupabaseClient | null = null;
 let anonClient: SupabaseClient | null = null;
 
-/** Return the BRAND slug uppercased, e.g. "BCON" */
+/** Return the BRAND slug uppercased, e.g. "BCON", "WINDCHASERS" */
 function brandPrefix(): string {
-  return (process.env.NEXT_PUBLIC_BRAND || 'bcon').toUpperCase();
+  return (process.env.NEXT_PUBLIC_BRAND || 'windchasers').toUpperCase();
 }
 
 /** Resolve a Supabase env var with brand-specific → generic → legacy fallback */
@@ -43,15 +43,15 @@ export function getServiceClient(): SupabaseClient | null {
   const supabaseUrl = resolveEnv(
     `NEXT_PUBLIC_${bp}_SUPABASE_URL`,
     'NEXT_PUBLIC_SUPABASE_URL',
-    'NEXT_PUBLIC_BCON_SUPABASE_URL',
+    'NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL',
     `${bp}_SUPABASE_URL`,
-    'BCON_SUPABASE_URL',
+    'WINDCHASERS_SUPABASE_URL',
   );
 
   const serviceKey = resolveEnv(
     `${bp}_SUPABASE_SERVICE_KEY`,
     'SUPABASE_SERVICE_ROLE_KEY',
-    'BCON_SUPABASE_SERVICE_KEY',
+    'WINDCHASERS_SUPABASE_SERVICE_KEY',
   );
 
   if (!supabaseUrl || !serviceKey) {
@@ -83,17 +83,17 @@ export function getAnonClient(): SupabaseClient | null {
   const supabaseUrl = resolveEnv(
     `NEXT_PUBLIC_${bp}_SUPABASE_URL`,
     'NEXT_PUBLIC_SUPABASE_URL',
-    'NEXT_PUBLIC_BCON_SUPABASE_URL',
+    'NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL',
     `${bp}_SUPABASE_URL`,
-    'BCON_SUPABASE_URL',
+    'WINDCHASERS_SUPABASE_URL',
   );
 
   const anonKey = resolveEnv(
     `NEXT_PUBLIC_${bp}_SUPABASE_ANON_KEY`,
     'NEXT_PUBLIC_SUPABASE_ANON_KEY',
-    'NEXT_PUBLIC_BCON_SUPABASE_ANON_KEY',
+    'NEXT_PUBLIC_WINDCHASERS_SUPABASE_ANON_KEY',
     `${bp}_SUPABASE_ANON_KEY`,
-    'BCON_SUPABASE_ANON_KEY',
+    'WINDCHASERS_SUPABASE_ANON_KEY',
   );
 
   if (!supabaseUrl || !anonKey) {
