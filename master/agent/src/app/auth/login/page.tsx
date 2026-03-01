@@ -1,12 +1,36 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import Image from 'next/image'
 import { createClient } from '../../../lib/supabase/client'
+import { getBrandConfig } from '@/configs'
+
+/** Brand website URLs */
+const brandWebsites: Record<string, string> = {
+  windchasers: 'https://windchasers.in',
+  bcon: 'https://bconclub.com',
+  proxe: 'https://proxe.ai',
+}
+
+/** Brand taglines for login subtitle */
+const brandTaglines: Record<string, string> = {
+  windchasers: 'WindChasers Aviation Academy',
+  bcon: 'BCON Club',
+  proxe: 'PROXe AI Platform',
+}
 
 export default function LoginPage() {
   const router = useRouter()
+
+  // Brand config — resolved from env var or hostname detection
+  const brand = useMemo(() => getBrandConfig(), [])
+  const brandId = (brand.brand || 'windchasers').toLowerCase()
+  const colors = brand.colors
+  const tagline = brandTaglines[brandId] || brand.name
+  const website = brandWebsites[brandId] || '#'
+  const logoLetter = brand.name.charAt(0).toUpperCase()
+  const logoImage = brand.chatStructure?.avatar?.source
+
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -48,15 +72,13 @@ export default function LoginPage() {
       try {
         const supabase = createClient()
         const { data: { user }, error } = await supabase.auth.getUser()
-        
+
         if (user && !error) {
-          // User is already authenticated, redirect to dashboard
           console.log('✅ User already logged in, redirecting to dashboard')
           router.push('/dashboard')
           router.refresh()
         }
       } catch (err) {
-        // If check fails, user is not logged in - stay on login page
         console.log('ℹ️ No existing session found, staying on login page')
       }
     }
@@ -74,9 +96,9 @@ export default function LoginPage() {
     const updateCountdown = () => {
       const now = Date.now()
       const remaining = Math.max(0, rateLimitUntil - now)
-      
+
       if (remaining > 0) {
-        setRateLimitCountdown(Math.ceil(remaining / 1000)) // seconds
+        setRateLimitCountdown(Math.ceil(remaining / 1000))
       } else {
         setRateLimited(false)
         setRateLimitUntil(null)
@@ -104,7 +126,7 @@ export default function LoginPage() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
-    
+
     // Check if we're still rate limited
     const now = Date.now()
     if (rateLimitUntil && now < rateLimitUntil) {
@@ -112,65 +134,52 @@ export default function LoginPage() {
       setError(`Rate limited. Please wait ${minutesLeft} minute${minutesLeft > 1 ? 's' : ''} before trying again.`)
       return
     }
-    
+
     // Reset rate limit if time has passed
     if (rateLimitUntil && now >= rateLimitUntil) {
       setRateLimited(false)
       setRateLimitUntil(null)
       setAttemptCount(0)
     }
-    
+
     // Client-side rate limiting: prevent too many rapid attempts
     if (lastAttemptTime && now - lastAttemptTime < 3000) {
       setError('Please wait a moment before trying again.')
       return
     }
-    
+
     setLastAttemptTime(now)
     setLoading(true)
 
     try {
       const supabase = createClient()
-      
-      // Log diagnostic info in development
-      if (process.env.NODE_ENV === 'development') {
-        console.log('🔍 Login attempt:', {
-          email,
-          supabaseUrl: process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL?.substring(0, 30) + '...',
-          timestamp: new Date().toISOString(),
-        })
-      }
-      
+
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
 
       if (error) {
-        // Log full error details for debugging
         console.error('❌ Supabase Auth Error:', {
           message: error.message,
           status: (error as any).status,
           name: error.name,
-          fullError: error,
         })
 
         // Check for rate limit errors (429 status)
-        const isRateLimit = 
-          error.message.includes('rate limit') || 
+        const isRateLimit =
+          error.message.includes('rate limit') ||
           error.message.includes('too many') ||
           error.message.includes('429') ||
           (error as any).status === 429
 
         if (isRateLimit) {
-          // Set rate limit for 10 minutes (Supabase rate limits usually reset after 5-10 minutes)
-          const limitUntil = now + 10 * 60 * 1000 // 10 minutes
+          const limitUntil = now + 10 * 60 * 1000
           setRateLimited(true)
           setRateLimitUntil(limitUntil)
           localStorage.setItem('rateLimitUntil', limitUntil.toString())
-          setError('Rate limited by Supabase. Please wait 10 minutes or use Google login.')
-          
-          // Disable form for 10 minutes
+          setError('Rate limited by Supabase. Please wait 10 minutes before trying again.')
+
           setTimeout(() => {
             setRateLimited(false)
             setRateLimitUntil(null)
@@ -181,10 +190,9 @@ export default function LoginPage() {
           setError('Invalid email or password. Please check your credentials and try again.')
           setAttemptCount(prev => {
             const newCount = prev + 1
-            // After 3 failed attempts, suggest waiting
             if (newCount >= 3) {
-              setError('Multiple failed attempts. Please wait a moment or try Google login.')
-              setLastAttemptTime(now + 10000) // Wait 10 seconds
+              setError('Multiple failed attempts. Please wait a moment before trying again.')
+              setLastAttemptTime(now + 10000)
             }
             return newCount
           })
@@ -193,7 +201,7 @@ export default function LoginPage() {
         } else {
           setError(error.message)
         }
-        
+
         setLoading(false)
       } else {
         // Reset everything on success
@@ -201,22 +209,17 @@ export default function LoginPage() {
         setLastAttemptTime(null)
         setRateLimited(false)
         setRateLimitUntil(null)
-        
+
           // Verify session is available
           if (data?.user && data?.session) {
             console.log('✅ Login successful, user:', data.user.email)
-            console.log('✅ Session token available:', !!data.session.access_token)
-            
+
             // Wait a moment to ensure session is fully established
-            // Then redirect with full page reload to trigger middleware
             await new Promise(resolve => setTimeout(resolve, 300))
-            
+
             // Send session to API to set cookies on server
             try {
-              const syncUrl = '/api/auth/sync-session'
-              console.log('🔄 Attempting to sync session to:', syncUrl)
-              
-              const syncResponse = await fetch(syncUrl, {
+              const syncResponse = await fetch('/api/auth/sync-session', {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
@@ -231,7 +234,7 @@ export default function LoginPage() {
                 }),
                 credentials: 'include',
               })
-              
+
               if (!syncResponse.ok) {
                 const errorText = await syncResponse.text()
                 let errorData
@@ -242,24 +245,18 @@ export default function LoginPage() {
                 }
                 console.error('❌ Sync failed:', {
                   status: syncResponse.status,
-                  statusText: syncResponse.statusText,
                   error: errorData,
                 })
                 throw new Error(`Sync failed: ${errorData.error || syncResponse.statusText}`)
               }
-              
+
               const result = await syncResponse.json()
-              console.log('✅ Sync response:', result)
-              
+
               if (syncResponse.ok && result.success) {
-                console.log('✅ Session synced to cookies, redirecting...')
-                console.log('✅ Sync result:', result)
-                
                 // Verify session is still available on client
                 const { data: { user: verifyUser } } = await supabase.auth.getUser()
                 if (!verifyUser) {
                   console.error('❌ Session lost after sync, retrying...')
-                  // Retry sync once
                   try {
                     const retryResponse = await fetch('/api/auth/sync-session', {
                       method: 'POST',
@@ -281,23 +278,20 @@ export default function LoginPage() {
                     console.error('❌ Retry sync failed:', retryError)
                   }
                 }
-                
-                // Wait longer for cookies to be set and propagated
+
+                // Wait for cookies to propagate
                 await new Promise(resolve => setTimeout(resolve, 1000))
-                
-                // Verify session one more time before redirect
+
+                // Final verification before redirect
                 const { data: { user: finalVerify } } = await supabase.auth.getUser()
                 if (finalVerify) {
-                  console.log('✅ Final verification passed, redirecting...')
-                  // Use window.location for full page reload to ensure cookies are read
                   window.location.href = '/dashboard'
                 } else {
-                  console.error('❌ Session verification failed, showing error')
-                  setError('Login successful but session not established. Please try again or use Google login.')
+                  console.error('❌ Session verification failed')
+                  setError('Login successful but session not established. Please try again.')
                   setLoading(false)
                 }
               } else {
-                console.warn('⚠️ Sync returned non-ok status:', result)
                 const errorMsg = result.error || 'Failed to sync session'
                 setError(`Login successful but session sync failed: ${errorMsg}. Please try again.`)
                 setLoading(false)
@@ -305,12 +299,10 @@ export default function LoginPage() {
             } catch (error: any) {
               console.error('❌ Sync error:', error)
               const errorMsg = error?.message || 'Failed to sync session to server'
-              setError(`Login successful but session sync failed: ${errorMsg}. Please try again or use Google login.`)
+              setError(`Login successful but session sync failed: ${errorMsg}. Please try again.`)
               setLoading(false)
-              // Don't redirect if sync failed - user needs to see the error
             }
           } else if (data?.user) {
-            // User exists but no session - redirect anyway
             console.warn('⚠️ User exists but session not immediately available, redirecting...')
             router.push('/dashboard')
             router.refresh()
@@ -327,74 +319,84 @@ export default function LoginPage() {
     }
   }
 
-  const handleGoogleLogin = async () => {
-    setError(null)
-    const supabase = createClient()
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-      },
-    })
-    if (error) {
-      setError(error.message)
-    }
-  }
-
   return (
-    <div className={`login-page min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 ${
-      darkMode ? 'bg-[#1A0F0A]' : 'bg-[#f6f6f6]'
-    }`}>
+    <div
+      className="login-page min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8"
+      style={{ backgroundColor: darkMode ? colors.primaryDark : '#f6f6f6' }}
+    >
       {/* Dark Mode Toggle */}
       <button
         onClick={toggleDarkMode}
-        className={`login-page-theme-toggle fixed top-4 right-4 p-2 rounded-full transition-colors ${
-          darkMode 
-            ? 'bg-[#2A1F1A] text-white hover:bg-[#3A2F2A] border border-[#3A2F2A]' 
-            : 'bg-[#ececec] text-black hover:bg-[#d0d0d0]'
-        }`}
+        className="login-page-theme-toggle fixed top-4 right-4 p-2 rounded-full transition-colors"
+        style={darkMode ? {
+          backgroundColor: colors.bgHover,
+          color: colors.textPrimary,
+          border: `1px solid ${colors.borderAccent}`,
+        } : {
+          backgroundColor: '#ececec',
+          color: '#000',
+          border: '1px solid #d0d0d0',
+        }}
         aria-label="Toggle dark mode"
       >
         {darkMode ? '☀️' : '🌙'}
       </button>
 
-      <div className={`login-page-card max-w-md w-full rounded-2xl shadow-xl p-8 ${
-        darkMode ? 'bg-[#1A0F0A] border border-[#3A2F2A]' : 'bg-[#ffffff] border-2 border-[#d0d0d0]'
-      }`}>
+      <div
+        className="login-page-card max-w-md w-full rounded-2xl shadow-xl p-8"
+        style={darkMode ? {
+          backgroundColor: colors.primaryDark,
+          border: `1px solid ${colors.borderAccent}`,
+        } : {
+          backgroundColor: '#ffffff',
+          border: '2px solid #d0d0d0',
+        }}
+      >
         <div className="login-page-card-content space-y-8">
           {/* Logo and Title */}
           <div className="login-page-header text-center">
             <div className="login-page-logo-container mx-auto w-16 h-16 mb-4 flex items-center justify-center">
-              {/* Windchasers Logo - Using text-based logo for now */}
-              <div 
-                className="login-page-logo w-full h-full flex items-center justify-center rounded-full font-bold text-2xl"
-                style={{ 
-                  backgroundColor: '#C9A961',
-                  color: '#1A0F0A'
-                }}
-              >
-                W
-              </div>
+              {logoImage ? (
+                <img
+                  src={logoImage}
+                  alt={brand.name}
+                  className="w-full h-full rounded-full object-cover"
+                />
+              ) : (
+                <div
+                  className="login-page-logo w-full h-full flex items-center justify-center rounded-full font-bold text-2xl"
+                  style={{
+                    backgroundColor: colors.primary,
+                    color: colors.primaryDark,
+                  }}
+                >
+                  {logoLetter}
+                </div>
+              )}
             </div>
-            <h2 className={`login-page-title text-3xl font-normal font-exo-2 ${
-              darkMode ? 'text-white' : 'text-black'
-            }`}>
+            <h2
+              className="login-page-title text-3xl font-normal"
+              style={{ color: darkMode ? colors.textPrimary : '#000' }}
+            >
               Sign in
             </h2>
-            <p className={`login-page-subtitle mt-2 text-sm font-zen-dots ${
-              darkMode ? 'text-[#C9A961]' : 'text-[#b8964f]'
-            }`}>
-              WindChasers Aviation Academy
+            <p
+              className="login-page-subtitle mt-2 text-sm"
+              style={{ color: darkMode ? colors.primary : colors.primaryVibrant }}
+            >
+              {tagline}
             </p>
           </div>
 
             {/* Error Message */}
             {error && (
               <div className={`login-page-error-message rounded-lg p-4 border ${
-                darkMode 
-                  ? 'bg-[#1A0F0A] border-red-500/50' 
+                darkMode
+                  ? 'border-red-500/50'
                   : 'bg-red-50 border-red-200'
-              }`}>
+              }`}
+              style={darkMode ? { backgroundColor: colors.primaryDark } : undefined}
+              >
                 <div className={`login-page-error-content text-sm flex items-start gap-2 ${
                   darkMode ? 'text-red-400' : 'text-red-600'
                 }`}>
@@ -410,11 +412,11 @@ export default function LoginPage() {
                     )}
                   </div>
                 </div>
-                {error.includes('wait') || error.includes('Rate limited') && (
+                {(error.includes('wait') || error.includes('Rate limited')) && (
                   <div className={`login-page-error-tip mt-2 text-xs ${
                     darkMode ? 'text-gray-400' : 'text-gray-600'
                   }`}>
-                    💡 <strong>Tip:</strong> Use Google login below - it has separate rate limits and should work immediately.
+                    💡 <strong>Tip:</strong> Please wait before trying again.
                   </div>
                 )}
               </div>
@@ -424,9 +426,11 @@ export default function LoginPage() {
           <form className="login-page-form space-y-5" onSubmit={handleLogin}>
             {/* Email Field */}
             <div className="login-page-form-field">
-              <label htmlFor="email" className={`login-page-form-label block text-sm font-medium mb-2 ${
-                darkMode ? 'text-gray-300' : 'text-gray-700'
-              }`}>
+              <label
+                htmlFor="email"
+                className="login-page-form-label block text-sm font-medium mb-2"
+                style={{ color: darkMode ? '#d1d5db' : '#374151' }}
+              >
                 Email
               </label>
               <input
@@ -435,22 +439,40 @@ export default function LoginPage() {
                 type="email"
                 autoComplete="email"
                 required
-                className={`login-page-form-input-email w-full px-4 py-3 rounded-lg border focus:outline-none focus:ring-2 transition-colors ${
-                  darkMode
-                    ? 'bg-[#1A0F0A] border-[#3A2F2A] text-white placeholder-gray-500 focus:ring-[#C9A961] focus:border-[#C9A961]'
-                    : 'bg-[#ffffff] border-[#d0d0d0] text-black placeholder-gray-500 focus:ring-[#C9A961] focus:border-[#C9A961]'
-                }`}
-                placeholder="demo@test.com"
+                className="login-page-form-input-email w-full px-4 py-3 rounded-lg border focus:outline-none focus:ring-2 transition-colors"
+                style={darkMode ? {
+                  backgroundColor: colors.primaryDark,
+                  borderColor: colors.borderAccent,
+                  color: colors.textPrimary,
+                  // @ts-ignore -- focus styles handled below
+                  '--tw-ring-color': colors.primary,
+                } as React.CSSProperties : {
+                  backgroundColor: '#ffffff',
+                  borderColor: '#d0d0d0',
+                  color: '#000',
+                  '--tw-ring-color': colors.primary,
+                } as React.CSSProperties}
+                placeholder="email@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                onFocus={(e) => {
+                  e.target.style.borderColor = colors.primary
+                  e.target.style.boxShadow = `0 0 0 2px ${colors.primary}40`
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = darkMode ? colors.borderAccent : '#d0d0d0'
+                  e.target.style.boxShadow = 'none'
+                }}
               />
             </div>
 
             {/* Password Field */}
             <div className="login-page-form-field">
-              <label htmlFor="password" className={`login-page-form-label block text-sm font-medium mb-2 ${
-                darkMode ? 'text-gray-300' : 'text-gray-700'
-              }`}>
+              <label
+                htmlFor="password"
+                className="login-page-form-label block text-sm font-medium mb-2"
+                style={{ color: darkMode ? '#d1d5db' : '#374151' }}
+              >
                 Password
               </label>
               <div className="login-page-form-password-container relative">
@@ -460,14 +482,27 @@ export default function LoginPage() {
                   type={showPassword ? 'text' : 'password'}
                   autoComplete="current-password"
                   required
-                  className={`login-page-form-input-password w-full px-4 py-3 pr-12 rounded-lg border focus:outline-none focus:ring-2 transition-colors ${
-                    darkMode
-                      ? 'bg-[#1A0F0A] border-[#3A2F2A] text-white placeholder-gray-500 focus:ring-[#C9A961] focus:border-[#C9A961]'
-                      : 'bg-[#ffffff] border-[#d0d0d0] text-black placeholder-gray-500 focus:ring-[#C9A961] focus:border-[#C9A961]'
-                  }`}
+                  className="login-page-form-input-password w-full px-4 py-3 pr-12 rounded-lg border focus:outline-none focus:ring-2 transition-colors"
+                  style={darkMode ? {
+                    backgroundColor: colors.primaryDark,
+                    borderColor: colors.borderAccent,
+                    color: colors.textPrimary,
+                  } : {
+                    backgroundColor: '#ffffff',
+                    borderColor: '#d0d0d0',
+                    color: '#000',
+                  }}
                   placeholder="Enter your password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = colors.primary
+                    e.target.style.boxShadow = `0 0 0 2px ${colors.primary}40`
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = darkMode ? colors.borderAccent : '#d0d0d0'
+                    e.target.style.boxShadow = 'none'
+                  }}
                 />
                 <button
                   type="button"
@@ -485,81 +520,42 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading || rateLimited}
-              className={`login-page-form-submit-button w-full py-3 px-4 font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 ${
-                darkMode
-                  ? 'bg-[#C9A961] text-[#1A0F0A] hover:bg-[#b8964f] focus:ring-[#C9A961]'
-                  : 'bg-[#C9A961] text-[#1A0F0A] hover:bg-[#b8964f] focus:ring-[#C9A961]'
-              }`}
+              className="login-page-form-submit-button w-full py-3 px-4 font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2"
+              style={{
+                backgroundColor: colors.primary,
+                color: colors.primaryDark,
+                // @ts-ignore
+                '--tw-ring-color': colors.primary,
+              } as React.CSSProperties}
+              onMouseEnter={(e) => {
+                if (!loading && !rateLimited) {
+                  (e.target as HTMLButtonElement).style.backgroundColor = colors.primaryVibrant
+                }
+              }}
+              onMouseLeave={(e) => {
+                (e.target as HTMLButtonElement).style.backgroundColor = colors.primary
+              }}
             >
-              {rateLimited 
-                ? 'Rate Limited - Please Wait' 
-                : loading 
-                  ? 'Signing in...' 
+              {rateLimited
+                ? 'Rate Limited - Please Wait'
+                : loading
+                  ? 'Signing in...'
                   : 'Log in'}
             </button>
           </form>
 
-          {/* Divider */}
-          <div className="login-page-divider relative">
-            <div className="login-page-divider-line absolute inset-0 flex items-center">
-              <div className={`w-full border-t ${
-                darkMode ? 'border-[#3A2F2A]' : 'border-[#d0d0d0]'
-              }`}></div>
-            </div>
-            <div className="login-page-divider-text relative flex justify-center text-sm">
-              <span className={`px-2 ${
-                darkMode ? 'bg-[#1A0F0A] text-gray-500' : 'bg-[#ffffff] text-gray-500'
-              }`}>
-                Or continue with
-              </span>
-            </div>
-          </div>
-
-          {/* Google Login Button */}
-          <button
-            onClick={handleGoogleLogin}
-            className={`login-page-google-button w-full py-3 px-4 rounded-lg border font-medium transition-colors flex items-center justify-center gap-3 ${
-              darkMode
-                ? 'bg-[#1A0F0A] border-[#3A2F2A] text-white hover:bg-[#2A1F1A]'
-                : 'bg-[#ffffff] border-[#d0d0d0] text-black hover:bg-[#f6f6f6]'
-            }`}
-          >
-            <svg className="login-page-google-icon w-5 h-5" viewBox="0 0 24 24">
-              <path
-                fill="#4285F4"
-                d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-              />
-              <path
-                fill="#34A853"
-                d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-              />
-              <path
-                fill="#FBBC05"
-                d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-              />
-              <path
-                fill="#EA4335"
-                d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-              />
-            </svg>
-            Continue with Google
-          </button>
-
-          {/* Access Info */}
+          {/* Footer */}
           <div className="login-page-footer text-center">
-            <p className={`login-page-footer-text text-xs ${
-              darkMode ? 'text-gray-500' : 'text-gray-500'
-            }`}>
+            <p className="login-page-footer-text text-xs text-gray-500">
               New? Visit{' '}
               <a
-                href="https://windchasers.in"
+                href={website}
                 target="_blank"
                 rel="noopener noreferrer"
-                className={`login-page-footer-link hover:underline ${
-                  darkMode ? 'text-[#C9A961] hover:text-[#E8D5B7]' : 'text-[#b8964f] hover:text-[#C9A961]'
-                }`}
+                className="login-page-footer-link hover:underline"
+                style={{ color: darkMode ? colors.primary : colors.primaryVibrant }}
               >
-                WindChasers Aviation Academy
+                {tagline}
               </a>
             </p>
           </div>
@@ -568,4 +564,3 @@ export default function LoginPage() {
     </div>
   )
 }
-

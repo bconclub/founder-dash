@@ -1,13 +1,29 @@
 'use client'
 
-import { useState, useEffect, Suspense } from 'react'
+import { useState, useEffect, useMemo, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '../../../lib/supabase/client'
+import { getBrandConfig } from '@/configs'
+
+/** Brand taglines */
+const brandTaglines: Record<string, string> = {
+  windchasers: 'WindChasers Aviation Academy',
+  bcon: 'BCON Club',
+  proxe: 'PROXe AI Platform',
+}
 
 function AcceptInviteForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const token = searchParams.get('token')
+
+  const brand = useMemo(() => getBrandConfig(), [])
+  const brandId = (brand.brand || 'windchasers').toLowerCase()
+  const colors = brand.colors
+  const tagline = brandTaglines[brandId] || brand.name
+  const logoLetter = brand.name.charAt(0).toUpperCase()
+  const logoImage = brand.chatStructure?.avatar?.source
+
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -36,7 +52,6 @@ function AcceptInviteForm() {
         return
       }
 
-      // Type assertion for invitation data
       const invitationData = data as {
         id: string
         email: string
@@ -82,7 +97,6 @@ function AcceptInviteForm() {
 
     const supabase = createClient()
 
-    // Sign up the user
     const { data: authData, error: signUpError } = await supabase.auth.signUp({
       email: invitation.email,
       password,
@@ -101,7 +115,6 @@ function AcceptInviteForm() {
 
     // Mark invitation as accepted
     if (authData.user) {
-      // Type assertion needed due to missing type definitions for user_invitations table
       const { error: updateError } = await (supabase as any)
         .from('user_invitations')
         .update({ accepted_at: new Date().toISOString() })
@@ -111,7 +124,6 @@ function AcceptInviteForm() {
         console.error('Error updating invitation:', updateError)
       }
 
-      // Type assertion needed due to missing type definitions for dashboard_users table
       const { error: roleError } = await (supabase as any)
         .from('dashboard_users')
         .update({ role: invitation.role })
@@ -128,10 +140,10 @@ function AcceptInviteForm() {
 
   if (!token) {
     return (
-      <div className="min-h-screen flex items-center justify-center dark:bg-[#1A0F0A] bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50" style={{ backgroundColor: colors.primaryDark }}>
         <div className="text-center">
-          <h2 className="text-2xl font-bold dark:text-white text-gray-900">Invalid Invitation</h2>
-          <p className="mt-2 dark:text-gray-400 text-gray-600">This invitation link is invalid.</p>
+          <h2 className="text-2xl font-bold" style={{ color: colors.textPrimary }}>Invalid Invitation</h2>
+          <p className="mt-2 text-gray-400">This invitation link is invalid.</p>
         </div>
       </div>
     )
@@ -139,37 +151,38 @@ function AcceptInviteForm() {
 
   if (!invitation) {
     return (
-      <div className="min-h-screen flex items-center justify-center dark:bg-[#1A0F0A] bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: colors.primaryDark }}>
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#C9A961] mx-auto"></div>
-          <p className="mt-4 dark:text-gray-400 text-gray-600">Verifying invitation...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto" style={{ borderColor: colors.primary }}></div>
+          <p className="mt-4 text-gray-400">Verifying invitation...</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center dark:bg-[#1A0F0A] bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8" style={{ backgroundColor: colors.primaryDark }}>
       <div className="max-w-md w-full space-y-8">
         <div>
           <div className="text-center mb-4">
-            <div 
-              className="mx-auto w-16 h-16 flex items-center justify-center rounded-full font-bold text-2xl mb-4"
-              style={{ 
-                backgroundColor: '#C9A961',
-                color: '#1A0F0A'
-              }}
-            >
-              W
-            </div>
+            {logoImage ? (
+              <img src={logoImage} alt={brand.name} className="mx-auto w-16 h-16 rounded-full object-cover mb-4" />
+            ) : (
+              <div
+                className="mx-auto w-16 h-16 flex items-center justify-center rounded-full font-bold text-2xl mb-4"
+                style={{ backgroundColor: colors.primary, color: colors.primaryDark }}
+              >
+                {logoLetter}
+              </div>
+            )}
           </div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold dark:text-white text-gray-900">
+          <h2 className="mt-6 text-center text-3xl font-extrabold" style={{ color: colors.textPrimary }}>
             Accept Invitation
           </h2>
-          <p className="mt-2 text-center text-sm dark:text-[#C9A961] text-gray-600">
-            WindChasers Aviation Academy
+          <p className="mt-2 text-center text-sm" style={{ color: colors.primary }}>
+            {tagline}
           </p>
-          <p className="mt-1 text-center text-sm dark:text-gray-400 text-gray-500">
+          <p className="mt-1 text-center text-sm text-gray-400">
             Create your account to access the dashboard
           </p>
         </div>
@@ -181,7 +194,7 @@ function AcceptInviteForm() {
           )}
           <div className="rounded-md shadow-sm space-y-4">
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="email" className="block text-sm font-medium" style={{ color: colors.textSecondary }}>
                 Email
               </label>
               <input
@@ -190,12 +203,17 @@ function AcceptInviteForm() {
                 type="email"
                 required
                 disabled
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm bg-gray-100"
+                className="mt-1 appearance-none relative block w-full px-3 py-2 border rounded-md sm:text-sm"
+                style={{
+                  backgroundColor: colors.bgHover,
+                  borderColor: colors.borderAccent,
+                  color: colors.textPrimary,
+                }}
                 value={email}
               />
             </div>
             <div>
-              <label htmlFor="fullName" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="fullName" className="block text-sm font-medium" style={{ color: colors.textSecondary }}>
                 Full Name
               </label>
               <input
@@ -203,14 +221,19 @@ function AcceptInviteForm() {
                 name="fullName"
                 type="text"
                 required
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                className="mt-1 appearance-none relative block w-full px-3 py-2 border rounded-md sm:text-sm"
+                style={{
+                  backgroundColor: colors.primaryDark,
+                  borderColor: colors.borderAccent,
+                  color: colors.textPrimary,
+                }}
                 placeholder="Enter your full name"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
               />
             </div>
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="password" className="block text-sm font-medium" style={{ color: colors.textSecondary }}>
                 Password
               </label>
               <input
@@ -218,14 +241,19 @@ function AcceptInviteForm() {
                 name="password"
                 type="password"
                 required
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                className="mt-1 appearance-none relative block w-full px-3 py-2 border rounded-md sm:text-sm"
+                style={{
+                  backgroundColor: colors.primaryDark,
+                  borderColor: colors.borderAccent,
+                  color: colors.textPrimary,
+                }}
                 placeholder="Enter password (min 6 characters)"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
             </div>
             <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="confirmPassword" className="block text-sm font-medium" style={{ color: colors.textSecondary }}>
                 Confirm Password
               </label>
               <input
@@ -233,7 +261,12 @@ function AcceptInviteForm() {
                 name="confirmPassword"
                 type="password"
                 required
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                className="mt-1 appearance-none relative block w-full px-3 py-2 border rounded-md sm:text-sm"
+                style={{
+                  backgroundColor: colors.primaryDark,
+                  borderColor: colors.borderAccent,
+                  color: colors.textPrimary,
+                }}
                 placeholder="Confirm password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
@@ -245,7 +278,11 @@ function AcceptInviteForm() {
             <button
               type="submit"
               disabled={loading}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-[#1A0F0A] bg-[#C9A961] hover:bg-[#b8964f] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#C9A961] disabled:opacity-50 disabled:cursor-not-allowed"
+              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{
+                backgroundColor: colors.primary,
+                color: colors.primaryDark,
+              }}
             >
               {loading ? 'Creating account...' : 'Accept Invitation & Sign Up'}
             </button>
@@ -257,12 +294,13 @@ function AcceptInviteForm() {
 }
 
 export default function AcceptInvitePage() {
+  // Use a simple loading state — brand colors applied by inner component
   return (
     <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center dark:bg-[#1A0F0A] bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center bg-gray-900">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#C9A961] mx-auto"></div>
-          <p className="mt-4 dark:text-gray-400 text-gray-600">Loading...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-400 mx-auto"></div>
+          <p className="mt-4 text-gray-400">Loading...</p>
         </div>
       </div>
     }>
@@ -270,5 +308,3 @@ export default function AcceptInvitePage() {
     </Suspense>
   )
 }
-
-
