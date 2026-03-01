@@ -1,23 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { errorLogger } from '@/lib/errorLogger'
-import fs from 'fs'
-import path from 'path'
 
 export const dynamic = 'force-dynamic'
 
-// Helper to read version from package.json
+// Get version from env var (set at build time by prebuild script) or fallback
 function getVersion(): string {
-  try {
-    const packageJsonPath = path.join(process.cwd(), 'package.json')
-    if (fs.existsSync(packageJsonPath)) {
-      const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'))
-      return packageJson.version || '1.0.0'
-    }
-  } catch {
-    // Fallback to default version
-  }
-  return '1.0.0'
+  return process.env.NEXT_PUBLIC_APP_VERSION || '0.0.1'
 }
 
 interface StatusResponse {

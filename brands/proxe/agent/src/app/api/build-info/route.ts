@@ -1,49 +1,21 @@
 import { NextResponse } from 'next/server'
-import fs from 'fs'
-import path from 'path'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET() {
-  try {
-    const packageJsonPath = path.join(process.cwd(), 'package.json')
-    const buildInfoPath = path.join(process.cwd(), '.build-info')
+  const version = process.env.NEXT_PUBLIC_APP_VERSION || '0.0.1'
+  const buildTimestamp = process.env.NEXT_PUBLIC_BUILD_TIME || new Date().toISOString()
 
-    // Read package.json version
-    let version = '1.0.0'
-    if (fs.existsSync(packageJsonPath)) {
-      const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'))
-      version = packageJson.version || '1.0.0'
-    }
+  const buildDate = new Date(buildTimestamp).toLocaleString('en-US', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: true,
+  })
 
-    // Read .build-info timestamp
-    let buildTimestamp = new Date().toISOString()
-    let buildDate = new Date().toLocaleString()
-    
-    if (fs.existsSync(buildInfoPath)) {
-      try {
-        const buildInfo = JSON.parse(fs.readFileSync(buildInfoPath, 'utf8'))
-        buildTimestamp = buildInfo.timestamp || buildTimestamp
-        buildDate = buildInfo.buildDate || buildDate
-      } catch {
-        // If .build-info is invalid, use current date
-        buildTimestamp = new Date().toISOString()
-        buildDate = new Date().toLocaleString()
-      }
-    }
-
-    return NextResponse.json({
-      version,
-      buildTimestamp,
-      buildDate,
-    })
-  } catch (error) {
-    console.error('Error reading build info:', error)
-    // Return defaults on error
-    return NextResponse.json({
-      version: '1.0.0',
-      buildTimestamp: new Date().toISOString(),
-      buildDate: new Date().toLocaleString(),
-    })
-  }
+  return NextResponse.json({ version, buildTimestamp, buildDate })
 }

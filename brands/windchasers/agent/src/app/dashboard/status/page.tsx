@@ -148,7 +148,7 @@ export default function StatusPage() {
       
       setStatus({
         systemHealth,
-        buildVersion: data.systemHealth?.version || '1.0.0',
+        buildVersion: data.systemHealth?.version || '0.0.1',
         webAgentStatus,
         dashboardStatus,
         whatsappAgentStatus,

@@ -87,7 +87,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [isDarkMode, setIsDarkMode] = useState(true)
   const [unreadCount] = useState(0) // TODO: Implement unread count logic
   const [buildDate, setBuildDate] = useState<string>('')
-  const [buildVersion, setBuildVersion] = useState<string>('1.0.0')
+  const [buildVersion, setBuildVersion] = useState<string>('0.0.1')
   const [moreOptionsOpen, setMoreOptionsOpen] = useState(false)
   const autoHideTimeoutRef = React.useRef<NodeJS.Timeout | null>(null)
   const sidebarCloseTimeoutRef = React.useRef<NodeJS.Timeout | null>(null)
@@ -99,7 +99,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     fetch('/api/build-info')
       .then(res => res.json())
       .then(data => {
-        setBuildVersion(data.version || '1.0.0')
+        setBuildVersion(data.version || '0.0.1')
         // Use buildDate from API if available, otherwise fallback to getBuildDate()
         if (data.buildDate) {
           setBuildDate(data.buildDate)
