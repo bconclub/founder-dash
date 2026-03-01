@@ -3,9 +3,15 @@ import { createClient } from '@supabase/supabase-js'
 
 export const dynamic = 'force-dynamic'
 
+/** Resolve brand-specific Supabase URL */
+function resolveSupabaseUrl(): string {
+  const bp = (process.env.NEXT_PUBLIC_BRAND_ID || process.env.NEXT_PUBLIC_BRAND || 'windchasers').toUpperCase()
+  return process.env[`NEXT_PUBLIC_${bp}_SUPABASE_URL`] || process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL || ''
+}
+
 // Service role client for fetching context (bypasses RLS)
 const getServiceClient = () => {
-  const supabaseUrl = process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL!
+  const supabaseUrl = resolveSupabaseUrl()
   return createClient(
     supabaseUrl,
     process.env.SUPABASE_SERVICE_ROLE_KEY!

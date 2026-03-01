@@ -2,33 +2,41 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { Database } from '@/types/database.types'
 
+/** Get brand prefix for env var lookup (e.g. "BCON", "WINDCHASERS", "PROXE") */
+function brandPrefix(): string {
+  return (process.env.NEXT_PUBLIC_BRAND_ID || process.env.NEXT_PUBLIC_BRAND || 'windchasers').toUpperCase()
+}
+
+/** Resolve env var with brand-specific → generic → legacy fallback */
+function resolveEnv(...keys: string[]): string | undefined {
+  for (const k of keys) {
+    if (process.env[k]) return process.env[k]
+  }
+  return undefined
+}
+
 export async function createClient() {
-  // Windchasers Supabase configuration
-  const supabaseUrl = process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL || 'https://placeholder.supabase.co'
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_ANON_KEY || 'placeholder-key'
-  
-  // Enhanced error checking
-  const hasUrl = !!process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL
-  const hasKey = !!process.env.NEXT_PUBLIC_WINDCHASERS_SUPABASE_ANON_KEY
-  
+  const bp = brandPrefix()
+
+  const supabaseUrl = resolveEnv(
+    `NEXT_PUBLIC_${bp}_SUPABASE_URL`,
+    'NEXT_PUBLIC_SUPABASE_URL',
+    'NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL',
+  ) || 'https://placeholder.supabase.co'
+
+  const supabaseAnonKey = resolveEnv(
+    `NEXT_PUBLIC_${bp}_SUPABASE_ANON_KEY`,
+    'NEXT_PUBLIC_SUPABASE_ANON_KEY',
+    'NEXT_PUBLIC_WINDCHASERS_SUPABASE_ANON_KEY',
+  ) || 'placeholder-key'
+
+  const hasUrl = supabaseUrl !== 'https://placeholder.supabase.co'
+  const hasKey = supabaseAnonKey !== 'placeholder-key'
+
   if (!hasUrl || !hasKey) {
-    console.error('❌ [Server] Supabase environment variables are not set!')
-    console.error('   Missing:', {
-      url: !hasUrl,
-      anonKey: !hasKey,
-    })
-    console.error('   Please configure NEXT_PUBLIC_WINDCHASERS_SUPABASE_URL and NEXT_PUBLIC_WINDCHASERS_SUPABASE_ANON_KEY in your .env.local file')
-  } else {
-    // Validate URL format
-    if (!supabaseUrl.startsWith('https://') || !supabaseUrl.includes('.supabase.co')) {
-      console.error('❌ [Server] Invalid Supabase URL format:', supabaseUrl)
-      console.error('   Expected format: https://your-project.supabase.co')
-    }
-    
-    // Validate key format
-    if (supabaseAnonKey.length < 50) {
-      console.error('❌ [Server] Supabase anon key appears invalid (too short)')
-    }
+    console.error(`❌ [Server] Supabase environment variables are not set! (brand=${bp})`)
+    console.error('   Missing:', { url: !hasUrl, anonKey: !hasKey })
+    console.error(`   Please configure NEXT_PUBLIC_${bp}_SUPABASE_URL and NEXT_PUBLIC_${bp}_SUPABASE_ANON_KEY`)
   }
 
   const cookieStore = await cookies()
@@ -51,7 +59,6 @@ export async function createClient() {
             })
           } catch (error) {
             // Cookie setting can fail in some contexts (e.g., during redirects)
-            // This is expected and handled gracefully
           }
         },
         remove(name: string, options: CookieOptions) {
@@ -68,4 +75,3 @@ export async function createClient() {
     }
   )
 }
-
