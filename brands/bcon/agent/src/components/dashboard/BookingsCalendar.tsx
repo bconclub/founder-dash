@@ -1,8 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { formatDate, formatTime } from '@/lib/utils'
-import { useRealtimeLeads } from '@/hooks/useRealtimeLeads'
 import CalendarView from './CalendarView'
 import { MdSync, MdCheckCircle, MdError } from 'react-icons/md'
 
@@ -24,7 +23,6 @@ interface BookingsCalendarProps {
 }
 
 export default function BookingsCalendar({ view = 'full' }: BookingsCalendarProps) {
-  const { leads } = useRealtimeLeads()
   const [bookings, setBookings] = useState<Booking[]>([])
   const [syncing, setSyncing] = useState(false)
   const [syncStatus, setSyncStatus] = useState<{
@@ -33,32 +31,38 @@ export default function BookingsCalendar({ view = 'full' }: BookingsCalendarProp
     details?: string
   } | null>(null)
 
-  useEffect(() => {
-    const bookingsWithDates = leads.filter(
-      (lead) => lead.booking_date && lead.booking_time
-    ) as Booking[]
+  const fetchBookings = useCallback(async () => {
+    try {
+      const res = await fetch('/api/dashboard/bookings')
+      if (!res.ok) throw new Error('Failed to fetch bookings')
+      const data = await res.json()
+      const sorted = (data.bookings || []).sort((a: Booking, b: Booking) => {
+        const dateA = new Date(`${a.booking_date}T${a.booking_time}`)
+        const dateB = new Date(`${b.booking_date}T${b.booking_time}`)
+        return dateA.getTime() - dateB.getTime()
+      })
 
-    // Sort by booking date and time
-    const sorted = bookingsWithDates.sort((a, b) => {
-      const dateA = new Date(`${a.booking_date}T${a.booking_time}`)
-      const dateB = new Date(`${b.booking_date}T${b.booking_time}`)
-      return dateA.getTime() - dateB.getTime()
-    })
-
-    if (view === 'upcoming') {
-      const now = new Date()
-      setBookings(
-        sorted.filter((booking) => {
-          const bookingDateTime = new Date(
-            `${booking.booking_date}T${booking.booking_time}`
-          )
-          return bookingDateTime >= now
-        })
-      )
-    } else {
-      setBookings(sorted)
+      if (view === 'upcoming') {
+        const now = new Date()
+        setBookings(
+          sorted.filter((booking: Booking) => {
+            const bookingDateTime = new Date(
+              `${booking.booking_date}T${booking.booking_time}`
+            )
+            return bookingDateTime >= now
+          })
+        )
+      } else {
+        setBookings(sorted)
+      }
+    } catch (err) {
+      console.error('Error fetching bookings:', err)
     }
-  }, [leads, view])
+  }, [view])
+
+  useEffect(() => {
+    fetchBookings()
+  }, [fetchBookings])
 
   const handleSyncCalendar = async () => {
     setSyncing(true)
@@ -88,7 +92,7 @@ export default function BookingsCalendar({ view = 'full' }: BookingsCalendarProp
 
       // Refresh bookings after sync
       setTimeout(() => {
-        window.location.reload()
+        fetchBookings()
       }, 2000)
     } catch (error: any) {
       setSyncStatus({
@@ -188,9 +192,9 @@ export default function BookingsCalendar({ view = 'full' }: BookingsCalendarProp
                   </div>
                 </div>
                 <div className="text-right">
-                  <span 
+                  <span
                     className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full"
-                    style={{ 
+                    style={{
                       backgroundColor: 'var(--accent-subtle)',
                       color: 'var(--accent-primary)'
                     }}
@@ -206,5 +210,3 @@ export default function BookingsCalendar({ view = 'full' }: BookingsCalendarProp
     </div>
   )
 }
-
-

@@ -283,8 +283,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             />
             <div className="dashboard-layout-auth-loader-icon-wrapper relative animate-pulse mx-auto" style={{ width: '80px', height: '80px' }}>
               <img
-                src="/windchasers-icon.png"
-                alt="Windchasers"
+                src="/bcon-icon.png"
+                alt="BCON"
                 className="w-full h-full object-contain drop-shadow-lg"
               />
             </div>
@@ -327,7 +327,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         >
           {!isCollapsed && (
             <>
-              <h1 className="dashboard-layout-sidebar-logo text-xl font-black tracking-tight" style={{ color: 'var(--accent-primary)' }}>Windchasers</h1>
+              <h1 className="dashboard-layout-sidebar-logo text-xl font-black tracking-tight" style={{ color: 'var(--accent-primary)' }}>BCON</h1>
               {!isMobile && (
                 <button
                   onClick={toggleSidebar}
@@ -378,8 +378,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               title="Click to expand sidebar"
             >
               <img
-                src="/windchasers-icon.png"
-                alt="Windchasers"
+                src="/bcon-icon.png"
+                alt="BCON"
                 className="w-full h-full object-contain"
                 style={{ maxWidth: '40px', maxHeight: '40px' }}
               />

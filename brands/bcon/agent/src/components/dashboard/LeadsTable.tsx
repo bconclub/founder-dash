@@ -519,7 +519,7 @@ export default function LeadsTable({
           <button
             onClick={exportToCSV}
             className="leads-table-export-button ml-auto px-4 py-2 text-white rounded-md text-sm transition-colors"
-            style={{ backgroundColor: 'var(--primary-color, #C9A961)' }}
+            style={{ backgroundColor: 'var(--accent-primary, #8B5CF6)' }}
             onMouseEnter={(e) => e.currentTarget.style.opacity = '0.85'}
             onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
           >
