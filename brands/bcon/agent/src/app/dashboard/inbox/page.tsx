@@ -1039,7 +1039,7 @@ export default function InboxPage() {
                   >
                     <div
                       className={`max-w-[85%] rounded-2xl px-4 py-3 shadow-sm border ${msg.sender === 'customer'
-                        ? 'bg-white dark:bg-[#2A1F1A] border-gray-200 dark:border-[#3A2F2A]'
+                        ? 'bg-white dark:bg-[#1A1A2E] border-gray-200 dark:border-[#1E1E2E]'
                         : ''
                         }`}
                       style={{
