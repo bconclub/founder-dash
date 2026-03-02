@@ -19,6 +19,8 @@ import {
   getServiceClient,
   getClient,
   ensureOrUpdateLead,
+  ensureSession,
+  addUserInput,
   logMessage,
   fetchCustomerContext,
   fetchSummary,
@@ -231,7 +233,18 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
       return;
     }
 
-    // 2. Log customer message
+    // 2. Ensure whatsapp session exists and increment message_count
+    await ensureSession(sessionId, 'whatsapp', supabase);
+    await addUserInput(
+      sessionId,
+      messageText,
+      'whatsapp',
+      undefined,
+      { source: 'meta_cloud_api', whatsapp_message_id: whatsappMessageId },
+      supabase,
+    );
+
+    // 3. Log customer message to conversations table
     await logMessage(
       leadId,
       'whatsapp',
@@ -247,10 +260,10 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
       supabase,
     );
 
-    // 3. Fetch cross-channel context
+    // 4. Fetch cross-channel context
     const customerContext = await fetchCustomerContext(customerPhone, customerName, supabase);
 
-    // 4. Fetch existing summary
+    // 5. Fetch existing summary
     let existingSummary = '';
     const summaryResult = await fetchSummary(sessionId, 'whatsapp', supabase);
     if (summaryResult) {
@@ -260,10 +273,10 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
       existingSummary = customerContext.webSummary.summary;
     }
 
-    // 5. Fetch recent conversation history for context
+    // 6. Fetch recent conversation history for context
     const conversationHistory = await fetchRecentHistory(leadId, supabase);
 
-    // 6. Build AgentInput and generate AI response
+    // 7. Build AgentInput and generate AI response
     const agentInput: AgentInput = {
       channel: 'whatsapp',
       message: messageText,
@@ -278,7 +291,9 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
       usedButtons: [],
     };
 
+    const aiStartTime = Date.now();
     const result = await processMessage(agentInput, supabase);
+    const responseTimeMs = Date.now() - aiStartTime;
 
     if (!result.response) {
       console.error('[meta/webhook] Empty AI response');
@@ -286,7 +301,7 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
       return;
     }
 
-    // 7. Log AI response
+    // 8. Log AI response (with response time for dashboard metrics)
     await logMessage(
       leadId,
       'whatsapp',
@@ -298,11 +313,12 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
         ai_generated: true,
         intent: result.intent,
         source: 'meta_cloud_api',
+        input_to_output_gap_ms: responseTimeMs,
       },
       supabase,
     );
 
-    // 8. Update lead context
+    // 9. Update lead context
     await supabase
       .from('all_leads')
       .update({
@@ -311,13 +327,19 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
       })
       .eq('id', leadId);
 
-    // 9. Send reply via Meta Graph API
+    // 10. Send reply via Meta Graph API
     const sent = await sendWhatsAppReply(customerPhone, result.response);
     if (!sent) {
       console.error('[meta/webhook] Failed to send reply to', customerPhone);
     }
 
-    // 10. Fire-and-forget: trigger AI scoring
+    // 11. Link lead_id to whatsapp session
+    await supabase
+      .from('whatsapp_sessions')
+      .update({ lead_id: leadId })
+      .eq('external_session_id', sessionId);
+
+    // 12. Fire-and-forget: trigger AI scoring
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
     fetch(`${appUrl}/api/webhooks/message-created`, {
       method: 'POST',

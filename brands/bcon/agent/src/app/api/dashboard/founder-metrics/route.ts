@@ -53,15 +53,15 @@ export async function GET(request: NextRequest) {
       .select('lead_id, booking_date, booking_time')
     
     // Get session data for conversation counting (with message_count and created_at)
+    // Primary: sessions with message_count >= 1
+    // Fallback: also count sessions that have last_message_at set (activity happened but count wasn't tracked)
     const { data: webSessionsForConversations } = await supabase
       .from('web_sessions')
-      .select('id, created_at, message_count')
-      .gte('message_count', 1)
-    
+      .select('id, created_at, message_count, last_message_at, conversation_summary')
+
     const { data: whatsappSessionsForConversations } = await supabase
       .from('whatsapp_sessions')
-      .select('id, created_at, message_count')
-      .gte('message_count', 1)
+      .select('id, created_at, message_count, last_message_at, conversation_summary')
     
     const { data: voiceSessions } = await supabase
       .from('voice_sessions')
@@ -211,8 +211,19 @@ export async function GET(request: NextRequest) {
     // - Any user-initiated message
     // - One per session
     
-    const safeWebSessions = webSessionsForConversations || []
-    const safeWhatsappSessions = whatsappSessionsForConversations || []
+    // Filter sessions that represent real conversations:
+    // - message_count >= 1 (properly tracked sessions), OR
+    // - last_message_at is set (activity happened but message_count wasn't incremented), OR
+    // - conversation_summary exists (AI generated a summary for this session)
+    const hasActivity = (session: any) => {
+      return (
+        (session.message_count && session.message_count >= 1) ||
+        !!session.last_message_at ||
+        !!session.conversation_summary
+      )
+    }
+    const safeWebSessions = (webSessionsForConversations || []).filter(hasActivity)
+    const safeWhatsappSessions = (whatsappSessionsForConversations || []).filter(hasActivity)
     
     // Helper function to count unique sessions within a date range
     const countSessionsInRange = (sessions: any[], startDate: Date, endDate?: Date) => {
@@ -258,15 +269,46 @@ export async function GET(request: NextRequest) {
     const totalLeadsCount = safeLeads.length
     
     // Use the unique session-based conversation counts
-    const conversations7D = uniqueConversations7D
-    const conversations14D = uniqueConversations14D
-    const conversations30D = uniqueConversations30D
-    const totalConversationsCount = totalUniqueConversations
+    let conversations7D = uniqueConversations7D
+    let conversations14D = uniqueConversations14D
+    let conversations30D = uniqueConversations30D
+    let totalConversationsCount = totalUniqueConversations
+
+    // Fallback: If session-based count is 0 but we have messages in conversations table,
+    // count unique lead_ids with messages as conversations
+    if (totalConversationsCount === 0 && messages && messages.length > 0) {
+      const uniqueLeadIds = new Set<string>()
+      const uniqueLeadIds7D = new Set<string>()
+      const uniqueLeadIds14D = new Set<string>()
+      const uniqueLeadIds30D = new Set<string>()
+
+      messages.forEach((msg: any) => {
+        if (!msg.lead_id || msg.sender === 'system') return
+        uniqueLeadIds.add(msg.lead_id)
+
+        const msgDate = new Date(msg.created_at)
+        if (msgDate >= thirtyDaysAgo) uniqueLeadIds30D.add(msg.lead_id)
+        if (msgDate >= fourteenDaysAgo) uniqueLeadIds14D.add(msg.lead_id)
+        if (msgDate >= sevenDaysAgo) uniqueLeadIds7D.add(msg.lead_id)
+      })
+
+      totalConversationsCount = uniqueLeadIds.size
+      conversations7D = uniqueLeadIds7D.size
+      conversations14D = uniqueLeadIds14D.size
+      conversations30D = uniqueLeadIds30D.size
+
+      console.log('📊 Conversations fallback (from conversations table):', {
+        total: totalConversationsCount,
+        '7D': conversations7D,
+        '14D': conversations14D,
+        '30D': conversations30D,
+      })
+    }
     
     // Debug logging for conversation counts
     console.log('📊 Total Conversations Calculation (Session-based):')
-    console.log(`  - Web sessions with engagement (message_count >= 1): ${totalWebConversations}`)
-    console.log(`  - WhatsApp sessions with engagement (message_count >= 1): ${totalWhatsappConversations}`)
+    console.log(`  - Raw web sessions: ${webSessionsForConversations?.length || 0}, with activity: ${totalWebConversations}`)
+    console.log(`  - Raw WhatsApp sessions: ${whatsappSessionsForConversations?.length || 0}, with activity: ${totalWhatsappConversations}`)
     console.log(`  - Total unique conversations: ${totalUniqueConversations}`)
     console.log(`  - 7D: ${conversations7D} (Web: ${webConversations7D}, WhatsApp: ${whatsappConversations7D})`)
     console.log(`  - 14D: ${conversations14D} (Web: ${webConversations14D}, WhatsApp: ${whatsappConversations14D})`)
@@ -294,26 +336,23 @@ export async function GET(request: NextRequest) {
     })
 
     // 3. Response Health (avg response time in seconds)
-    // Calculate from conversations table using input_to_output_gap_ms
-    // Filter: channel IN ('web', 'whatsapp') AND sender = 'agent'
-    // SQL equivalent: SELECT AVG((metadata->>'input_to_output_gap_ms')::numeric / 1000) as avg_response_seconds
-    //                 FROM conversations
-    //                 WHERE channel IN ('web', 'whatsapp') AND sender = 'agent'
-    //                 AND metadata->>'input_to_output_gap_ms' IS NOT NULL
+    // Strategy 1: Use input_to_output_gap_ms from metadata (most accurate)
+    // Strategy 2: Calculate from consecutive customer→agent message timestamps (fallback)
     let avgResponseTimeSeconds = 0
-    
+
     try {
+      // Strategy 1: Use pre-calculated input_to_output_gap_ms
       const { data: conversationsForResponse, error: convError } = await supabase
         .from('conversations')
         .select('metadata')
         .in('channel', ['web', 'whatsapp'])
         .eq('sender', 'agent')
         .not('metadata->input_to_output_gap_ms', 'is', null)
-      
+
       if (!convError && conversationsForResponse && conversationsForResponse.length > 0) {
         let totalGapMs = 0
         let validCount = 0
-        
+
         conversationsForResponse.forEach((conv: any) => {
           const gapMs = conv.metadata?.input_to_output_gap_ms
           if (gapMs !== null && gapMs !== undefined) {
@@ -324,11 +363,52 @@ export async function GET(request: NextRequest) {
             }
           }
         })
-        
+
         if (validCount > 0) {
           avgResponseTimeSeconds = (totalGapMs / validCount) / 1000 // Convert ms to seconds
         }
-      } else if (convError) {
+      }
+
+      // Strategy 2 (fallback): Calculate from consecutive customer→agent timestamps
+      if (avgResponseTimeSeconds === 0 && messages && messages.length > 0) {
+        let totalGapSeconds = 0
+        let pairCount = 0
+
+        // Group messages by lead_id, then find customer→agent pairs
+        const messagesByLead: Record<string, any[]> = {}
+        messages.forEach((msg: any) => {
+          if (!msg.lead_id) return
+          if (!messagesByLead[msg.lead_id]) messagesByLead[msg.lead_id] = []
+          messagesByLead[msg.lead_id].push(msg)
+        })
+
+        Object.values(messagesByLead).forEach((leadMessages: any[]) => {
+          // Messages are already sorted by created_at ascending
+          for (let i = 0; i < leadMessages.length - 1; i++) {
+            const current = leadMessages[i]
+            const next = leadMessages[i + 1]
+
+            // Find customer→agent pairs
+            if (current.sender === 'customer' && next.sender === 'agent') {
+              const customerTime = new Date(current.created_at).getTime()
+              const agentTime = new Date(next.created_at).getTime()
+              const gapSeconds = (agentTime - customerTime) / 1000
+
+              // Only count reasonable response times (between 0.1s and 300s / 5 minutes)
+              if (gapSeconds > 0.1 && gapSeconds < 300) {
+                totalGapSeconds += gapSeconds
+                pairCount++
+              }
+            }
+          }
+        })
+
+        if (pairCount > 0) {
+          avgResponseTimeSeconds = totalGapSeconds / pairCount
+        }
+      }
+
+      if (convError) {
         console.warn('Error fetching conversations for response time:', convError)
       }
     } catch (error) {

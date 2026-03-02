@@ -21,6 +21,8 @@ import {
   fetchSummary,
   logMessage,
   ensureOrUpdateLead,
+  ensureSession,
+  addUserInput,
 } from '@/lib/services';
 
 export const dynamic = 'force-dynamic';
@@ -56,6 +58,11 @@ export async function POST(request: NextRequest) {
         { status: 503 },
       );
     }
+
+    // Ensure whatsapp session exists and increment message_count
+    const effectiveSessionId = sessionId || `whatsapp_${Date.now()}`;
+    await ensureSession(effectiveSessionId, 'whatsapp', supabase);
+    await addUserInput(effectiveSessionId, message, 'whatsapp', undefined, {}, supabase);
 
     // Fetch cross-channel context for this customer
     const customerContext = await fetchCustomerContext(phone, name, supabase);

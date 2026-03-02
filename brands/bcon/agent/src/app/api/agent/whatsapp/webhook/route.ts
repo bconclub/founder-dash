@@ -14,6 +14,7 @@ import {
   getServiceClient,
   ensureOrUpdateLead,
   ensureSession,
+  addUserInput,
   logMessage,
   normalizePhone,
 } from '@/lib/services';
@@ -104,13 +105,24 @@ export async function POST(request: NextRequest) {
       .maybeSingle();
 
     if (existingSession?.id) {
-      // Update existing session
+      // Update existing session — auto-increment message_count
+      const { data: currentSession } = await supabase
+        .from('whatsapp_sessions')
+        .select('message_count')
+        .eq('id', existingSession.id)
+        .maybeSingle();
+
+      const autoMessageCount = Math.max(
+        (currentSession?.message_count ?? 0) + 1,
+        message_count || 1,
+      );
+
       await supabase
         .from('whatsapp_sessions')
         .update({
           conversation_summary: conversation_summary || null,
           user_inputs_summary: user_inputs_summary || null,
-          message_count: message_count || 0,
+          message_count: autoMessageCount,
           last_message_at: last_message_at || new Date().toISOString(),
           conversation_status: conversation_status || null,
           overall_sentiment: overall_sentiment || null,
@@ -121,7 +133,7 @@ export async function POST(request: NextRequest) {
         })
         .eq('id', existingSession.id);
     } else {
-      // Create new session
+      // Create new session — start with message_count = 1 (this IS a message)
       await supabase
         .from('whatsapp_sessions')
         .insert({
@@ -134,7 +146,7 @@ export async function POST(request: NextRequest) {
           external_session_id: externalSessionId,
           conversation_summary: conversation_summary || null,
           user_inputs_summary: user_inputs_summary || null,
-          message_count: message_count || 0,
+          message_count: Math.max(message_count || 1, 1),
           last_message_at: last_message_at || new Date().toISOString(),
           conversation_status: conversation_status || 'active',
           overall_sentiment: overall_sentiment || null,
@@ -164,7 +176,7 @@ export async function POST(request: NextRequest) {
         conversation_summary: conversation_summary ?? existingWA.conversation_summary ?? null,
         conversation_context: conversation_context ?? existingWA.conversation_context ?? null,
         user_inputs_summary: user_inputs_summary ?? existingWA.user_inputs_summary ?? null,
-        message_count: message_count ?? existingWA.message_count ?? 0,
+        message_count: Math.max((existingWA.message_count ?? 0) + 1, message_count || 1),
         last_interaction: last_interaction || last_message_at || new Date().toISOString(),
         booking_status: booking_status ?? existingWA.booking_status ?? null,
         booking_date: booking_date ?? existingWA.booking_date ?? null,
