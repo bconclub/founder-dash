@@ -147,13 +147,14 @@ export async function GET(request: NextRequest) {
       const socialBooking = unifiedContext?.social?.booking || {}
       const sessionBooking = sessionBookings[lead.id]
       
-      // Check unified_context for booking_date directly (not nested in booking object)
-      const bookingDate = 
+      // Check direct columns first, then unified_context, then session data
+      const bookingDate =
+        lead.booking_date ||
         unifiedContext?.web?.booking_date ||
         unifiedContext?.whatsapp?.booking_date ||
         unifiedContext?.voice?.booking_date ||
         unifiedContext?.social?.booking_date ||
-        webBooking?.date || 
+        webBooking?.date ||
         webBooking?.booking_date ||
         whatsappBooking?.date ||
         whatsappBooking?.booking_date ||
@@ -163,13 +164,14 @@ export async function GET(request: NextRequest) {
         socialBooking?.booking_date ||
         sessionBooking?.date ||
         null
-      
-      const bookingTime = 
+
+      const bookingTime =
+        lead.booking_time ||
         unifiedContext?.web?.booking_time ||
         unifiedContext?.whatsapp?.booking_time ||
         unifiedContext?.voice?.booking_time ||
         unifiedContext?.social?.booking_time ||
-        webBooking?.time || 
+        webBooking?.time ||
         webBooking?.booking_time ||
         whatsappBooking?.time ||
         whatsappBooking?.booking_time ||
@@ -437,16 +439,16 @@ export async function GET(request: NextRequest) {
         stage: lead.lead_stage || 'New',
       }))
 
-    // 6. Upcoming Bookings (next 3)
+    // 6. Upcoming Bookings (next 10)
     const upcomingBookings = safeLeads
       .map(lead => {
         const { bookingDate, bookingTime } = getBookingData(lead)
         return { lead, bookingDate, bookingTime }
       })
-      .filter(({ bookingDate }) => {
+      .filter(({ bookingDate, bookingTime }) => {
         if (!bookingDate) return false
         try {
-          const bookingDateTime = new Date(`${bookingDate}T12:00:00`)
+          const bookingDateTime = new Date(`${bookingDate}T${bookingTime || '23:59:59'}`)
           return bookingDateTime >= now && !isNaN(bookingDateTime.getTime())
         } catch {
           return false
@@ -461,7 +463,7 @@ export async function GET(request: NextRequest) {
           return 0
         }
       })
-      .slice(0, 3)
+      .slice(0, 10)
       .map(({ lead, bookingDate, bookingTime }) => ({
         id: lead.id,
         name: lead.customer_name || 'Unknown',
