@@ -29,15 +29,9 @@ interface CalendarViewProps {
 const HOURS = Array.from({ length: 24 }, (_, i) => i) // 0-23 hours
 const DAYS_OF_WEEK = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
 
-// Color mapping for sources
-const getSourceColor = (source: string | null) => {
-  const colors: Record<string, string> = {
-    web: 'bg-blue-500',
-    whatsapp: 'bg-green-500',
-    voice: 'bg-violet-500',
-    social: 'bg-orange-500',
-  }
-  return colors[source || 'web'] || 'bg-blue-500'
+// All events use brand accent color
+const getSourceColor = (_source: string | null) => {
+  return '' // Using inline style with var(--accent-primary) instead
 }
 
 export default function CalendarView({ bookings, onDateSelect }: CalendarViewProps) {
@@ -470,14 +464,10 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
                                 <div
                                   key={booking.id}
                                   onClick={(e) => handleBookingClick(booking, e)}
-                                  className={`
-                                    rounded px-1.5 md:px-2 py-0.5 text-[9px] md:text-[10px] leading-tight
-                                    ${getSourceColor(booking.source)}
-                                    text-white cursor-pointer hover:opacity-90 hover:shadow-lg
-                                    z-10 transition-all overflow-hidden
-                                  `}
+                                  className="rounded px-1.5 md:px-2 py-0.5 text-[9px] md:text-[10px] leading-tight text-white cursor-pointer hover:opacity-90 hover:shadow-lg z-10 transition-all overflow-hidden"
                                   style={{
                                     ...style,
+                                    backgroundColor: 'var(--accent-primary)',
                                     left: total > 1 ? `${leftPercent}%` : '4px',
                                     right: total > 1 ? undefined : '4px',
                                     width: total > 1 ? `calc(${widthPercent}% - 4px)` : undefined,
@@ -553,12 +543,8 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
                           <div
                             key={booking.id}
                             onClick={(e) => handleBookingClick(booking, e)}
-                            className={`
-                              text-xs px-2 py-1 rounded truncate
-                              ${getSourceColor(booking.source)}
-                              text-white cursor-pointer hover:opacity-90 hover:shadow-md
-                              transition-all
-                            `}
+                            className="text-xs px-2 py-1 rounded truncate text-white cursor-pointer hover:opacity-90 hover:shadow-md transition-all"
+                            style={{ backgroundColor: 'var(--accent-primary)' }}
                             title={`${booking.name || 'Unnamed'} - ${booking.booking_time}`}
                           >
                             {booking.booking_time?.substring(0, 5)} {booking.name || 'Unnamed'}
@@ -745,11 +731,10 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
 
                 <div>
                   <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Source</div>
-                  <span className={`
-                    px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full
-                    ${getSourceColor(selectedBooking.source)}
-                    text-white
-                  `}>
+                  <span
+                    className="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full text-white"
+                    style={{ backgroundColor: 'var(--accent-primary)' }}
+                  >
                     {selectedBooking.source || selectedBooking.first_touchpoint || selectedBooking.last_touchpoint || 'web'}
                   </span>
                 </div>
