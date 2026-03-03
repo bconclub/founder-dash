@@ -461,9 +461,9 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
                               const style = getBookingStyle(booking, hour)
                               // Handle overlapping bookings by offsetting horizontally
                               const leftOffset = idx * 50 // Offset for overlapping bookings
-                              const callTitle = booking.metadata?.conversation_summary 
-                                || booking.metadata?.title 
-                                || booking.metadata?.summary 
+                              const callTitle = booking.metadata?.title
+                                || booking.metadata?.conversation_summary
+                                || booking.metadata?.summary
                                 || 'Call'
                               return (
                                 <div
@@ -484,7 +484,7 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
                                   title={`${booking.booking_time} - ${callTitle} - ${booking.name || 'Unnamed'}`}
                                 >
                                   <div className="font-semibold truncate mb-0.5 text-[8px] md:text-[10px]">
-                                    {booking.booking_time}
+                                    {booking.booking_time?.substring(0, 5)}
                                   </div>
                                   <div className="text-[8px] md:text-[9px] opacity-90 truncate italic mb-0.5 hidden md:block">
                                     {callTitle.length > 20 ? callTitle.substring(0, 20) + '...' : callTitle}
@@ -560,7 +560,7 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
                             `}
                             title={`${booking.name || 'Unnamed'} - ${booking.booking_time}`}
                           >
-                            {booking.booking_time} {booking.name || 'Unnamed'}
+                            {booking.booking_time?.substring(0, 5)} {booking.name || 'Unnamed'}
                           </div>
                         ))}
                         {dayBookings.length > 3 && (

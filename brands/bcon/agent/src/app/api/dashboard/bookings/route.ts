@@ -39,7 +39,18 @@ export async function GET(request: NextRequest) {
 
     if (error) throw error
 
-    return NextResponse.json({ bookings: data || [] })
+    // Map all_leads columns to the shape the frontend expects
+    const bookings = (data || []).map((lead: any) => ({
+      ...lead,
+      name: lead.customer_name || lead.name || null,
+      source: lead.first_touchpoint || lead.last_touchpoint || 'whatsapp',
+      metadata: {
+        ...lead.metadata,
+        title: lead.booking_title || lead.metadata?.title || null,
+      },
+    }))
+
+    return NextResponse.json({ bookings })
   } catch (error) {
     console.error('Error fetching bookings:', error)
     return NextResponse.json(
