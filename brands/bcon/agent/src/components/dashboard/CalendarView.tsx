@@ -459,8 +459,9 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
                           >
                             {hourBookings.map((booking, idx) => {
                               const style = getBookingStyle(booking, hour)
-                              // Handle overlapping bookings by offsetting horizontally
-                              const leftOffset = idx * 50 // Offset for overlapping bookings
+                              const total = hourBookings.length
+                              const widthPercent = 100 / total
+                              const leftPercent = idx * widthPercent
                               const callTitle = booking.metadata?.title
                                 || booking.metadata?.conversation_summary
                                 || booking.metadata?.summary
@@ -477,9 +478,9 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
                                   `}
                                   style={{
                                     ...style,
-                                    left: `${2 + leftOffset}px`,
-                                    right: `${2 + (hourBookings.length > 1 ? leftOffset + 2 : 0)}px`,
-                                    width: hourBookings.length > 1 ? `calc(50% - ${leftOffset}px)` : undefined,
+                                    left: total > 1 ? `${leftPercent}%` : '4px',
+                                    right: total > 1 ? undefined : '4px',
+                                    width: total > 1 ? `calc(${widthPercent}% - 4px)` : undefined,
                                   }}
                                   title={`${booking.booking_time} - ${callTitle} - ${booking.name || 'Unnamed'}`}
                                 >

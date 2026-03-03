@@ -360,7 +360,7 @@ export default function InboxPage() {
 
       const { data: leadsData, error: leadsError } = await supabase
         .from('all_leads')
-        .select('id, customer_name, email, phone, unified_context')
+        .select('id, customer_name, email, phone, unified_context, booking_date, booking_status, lead_stage')
         .in('id', leadIds)
 
       if (leadsError) {
@@ -397,6 +397,9 @@ export default function InboxPage() {
         email?: string | null
         phone?: string | null
         unified_context?: any
+        booking_date?: string | null
+        booking_status?: string | null
+        lead_stage?: string | null
       }>
 
       for (const [leadId, convData] of conversationMap) {
@@ -412,9 +415,14 @@ export default function InboxPage() {
           continue;
         }
 
-        // Extract booking status from unified_context (check all channels)
+        // Extract booking status: check direct columns first, then unified_context
         const ctx = lead?.unified_context || {};
-        const bookingStatus = ctx?.whatsapp?.booking_status || ctx?.web?.booking_status || null;
+        const bookingStatus = lead?.booking_status
+          || (lead?.booking_date ? 'Call Booked' : null)
+          || (lead?.lead_stage === 'Booking Made' ? 'Call Booked' : null)
+          || ctx?.whatsapp?.booking_status
+          || ctx?.web?.booking_status
+          || null;
 
         const conversation: Conversation = {
           lead_id: leadId,
