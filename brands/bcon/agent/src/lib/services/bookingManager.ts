@@ -398,8 +398,66 @@ export async function getAvailableSlots(date: string): Promise<TimeSlot[]> {
       };
     });
   } catch (error) {
-    console.error('[bookingManager] Failed to check availability', error);
-    // Fallback: return all slots as available
+    console.error('[bookingManager] Google Calendar check failed, falling back to Supabase', error);
+    // Fallback: check Supabase for existing bookings on this date
+    return checkAvailabilityFromSupabase(date);
+  }
+}
+
+/**
+ * Fallback: check availability from Supabase bookings when Google Calendar is unavailable
+ */
+async function checkAvailabilityFromSupabase(date: string): Promise<TimeSlot[]> {
+  try {
+    const { createClient } = await import('@supabase/supabase-js');
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!supabaseUrl || !supabaseKey) {
+      return AVAILABLE_SLOTS.map(slot => ({
+        time: formatTimeForDisplay(slot),
+        time24: slot,
+        available: true,
+        displayTime: formatTimeForDisplay(slot),
+      }));
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseKey);
+    const dateStr = date.split('T')[0];
+
+    // Check all_leads for bookings on this date
+    const { data: bookedLeads } = await supabase
+      .from('all_leads')
+      .select('booking_time')
+      .eq('booking_date', dateStr)
+      .not('booking_time', 'is', null);
+
+    // Check whatsapp_sessions for bookings on this date
+    const { data: bookedSessions } = await supabase
+      .from('whatsapp_sessions')
+      .select('booking_time')
+      .eq('booking_date', dateStr)
+      .not('booking_time', 'is', null);
+
+    // Combine all booked times
+    const bookedTimes = new Set<string>();
+    for (const row of [...(bookedLeads || []), ...(bookedSessions || [])]) {
+      if (row.booking_time) {
+        // Normalize time to HH:MM format
+        const t = String(row.booking_time).substring(0, 5);
+        bookedTimes.add(t);
+      }
+    }
+
+    console.log(`[bookingManager] Supabase fallback: ${bookedTimes.size} booked slots on ${dateStr}:`, Array.from(bookedTimes));
+
+    return AVAILABLE_SLOTS.map(slot => ({
+      time: formatTimeForDisplay(slot),
+      time24: slot,
+      available: !bookedTimes.has(slot),
+      displayTime: formatTimeForDisplay(slot),
+    }));
+  } catch (err) {
+    console.error('[bookingManager] Supabase availability check failed', err);
     return AVAILABLE_SLOTS.map(slot => ({
       time: formatTimeForDisplay(slot),
       time24: slot,
