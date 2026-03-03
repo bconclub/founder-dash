@@ -531,41 +531,53 @@ export default function LeadsTable({
 
       {/* Table */}
       <div className="leads-table-container overflow-x-auto overflow-y-visible">
-        <table className="leads-table-table min-w-full divide-y divide-gray-200 dark:divide-[#262626]">
+        <table className="leads-table-table min-w-full divide-y divide-gray-200 dark:divide-[#262626]" style={{ tableLayout: 'fixed' }}>
+          <colgroup>
+            <col style={{ width: '160px' }} /> {/* Name */}
+            <col style={{ width: '170px' }} /> {/* Email */}
+            <col style={{ width: '120px' }} /> {/* Phone */}
+            <col style={{ width: '90px' }} />  {/* First Touch */}
+            {showAviationColumns && <col style={{ width: '100px' }} />} {/* User Type */}
+            {showAviationColumns && <col style={{ width: '110px' }} />} {/* Course Interest */}
+            <col style={{ width: '80px' }} />  {/* Timeline */}
+            <col style={{ width: '70px' }} />  {/* Score */}
+            <col style={{ width: '100px' }} /> {/* Stage */}
+            <col style={{ width: '130px' }} /> {/* Key Event */}
+          </colgroup>
           <thead className="leads-table-thead bg-gray-50 dark:bg-[#0A0A0B]">
             <tr className="leads-table-thead-row">
-              <th className="leads-table-th leads-table-th-name px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              <th className="leads-table-th leads-table-th-name px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 Name
               </th>
-              <th className="leads-table-th leads-table-th-email px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              <th className="leads-table-th leads-table-th-email px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 Email
               </th>
-              <th className="leads-table-th leads-table-th-phone px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              <th className="leads-table-th leads-table-th-phone px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 Phone
               </th>
-              <th className="leads-table-th leads-table-th-first-touch px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                First Touch
+              <th className="leads-table-th leads-table-th-first-touch px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                Source
               </th>
               {showAviationColumns && (
-                <th className="leads-table-th leads-table-th-user-type px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                <th className="leads-table-th leads-table-th-user-type px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   User Type
                 </th>
               )}
               {showAviationColumns && (
-                <th className="leads-table-th leads-table-th-course-interest px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                <th className="leads-table-th leads-table-th-course-interest px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Course Interest
                 </th>
               )}
-              <th className="leads-table-th leads-table-th-timeline px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              <th className="leads-table-th leads-table-th-timeline px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 Timeline
               </th>
-              <th className="leads-table-th leads-table-th-score px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              <th className="leads-table-th leads-table-th-score px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 Score
               </th>
-              <th className="leads-table-th leads-table-th-stage px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              <th className="leads-table-th leads-table-th-stage px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 Stage
               </th>
-              <th className="leads-table-th leads-table-th-key-event px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              <th className="leads-table-th leads-table-th-key-event px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 Key Event
               </th>
             </tr>
@@ -573,7 +585,7 @@ export default function LeadsTable({
           <tbody className="leads-table-tbody bg-white dark:bg-[#0A0A0B] divide-y divide-gray-200 dark:divide-[#1E1E2E]">
             {filteredLeads.length === 0 ? (
               <tr className="leads-table-empty-row">
-                <td colSpan={showAviationColumns ? 10 : 8} className="leads-table-empty-cell px-6 py-4 text-center text-gray-500 dark:text-gray-400">
+                <td colSpan={showAviationColumns ? 10 : 8} className="leads-table-empty-cell px-3 py-4 text-center text-gray-500 dark:text-gray-400">
                   No leads found
                 </td>
               </tr>
@@ -584,16 +596,16 @@ export default function LeadsTable({
                   className="leads-table-row hover:bg-gray-50 dark:hover:bg-[#1A1A2E] cursor-pointer transition-colors"
                   onClick={() => handleRowClick(lead)}
                 >
-                  <td className="leads-table-cell leads-table-cell-name px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
+                  <td className="leads-table-cell leads-table-cell-name px-3 py-4 text-sm font-medium text-gray-900 dark:text-white truncate" title={lead.name || '-'}>
                     {lead.name || '-'}
                   </td>
-                  <td className="leads-table-cell leads-table-cell-email px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                  <td className="leads-table-cell leads-table-cell-email px-3 py-4 text-sm text-gray-500 dark:text-gray-400 truncate" title={lead.email || '-'}>
                     {lead.email || '-'}
                   </td>
-                  <td className="leads-table-cell leads-table-cell-phone px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                  <td className="leads-table-cell leads-table-cell-phone px-3 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                     {lead.phone || '-'}
                   </td>
-                  <td className="leads-table-cell leads-table-cell-first-touch px-6 py-4 whitespace-nowrap text-sm">
+                  <td className="leads-table-cell leads-table-cell-first-touch px-3 py-4 whitespace-nowrap text-sm">
                     {(() => {
                       const source = (lead.first_touchpoint || lead.source || 'unknown').toLowerCase()
                       const config: Record<string, any> = {
@@ -616,7 +628,7 @@ export default function LeadsTable({
                     })()}
                   </td>
                   {showAviationColumns && (
-                    <td className="leads-table-cell leads-table-cell-user-type px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                    <td className="leads-table-cell leads-table-cell-user-type px-3 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                       {(() => {
                         const brandData = lead.unified_context?.[brandId] || {}
                         const userType = brandData.user_type
@@ -638,7 +650,7 @@ export default function LeadsTable({
                     </td>
                   )}
                   {showAviationColumns && (
-                    <td className="leads-table-cell leads-table-cell-course-interest px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                    <td className="leads-table-cell leads-table-cell-course-interest px-3 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                       {(() => {
                         const brandData = lead.unified_context?.[brandId] || {}
                         const courseInterest = brandData.course_interest
@@ -659,7 +671,7 @@ export default function LeadsTable({
                       })()}
                     </td>
                   )}
-                  <td className="leads-table-cell leads-table-cell-timeline px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                  <td className="leads-table-cell leads-table-cell-timeline px-3 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                     {(() => {
                       const brandData = lead.unified_context?.[brandId] || {}
                       // Check both plan_to_fly and timeline for backward compatibility
@@ -680,7 +692,7 @@ export default function LeadsTable({
                       )
                     })()}
                   </td>
-                  <td className="leads-table-cell leads-table-cell-score px-6 py-4 whitespace-nowrap text-sm">
+                  <td className="leads-table-cell leads-table-cell-score px-3 py-4 whitespace-nowrap text-sm">
                     {(() => {
                       // Use calculated score (same as modal) if available, otherwise fallback to stored score
                       const calculatedScore = calculatedScores[lead.id]
@@ -711,7 +723,7 @@ export default function LeadsTable({
                       )
                     })()}
                   </td>
-                  <td className="leads-table-cell leads-table-cell-stage px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                  <td className="leads-table-cell leads-table-cell-stage px-3 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                     {(() => {
                       // Try multiple possible property names for stage
                       const stage = lead.lead_stage ?? (lead as any).leadStage ?? (lead as any).stage ?? null
@@ -735,7 +747,7 @@ export default function LeadsTable({
                       return '-'
                     })()}
                   </td>
-                  <td className="leads-table-cell leads-table-cell-key-event px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                  <td className="leads-table-cell leads-table-cell-key-event px-3 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                     {(() => {
                       const bookingDate = lead.booking_date ||
                         lead.unified_context?.web?.booking_date ||

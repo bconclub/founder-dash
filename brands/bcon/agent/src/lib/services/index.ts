@@ -69,6 +69,14 @@ export {
   createCalendarEvent,
 } from './bookingManager';
 
+// WhatsApp messaging
+export {
+  sendWhatsAppText,
+  sendWhatsAppTemplate,
+  sendBookingConfirmation,
+  sendBookingReminder,
+} from './whatsappSender';
+
 // Cross-channel context
 export {
   type CustomerContext,

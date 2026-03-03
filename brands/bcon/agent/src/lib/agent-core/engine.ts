@@ -256,7 +256,7 @@ function buildBookingTools(
     },
     {
       name: 'book_consultation',
-      description: 'Book a consultation call. Use ONLY after: (1) confirming date and time with the user, (2) having the user name, (3) verifying slot is available via check_availability. Email is optional.',
+      description: 'Book a consultation call. Use ONLY after: (1) confirming date and time with the user, (2) having the user name, (3) verifying slot is available via check_availability. Email is optional. You MUST generate a specific call title based on the conversation context.',
       input_schema: {
         type: 'object',
         properties: {
@@ -280,13 +280,17 @@ function buildBookingTools(
             type: 'string',
             description: 'Phone number of the person booking',
           },
+          title: {
+            type: 'string',
+            description: 'AI-generated call title based on discussion. Format: "[Topic/Solution] - [Brand Name]". Examples: "AI Lead Qualification for Meta Ads - Acme Corp", "Online Customer Acquisition - Fresh Foods". Never use generic titles.',
+          },
           course_interest: {
             type: 'string',
             enum: ['pilot', 'helicopter', 'drone', 'cabin', 'general'],
             description: 'Which training program they are interested in',
           },
         },
-        required: ['date', 'time', 'name', 'phone'],
+        required: ['date', 'time', 'name', 'phone', 'title'],
       },
     },
   ];
@@ -335,11 +339,12 @@ function buildBookingTools(
     },
 
     book_consultation: async (toolInput: Record<string, any>) => {
-      const { date, time, name, email, phone, course_interest } = toolInput;
+      const { date, time, name, email, phone, course_interest, title } = toolInput;
 
       const bookingPhone = phone || input.userProfile.phone;
       const bookingName = name || input.userProfile.name || 'WhatsApp User';
       const bookingEmail = email || input.userProfile.email || '';
+      const bookingTitle = title || `AI Strategy Call - ${bookingName}`;
 
       if (!bookingPhone) {
         return JSON.stringify({
@@ -357,8 +362,8 @@ function buildBookingTools(
         });
       }
 
-      // Create Google Calendar event
-      let calendarResult: { eventId: string; eventLink: string; hasAttendees: boolean } | null = null;
+      // Create Google Calendar event (now includes Meet link)
+      let calendarResult: { eventId: string; eventLink: string; hasAttendees: boolean; meetLink: string | null } | null = null;
       try {
         calendarResult = await createCalendarEvent({
           date,
@@ -369,6 +374,7 @@ function buildBookingTools(
           courseInterest: course_interest,
           sessionType: 'online',
           conversationSummary: input.summary || undefined,
+          title: bookingTitle,
         });
       } catch (calendarError: any) {
         console.error('[Engine] Calendar event creation failed:', calendarError);
@@ -389,6 +395,8 @@ function buildBookingTools(
             courseInterest: course_interest,
             sessionType: 'online',
             conversationSummary: input.summary || undefined,
+            title: bookingTitle,
+            meetLink: calendarResult?.meetLink || undefined,
           },
           'whatsapp',
           supabase,
@@ -401,12 +409,34 @@ function buildBookingTools(
         });
       }
 
+      // Send WhatsApp confirmation with Meet link (fire-and-forget)
+      if (bookingPhone) {
+        const { sendBookingConfirmation } = await import('@/lib/services/whatsappSender');
+        const bookingDate = new Date(date + 'T00:00:00+05:30');
+        const dateDisplay = bookingDate.toLocaleDateString('en-IN', {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+          timeZone: 'Asia/Kolkata',
+        });
+        sendBookingConfirmation(
+          bookingPhone,
+          bookingName,
+          bookingTitle,
+          `${dateDisplay} at ${time}`,
+          calendarResult?.meetLink || '',
+        ).catch((err: any) => console.error('[Engine] WhatsApp confirmation failed:', err));
+      }
+
       return JSON.stringify({
         success: true,
         date,
         time,
         name: bookingName,
+        title: bookingTitle,
         google_event_created: !!calendarResult,
+        meet_link: calendarResult?.meetLink || null,
         message: `Booking confirmed for ${bookingName} on ${date} at ${time}.`,
       });
     },

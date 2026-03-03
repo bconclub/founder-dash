@@ -1,0 +1,230 @@
+/**
+ * services/whatsappSender.ts — Shared WhatsApp message sending helpers
+ *
+ * Extracted so both the booking flow (engine.ts) and cron reminders
+ * can send WhatsApp messages via the Meta Cloud API.
+ *
+ * Supports:
+ *   - Free-form text messages (within 24h window)
+ *   - Template messages (outside 24h window — reminders, re-engagement)
+ *   - Auto-fallback: try text first, retry with template if 24h error
+ */
+
+const GRAPH_API_VERSION = 'v21.0';
+const GRAPH_API_BASE = `https://graph.facebook.com/${GRAPH_API_VERSION}`;
+
+function getCredentials() {
+  const phoneNumberId = process.env.META_WHATSAPP_PHONE_NUMBER_ID;
+  const accessToken = process.env.META_WHATSAPP_ACCESS_TOKEN;
+  if (!phoneNumberId || !accessToken) {
+    console.error('[whatsappSender] Missing META_WHATSAPP_PHONE_NUMBER_ID or META_WHATSAPP_ACCESS_TOKEN');
+    return null;
+  }
+  return { phoneNumberId, accessToken };
+}
+
+/** Normalize phone: strip everything except digits */
+function normalizePhone(phone: string): string {
+  return phone.replace(/[^0-9]/g, '');
+}
+
+/**
+ * Send a free-form text message via Meta Cloud API.
+ * Only works within the 24-hour customer-initiated window.
+ */
+export async function sendWhatsAppText(
+  to: string,
+  message: string,
+): Promise<{ success: boolean; error?: string }> {
+  const creds = getCredentials();
+  if (!creds) return { success: false, error: 'Missing credentials' };
+
+  try {
+    const res = await fetch(`${GRAPH_API_BASE}/${creds.phoneNumberId}/messages`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${creds.accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        to: normalizePhone(to),
+        type: 'text',
+        text: { preview_url: true, body: message },
+      }),
+    });
+
+    if (!res.ok) {
+      const errBody = await res.text();
+      console.error('[whatsappSender] Text send failed:', res.status, errBody);
+      return { success: false, error: errBody };
+    }
+
+    return { success: true };
+  } catch (err: any) {
+    console.error('[whatsappSender] Text send error:', err.message);
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * Send a template message via Meta Cloud API.
+ * Works outside the 24-hour window (requires approved templates).
+ *
+ * @param templateName — The approved template name in Meta (e.g. "booking_confirmation")
+ * @param components — Template variable components
+ */
+export async function sendWhatsAppTemplate(
+  to: string,
+  templateName: string,
+  components: Array<{
+    type: 'body' | 'header' | 'button';
+    parameters: Array<{ type: 'text'; text: string }>;
+  }>,
+  languageCode: string = 'en',
+): Promise<{ success: boolean; error?: string }> {
+  const creds = getCredentials();
+  if (!creds) return { success: false, error: 'Missing credentials' };
+
+  try {
+    const res = await fetch(`${GRAPH_API_BASE}/${creds.phoneNumberId}/messages`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${creds.accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        to: normalizePhone(to),
+        type: 'template',
+        template: {
+          name: templateName,
+          language: { code: languageCode },
+          components,
+        },
+      }),
+    });
+
+    if (!res.ok) {
+      const errBody = await res.text();
+      console.error('[whatsappSender] Template send failed:', res.status, errBody);
+      return { success: false, error: errBody };
+    }
+
+    return { success: true };
+  } catch (err: any) {
+    console.error('[whatsappSender] Template send error:', err.message);
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * Send a booking confirmation message.
+ * Tries free-form text first (within 24h window), falls back to template.
+ *
+ * Template: booking_confirmation
+ *   {{1}} = name, {{2}} = call title, {{3}} = date/time display
+ */
+export async function sendBookingConfirmation(
+  to: string,
+  name: string,
+  title: string,
+  dateTimeDisplay: string,
+  meetLink: string,
+): Promise<boolean> {
+  const message =
+    `Hey ${name}! Your ${title} with the BCON team is confirmed.\n\n` +
+    `📅 ${dateTimeDisplay} IST\n` +
+    (meetLink ? `📍 ${meetLink}\n\n` : '\n') +
+    `Talk soon!`;
+
+  // Try free-form text first (should work within 24h window)
+  const textResult = await sendWhatsAppText(to, message);
+
+  if (textResult.success) {
+    console.log('[whatsappSender] Booking confirmation sent (text)');
+    return true;
+  }
+
+  // If text failed (likely 24h window), try template
+  // Template vars: {{1}}=name, {{2}}=title, {{3}}=dateTime
+  console.log('[whatsappSender] Text failed, trying template fallback...');
+  const templateResult = await sendWhatsAppTemplate(to, 'booking_confirmation', [
+    {
+      type: 'body',
+      parameters: [
+        { type: 'text', text: name },
+        { type: 'text', text: title },
+        { type: 'text', text: dateTimeDisplay },
+      ],
+    },
+  ]);
+
+  if (templateResult.success) {
+    console.log('[whatsappSender] Booking confirmation sent (template)');
+    return true;
+  }
+
+  console.error('[whatsappSender] Both text and template failed for', to);
+  return false;
+}
+
+/**
+ * Send a booking reminder message (always uses template — outside 24h window).
+ *
+ * Template: booking_reminder
+ *   {{1}} = name, {{2}} = call title, {{3}} = date/time display
+ */
+export async function sendBookingReminder(
+  to: string,
+  name: string,
+  title: string,
+  timeDisplay: string,
+  meetLink: string,
+  type: '24h' | '1h',
+): Promise<boolean> {
+  const templateName = 'booking_reminder';
+
+  const dateTimeText = type === '24h' ? `tomorrow at ${timeDisplay} IST` : `today — starts in 1 hour`;
+
+  const message24h =
+    `Hey ${name}! Quick reminder — your ${title} with BCON is tomorrow at ${timeDisplay} IST.\n\n` +
+    (meetLink ? `📍 ${meetLink}\n\n` : '') +
+    `See you there!`;
+
+  const message1h =
+    `Hey ${name}! Your ${title} with BCON starts in 1 hour.\n\n` +
+    (meetLink ? `📍 ${meetLink}\n\n` : '') +
+    `Ready when you are.`;
+
+  // Reminders are always outside 24h window — use template
+  // Template vars: {{1}}=name, {{2}}=title, {{3}}=dateTime
+  const result = await sendWhatsAppTemplate(to, templateName, [
+    {
+      type: 'body',
+      parameters: [
+        { type: 'text', text: name },
+        { type: 'text', text: title },
+        { type: 'text', text: dateTimeText },
+      ],
+    },
+  ]);
+
+  if (result.success) {
+    console.log(`[whatsappSender] ${type} reminder sent to ${to}`);
+    return true;
+  }
+
+  // If template not yet approved, try text as fallback (might work if recent interaction)
+  const fallbackMessage = type === '24h' ? message24h : message1h;
+  const textResult = await sendWhatsAppText(to, fallbackMessage);
+  if (textResult.success) {
+    console.log(`[whatsappSender] ${type} reminder sent via text fallback to ${to}`);
+    return true;
+  }
+
+  console.error(`[whatsappSender] ${type} reminder failed for ${to}`);
+  return false;
+}

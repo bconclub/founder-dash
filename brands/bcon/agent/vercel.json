@@ -14,8 +14,17 @@
     "src/app/api/agent/whatsapp/meta/route.ts": {
       "maxDuration": 30
     },
+    "src/app/api/cron/booking-reminders/route.ts": {
+      "maxDuration": 30
+    },
     "src/app/api/**/*.ts": {
       "maxDuration": 10
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/cron/booking-reminders",
+      "schedule": "*/30 * * * *"
+    }
+  ]
 }

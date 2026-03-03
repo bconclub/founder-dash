@@ -45,6 +45,7 @@ interface Conversation {
   last_message: string
   last_message_at: string
   unread_count: number
+  booking_status: string | null
 }
 
 interface Message {
@@ -291,7 +292,8 @@ export default function InboxPage() {
               channels: channels.length > 0 ? channels : ['web'],
               last_message: 'No messages yet',
               last_message_at: lead.last_interaction_at ? new Date(lead.last_interaction_at).toISOString() : new Date().toISOString(),
-              unread_count: 0
+              unread_count: 0,
+              booking_status: null,
             }
           })
 
@@ -357,7 +359,7 @@ export default function InboxPage() {
 
       const { data: leadsData, error: leadsError } = await supabase
         .from('all_leads')
-        .select('id, customer_name, email, phone')
+        .select('id, customer_name, email, phone, unified_context')
         .in('id', leadIds)
 
       if (leadsError) {
@@ -393,6 +395,7 @@ export default function InboxPage() {
         customer_name?: string | null
         email?: string | null
         phone?: string | null
+        unified_context?: any
       }>
 
       for (const [leadId, convData] of conversationMap) {
@@ -408,6 +411,10 @@ export default function InboxPage() {
           continue;
         }
 
+        // Extract booking status from unified_context (check all channels)
+        const ctx = lead?.unified_context || {};
+        const bookingStatus = ctx?.whatsapp?.booking_status || ctx?.web?.booking_status || null;
+
         const conversation: Conversation = {
           lead_id: leadId,
           lead_name: lead?.customer_name || 'Unknown',
@@ -416,7 +423,8 @@ export default function InboxPage() {
           channels: Array.from(convData.channels),
           last_message: cleanedLastMessage,
           last_message_at: convData.last_message_at,
-          unread_count: 0
+          unread_count: 0,
+          booking_status: bookingStatus,
         }
 
         console.log('Adding conversation:', {
@@ -953,6 +961,16 @@ export default function InboxPage() {
                         <p className="text-[12px] truncate opacity-60 flex-1">
                           {conv.last_message}
                         </p>
+                        {conv.booking_status && (
+                          <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md whitespace-nowrap"
+                            style={{
+                              background: 'rgba(34, 197, 94, 0.15)',
+                              color: '#22c55e',
+                              border: '1px solid rgba(34, 197, 94, 0.3)',
+                            }}>
+                            📅 Booked
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>

@@ -46,6 +46,8 @@ export interface BookingData {
   sessionType?: string;
   description?: string;
   conversationSummary?: string;
+  title?: string;          // AI-generated call title
+  meetLink?: string;       // Google Meet link
 }
 
 export interface ExistingBooking {
@@ -236,6 +238,8 @@ export async function storeBooking(
     booking_created_at: getISTTimestamp(),
     metadata: mergedMetadata,
     conversation_summary: updatedSummary,
+    ...(booking.meetLink ? { booking_meet_link: booking.meetLink } : {}),
+    ...(booking.title ? { booking_title: booking.title } : {}),
   };
 
   let sessionData: any = null;
@@ -275,6 +279,8 @@ export async function storeBooking(
         booking_status: booking.status ?? 'Call Booked',
         booking_date: booking.date,
         booking_time: booking.time,
+        booking_meet_link: booking.meetLink || null,
+        booking_title: booking.title || null,
         user_inputs: sessionData?.user_inputs_summary || currentSession?.user_inputs_summary || [],
         booking_details: {
           courseInterest: booking.courseInterest || null,
@@ -418,7 +424,8 @@ export async function createCalendarEvent(booking: {
   courseInterest?: string;
   sessionType?: string;
   conversationSummary?: string;
-}): Promise<{ eventId: string; eventLink: string; hasAttendees: boolean } | null> {
+  title?: string;
+}): Promise<{ eventId: string; eventLink: string; hasAttendees: boolean; meetLink: string | null } | null> {
   try {
     const { google } = await import('googleapis');
     const auth = await getGoogleCalendarAuth();
@@ -452,11 +459,16 @@ export async function createCalendarEvent(booking: {
         ? courseNameMap[booking.courseInterest.toLowerCase()]
         : booking.courseInterest || 'Aviation Course Inquiry';
 
-    // Event title
-    let eventTitle = `${booking.name} - ${courseDisplayName}`;
-    if (booking.sessionType) {
-      const label = booking.sessionType === 'offline' ? 'Facility Visit' : 'Online';
-      eventTitle += ` [${label}]`;
+    // Event title — use AI-generated title if provided, otherwise auto-generate
+    let eventTitle: string;
+    if (booking.title) {
+      eventTitle = booking.title;
+    } else {
+      eventTitle = `${booking.name} - ${courseDisplayName}`;
+      if (booking.sessionType) {
+        const label = booking.sessionType === 'offline' ? 'Facility Visit' : 'Online';
+        eventTitle += ` [${label}]`;
+      }
     }
 
     // Description — brand-aware
@@ -491,12 +503,18 @@ export async function createCalendarEvent(booking: {
       description,
       start: { dateTime: eventStart, timeZone: TIMEZONE },
       end: { dateTime: eventEnd, timeZone: TIMEZONE },
+      conferenceData: {
+        createRequest: {
+          requestId: `bcon-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          conferenceSolutionKey: { type: 'hangoutsMeet' },
+        },
+      },
       ...(hasRealEmail ? { attendees: [{ email: booking.email, displayName: booking.name }] } : {}),
       reminders: {
         useDefault: false,
         overrides: [
           { method: 'email', minutes: 24 * 60 },
-          { method: 'popup', minutes: 30 },
+          { method: 'popup', minutes: 60 },
         ],
       },
     };
@@ -514,6 +532,7 @@ export async function createCalendarEvent(booking: {
       createdEvent = await calendar.events.insert({
         calendarId: CALENDAR_ID,
         requestBody: event,
+        conferenceDataVersion: 1,
       });
       hasAttendees = true;
     } catch (calendarError: any) {
@@ -523,6 +542,7 @@ export async function createCalendarEvent(booking: {
         createdEvent = await calendar.events.insert({
           calendarId: CALENDAR_ID,
           requestBody: eventWithoutAttendees,
+          conferenceDataVersion: 1,
         });
         hasAttendees = false;
       } else {
@@ -532,10 +552,16 @@ export async function createCalendarEvent(booking: {
 
     if (!createdEvent?.data?.id) return null;
 
+    // Extract Google Meet link from conference data
+    const meetLink = createdEvent.data.conferenceData?.entryPoints?.find(
+      (ep: any) => ep.entryPointType === 'video'
+    )?.uri || null;
+
     return {
       eventId: createdEvent.data.id,
       eventLink: createdEvent.data.htmlLink || '',
       hasAttendees,
+      meetLink,
     };
   } catch (error) {
     console.error('[bookingManager] Failed to create calendar event', error);
