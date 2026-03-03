@@ -293,6 +293,40 @@ function buildBookingTools(
         required: ['date', 'time', 'name', 'phone', 'title'],
       },
     },
+    {
+      name: 'update_lead_profile',
+      description: 'Save lead profile details whenever the user shares personal or business information. Call IMMEDIATELY when the user mentions their name, email, city, company/brand, or business type. Can be called multiple times as new details emerge. Only include fields explicitly shared — never guess.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          full_name: {
+            type: 'string',
+            description: 'User\'s full name if shared (e.g. "Rajesh Kumar")',
+          },
+          email: {
+            type: 'string',
+            description: 'User\'s email address if shared',
+          },
+          city: {
+            type: 'string',
+            description: 'City the user is based in (e.g. "Hyderabad")',
+          },
+          company: {
+            type: 'string',
+            description: 'User\'s company or brand name (e.g. "Door2Shine")',
+          },
+          business_type: {
+            type: 'string',
+            description: 'What kind of business they run (e.g. "doorstep car wash")',
+          },
+          notes: {
+            type: 'string',
+            description: 'Any other notable detail (e.g. "has 3 employees", "launched 2 months ago")',
+          },
+        },
+        required: [],
+      },
+    },
   ];
 
   const toolHandlers: Record<string, ToolHandler> = {
@@ -439,6 +473,105 @@ function buildBookingTools(
         meet_link: calendarResult?.meetLink || null,
         message: `Booking confirmed for ${bookingName} on ${date} at ${time}.`,
       });
+    },
+
+    update_lead_profile: async (toolInput: Record<string, any>) => {
+      const { full_name, email, city, company, business_type, notes } = toolInput;
+
+      if (!full_name && !email && !city && !company && !business_type && !notes) {
+        return JSON.stringify({ success: false, error: 'No profile data provided.' });
+      }
+
+      const phone = input.userProfile.phone;
+      if (!phone) {
+        return JSON.stringify({ success: false, error: 'No phone number available.' });
+      }
+
+      try {
+        const normalizedPhone = phone.replace(/\D/g, '').slice(-10);
+
+        // Fetch existing lead
+        const { data: lead } = await supabase
+          .from('all_leads')
+          .select('id, unified_context, email, customer_name')
+          .eq('customer_phone_normalized', normalizedPhone)
+          .maybeSingle();
+
+        if (!lead) {
+          return JSON.stringify({ success: false, error: 'Lead not found.' });
+        }
+
+        // Build top-level updates
+        const leadUpdates: Record<string, any> = {};
+        if (email) leadUpdates.email = email.trim().toLowerCase();
+        if (full_name) leadUpdates.customer_name = full_name.trim();
+
+        // Build unified_context.whatsapp.profile
+        const existingCtx = lead.unified_context || {};
+        const existingWA = existingCtx.whatsapp || {};
+        const existingProfile = existingWA.profile || {};
+
+        const profile: Record<string, any> = { ...existingProfile };
+        if (full_name) profile.full_name = full_name.trim();
+        if (email) profile.email = email.trim().toLowerCase();
+        if (city) profile.city = city.trim();
+        if (company) profile.company = company.trim();
+        if (business_type) profile.business_type = business_type.trim();
+        if (notes) {
+          profile.notes = existingProfile.notes
+            ? `${existingProfile.notes}; ${notes.trim()}`
+            : notes.trim();
+        }
+
+        leadUpdates.unified_context = {
+          ...existingCtx,
+          whatsapp: { ...existingWA, profile },
+        };
+
+        await supabase
+          .from('all_leads')
+          .update(leadUpdates)
+          .eq('id', lead.id);
+
+        // Also update whatsapp_sessions
+        const sessionUpdates: Record<string, any> = {};
+        if (email) sessionUpdates.customer_email = email.trim().toLowerCase();
+        if (full_name) sessionUpdates.customer_name = full_name.trim();
+
+        const { data: waSession } = await supabase
+          .from('whatsapp_sessions')
+          .select('id, channel_data')
+          .eq('external_session_id', input.sessionId)
+          .maybeSingle();
+
+        if (waSession) {
+          const existingData = waSession.channel_data || {};
+          sessionUpdates.channel_data = {
+            ...existingData,
+            ...(city ? { city: city.trim() } : {}),
+            ...(company ? { company: company.trim() } : {}),
+            ...(business_type ? { business_type: business_type.trim() } : {}),
+          };
+          await supabase
+            .from('whatsapp_sessions')
+            .update(sessionUpdates)
+            .eq('id', waSession.id);
+        }
+
+        const saved: string[] = [];
+        if (full_name) saved.push(`name: ${full_name}`);
+        if (email) saved.push(`email: ${email}`);
+        if (city) saved.push(`city: ${city}`);
+        if (company) saved.push(`company: ${company}`);
+        if (business_type) saved.push(`type: ${business_type}`);
+        if (notes) saved.push(`notes: ${notes}`);
+
+        console.log(`[Engine] Lead profile updated: ${saved.join(', ')}`);
+        return JSON.stringify({ success: true, updated: saved });
+      } catch (err: any) {
+        console.error('[Engine] update_lead_profile failed:', err);
+        return JSON.stringify({ success: false, error: 'Failed to save profile.' });
+      }
     },
   };
 

@@ -49,6 +49,7 @@ const navigation: NavItem[] = [
   { name: 'Conversations', href: '/dashboard/inbox', icon: MdInbox },
   { name: 'Leads', href: '/dashboard/leads', icon: MdPeople },
   { name: 'Events', href: '/dashboard/bookings', icon: MdCalendarToday },
+  { name: 'Flow', href: '/dashboard/settings/sequences', icon: MdTimeline },
   // SYSTEM
   {
     name: 'Configure',
@@ -57,7 +58,6 @@ const navigation: NavItem[] = [
     children: [
       { name: 'Web Agent', href: '/dashboard/settings/web-agent', icon: MdChatBubbleOutline },
       { name: 'Knowledge', href: '/dashboard/settings/knowledge-base', icon: MdMenuBook },
-      { name: 'Flow', href: '/dashboard/settings/sequences', icon: MdTimeline },
     ]
   },
 ]
