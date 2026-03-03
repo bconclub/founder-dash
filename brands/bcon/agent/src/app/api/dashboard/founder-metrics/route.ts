@@ -467,7 +467,7 @@ export async function GET(request: NextRequest) {
         name: lead.customer_name || 'Unknown',
         date: bookingDate,
         time: bookingTime,
-        datetime: new Date(`${bookingDate}T${bookingTime || '12:00:00'}`).toISOString(),
+        datetime: (() => { try { const d = new Date(`${bookingDate}T${bookingTime || '12:00:00'}`); return isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString(); } catch { return new Date().toISOString(); } })(),
       }))
 
     // 7. Stale Leads (>48h no response)
@@ -581,7 +581,7 @@ export async function GET(request: NextRequest) {
         timestamp: session.booking_created_at || session.updated_at,
         content: eventType === 'booking_cancelled' 
           ? `${leadName} cancelled their booking`
-          : `${leadName} booked a call${session.booking_date ? ` for ${new Date(session.booking_date).toLocaleDateString()}` : ''}`,
+          : `${leadName} booked a call${session.booking_date && !isNaN(new Date(session.booking_date).getTime()) ? ` for ${new Date(session.booking_date).toLocaleDateString()}` : ''}`,
         channel: 'web',
         metadata: { bookingDate: session.booking_date, bookingTime: session.booking_time, status: session.booking_status },
       })
@@ -607,7 +607,7 @@ export async function GET(request: NextRequest) {
         timestamp: session.booking_created_at || session.updated_at,
         content: eventType === 'booking_cancelled'
           ? `${leadName} cancelled their booking`
-          : `${leadName} booked a call${session.booking_date ? ` for ${new Date(session.booking_date).toLocaleDateString()}` : ''}`,
+          : `${leadName} booked a call${session.booking_date && !isNaN(new Date(session.booking_date).getTime()) ? ` for ${new Date(session.booking_date).toLocaleDateString()}` : ''}`,
         channel: 'whatsapp',
         metadata: { bookingDate: session.booking_date, bookingTime: session.booking_time, status: session.booking_status },
       })
