@@ -56,8 +56,8 @@ const navigation: NavItem[] = [
     icon: MdSettings,
     children: [
       { name: 'Web Agent', href: '/dashboard/settings/web-agent', icon: MdChatBubbleOutline },
-      { name: 'Knowledge Base', href: '/dashboard/settings/knowledge-base', icon: MdMenuBook },
-      { name: 'Sequences', href: '/dashboard/settings/sequences', icon: MdTimeline },
+      { name: 'Knowledge', href: '/dashboard/settings/knowledge-base', icon: MdMenuBook },
+      { name: 'Flow', href: '/dashboard/settings/sequences', icon: MdTimeline },
     ]
   },
 ]
@@ -733,7 +733,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                       )}
                     </button>
                     <Link
-                      href="/dashboard/status"
+                      href="/status"
                       onClick={() => {
                         setMoreOptionsOpen(false)
                         if (isMobile) {
@@ -910,7 +910,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                       )}
                     </button>
                     <Link
-                      href="/dashboard/status"
+                      href="/status"
                       onClick={() => {
                         setMoreOptionsOpen(false)
                         if (isMobile) {
