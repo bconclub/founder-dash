@@ -7,7 +7,8 @@ import {
   MdInbox,
   MdSend,
   MdSearch,
-  MdAutoAwesome
+  MdAutoAwesome,
+  MdEventAvailable
 } from 'react-icons/md'
 import LoadingOverlay from '@/components/dashboard/LoadingOverlay'
 import LeadDetailsModal from '@/components/dashboard/LeadDetailsModal'
@@ -968,7 +969,7 @@ export default function InboxPage() {
                               color: '#22c55e',
                               border: '1px solid rgba(34, 197, 94, 0.3)',
                             }}>
-                            📅 Event
+                            <MdEventAvailable size={10} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 2 }} /> Event
                           </span>
                         )}
                       </div>
