@@ -112,49 +112,52 @@ export async function checkExistingBooking(
   const client = supabase || getClient();
   if (!client || (!phone && !email)) return { exists: false };
 
-  const tableName = getChannelTable('web');
+  // Check both web_sessions and whatsapp_sessions for existing bookings
+  const tables = [getChannelTable('web'), getChannelTable('whatsapp')];
 
   try {
-    let data = null;
+    for (const tableName of tables) {
+      let data = null;
 
-    // Try by phone first
-    if (phone) {
-      const { data: phoneData } = await client
-        .from(tableName)
-        .select('booking_date, booking_time, booking_status, booking_created_at')
-        .eq('customer_phone', phone)
-        .not('booking_date', 'is', null)
-        .not('booking_time', 'is', null)
-        .order('booking_created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      // Try by phone first
+      if (phone) {
+        const { data: phoneData } = await client
+          .from(tableName)
+          .select('booking_date, booking_time, booking_status, booking_created_at')
+          .eq('customer_phone', phone)
+          .not('booking_date', 'is', null)
+          .not('booking_time', 'is', null)
+          .order('booking_created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
 
-      if (phoneData?.booking_date) data = phoneData;
-    }
+        if (phoneData?.booking_date) data = phoneData;
+      }
 
-    // Fallback to email
-    if (!data && email) {
-      const { data: emailData } = await client
-        .from(tableName)
-        .select('booking_date, booking_time, booking_status, booking_created_at')
-        .eq('customer_email', email)
-        .not('booking_date', 'is', null)
-        .not('booking_time', 'is', null)
-        .order('booking_created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      // Fallback to email
+      if (!data && email) {
+        const { data: emailData } = await client
+          .from(tableName)
+          .select('booking_date, booking_time, booking_status, booking_created_at')
+          .eq('customer_email', email)
+          .not('booking_date', 'is', null)
+          .not('booking_time', 'is', null)
+          .order('booking_created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
 
-      if (emailData?.booking_date) data = emailData;
-    }
+        if (emailData?.booking_date) data = emailData;
+      }
 
-    if (data?.booking_date) {
-      return {
-        exists: true,
-        bookingDate: data.booking_date,
-        bookingTime: data.booking_time,
-        bookingStatus: data.booking_status,
-        bookingCreatedAt: data.booking_created_at,
-      };
+      if (data?.booking_date) {
+        return {
+          exists: true,
+          bookingDate: data.booking_date,
+          bookingTime: data.booking_time,
+          bookingStatus: data.booking_status,
+          bookingCreatedAt: data.booking_created_at,
+        };
+      }
     }
 
     return { exists: false };
@@ -235,6 +238,8 @@ export async function storeBooking(
     conversation_summary: updatedSummary,
   };
 
+  let sessionData: any = null;
+
   const { data, error } = await client
     .from(tableName)
     .update(bookingUpdate)
@@ -242,74 +247,73 @@ export async function storeBooking(
     .select('lead_id, conversation_summary, user_inputs_summary, metadata');
 
   if (error) {
-    console.error('[bookingManager] Failed to store booking', error);
-
-    // Fallback to old sessions table
-    if (error.code === '42P01' || error.code === '42703') {
-      await client
-        .from('sessions')
-        .update({
-          booking_date: booking.date,
-          booking_time: booking.time,
-          google_event_id: booking.googleEventId ?? null,
-          booking_status: booking.status ?? 'Call Booked',
-          booking_created_at: getISTTimestamp(),
-        })
-        .eq('external_session_id', externalSessionId);
-    }
-    return;
+    console.error('[bookingManager] Failed to store booking in session table', error);
+    // Session update failed — but DON'T return early.
+    // We still need to save booking data to all_leads below.
+  } else if (data && data.length > 0) {
+    sessionData = data[0];
   }
 
-  // Sync to all_leads
-  if (data && data.length > 0) {
-    const sessionData = data[0];
-    const leadId = sessionData.lead_id || currentLeadId;
+  // Sync to all_leads — ALWAYS attempt this, even if session update failed.
+  // Resolve lead_id from session data, or from profile update, or by looking up the session.
+  let leadId = sessionData?.lead_id || currentLeadId;
 
-    if (leadId) {
-      const unifiedContext = {
-        [channel]: {
-          conversation_summary: cleanSummary(sessionData.conversation_summary) || null,
-          booking_status: booking.status ?? 'Call Booked',
-          booking_date: booking.date,
-          booking_time: booking.time,
-          user_inputs: sessionData.user_inputs_summary || [],
-          booking_details: {
-            courseInterest: booking.courseInterest || null,
-            sessionType: booking.sessionType || null,
-            description: booking.description || null,
-          },
+  // If we don't have a lead_id yet (session update failed), look it up directly
+  if (!leadId) {
+    const { data: sessionLookup } = await client
+      .from(tableName)
+      .select('lead_id')
+      .eq('external_session_id', externalSessionId)
+      .maybeSingle();
+    leadId = sessionLookup?.lead_id || null;
+  }
+
+  if (leadId) {
+    const unifiedContext = {
+      [channel]: {
+        conversation_summary: cleanSummary(sessionData?.conversation_summary || currentSession?.conversation_summary) || null,
+        booking_status: booking.status ?? 'Call Booked',
+        booking_date: booking.date,
+        booking_time: booking.time,
+        user_inputs: sessionData?.user_inputs_summary || currentSession?.user_inputs_summary || [],
+        booking_details: {
+          courseInterest: booking.courseInterest || null,
+          sessionType: booking.sessionType || null,
+          description: booking.description || null,
         },
-      };
+      },
+    };
 
-      const { data: existingLead } = await client
-        .from('all_leads')
-        .select('unified_context, metadata')
-        .eq('id', leadId)
-        .maybeSingle();
+    const { data: existingLead } = await client
+      .from('all_leads')
+      .select('unified_context, metadata')
+      .eq('id', leadId)
+      .maybeSingle();
 
-      const existingCtx = existingLead?.unified_context || {};
-      const existingLeadMeta = existingLead?.metadata || {};
+    const existingCtx = existingLead?.unified_context || {};
+    const existingLeadMeta = existingLead?.metadata || {};
 
-      const mergedCtx = {
-        ...existingCtx,
-        [channel]: {
-          ...(existingCtx[channel] || {}),
-          ...unifiedContext[channel],
-        },
-      };
+    const mergedCtx = {
+      ...existingCtx,
+      [channel]: {
+        ...(existingCtx[channel] || {}),
+        ...unifiedContext[channel],
+      },
+    };
 
-      await client
-        .from('all_leads')
-        .update({
-          unified_context: mergedCtx,
-          last_touchpoint: channel,
-          last_interaction_at: getISTTimestamp(),
-          metadata: { ...existingLeadMeta, ...mergedMetadata },
-        })
-        .eq('id', leadId);
+    await client
+      .from('all_leads')
+      .update({
+        unified_context: mergedCtx,
+        last_touchpoint: channel,
+        last_interaction_at: getISTTimestamp(),
+        metadata: { ...existingLeadMeta, ...mergedMetadata },
+      })
+      .eq('id', leadId);
 
-      console.log('[bookingManager] Updated all_leads with booking info', { leadId });
-    }
+    console.log('[bookingManager] Updated all_leads with booking info', { leadId });
+  } else {
+    console.error('[bookingManager] Could not find lead_id to save booking — data may be lost', { externalSessionId, channel });
   }
 }
 

@@ -24,7 +24,7 @@ interface FounderMetrics {
   hotLeads: { count: number; leads: Array<{ id: string; name: string; score: number }> }
   totalConversations: { total: number; count7D: number; count14D: number; count30D: number; trend7D: number }
   totalLeads: { count: number; fromConversations: number; conversionRate: number }
-  responseHealth: { avgSeconds: number; status: 'good' | 'warning' | 'critical' }
+  responseHealth: { avgMs: number; status: 'good' | 'warning' | 'critical' }
   leadsNeedingAttention: Array<{ id: string; name: string; score: number; lastContact: string; stage: string }>
   upcomingBookings: Array<{ id: string; name: string; date: string; time: string; datetime: string }>
   staleLeads: { count: number; leads: Array<{ id: string; name: string }> }
@@ -287,9 +287,9 @@ export default function FounderDashboard() {
         return RED
 
       case 'avgResponseTime':
-        // Green: 3-5s, Amber: 5.1-8s, Red: >8s
-        if (value >= 3 && value <= 5) return GREEN
-        if (value > 5 && value <= 8) return AMBER
+        // Green: ≤5000ms, Amber: 5001-8000ms, Red: >8000ms (values in ms)
+        if (value > 0 && value <= 5000) return GREEN
+        if (value > 5000 && value <= 8000) return AMBER
         return RED
 
       default:
@@ -456,10 +456,10 @@ export default function FounderDashboard() {
                   <>
                     <RadialProgress
                       value={metrics.radialMetrics.avgResponseTime}
-                      max={15}
+                      max={10000}
                       label="Avg Response"
                       color={metricColor}
-                      valueFormatter={(v) => `${v.toFixed(1)}s`}
+                      valueFormatter={(v) => `${Math.round(v)}ms`}
                       showPercentage={false}
                     />
                     {metrics.radialTrends?.avgResponseTime && (

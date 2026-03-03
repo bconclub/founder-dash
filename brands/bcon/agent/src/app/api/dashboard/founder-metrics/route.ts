@@ -335,10 +335,10 @@ export async function GET(request: NextRequest) {
       return createdDate >= todayStart && createdDate <= todayEnd
     })
 
-    // 3. Response Health (avg response time in seconds)
+    // 3. Response Health (avg response time in milliseconds)
     // Strategy 1: Use input_to_output_gap_ms from metadata (most accurate)
     // Strategy 2: Calculate from consecutive customer→agent message timestamps (fallback)
-    let avgResponseTimeSeconds = 0
+    let avgResponseTimeMs = 0
 
     try {
       // Strategy 1: Use pre-calculated input_to_output_gap_ms
@@ -365,13 +365,13 @@ export async function GET(request: NextRequest) {
         })
 
         if (validCount > 0) {
-          avgResponseTimeSeconds = (totalGapMs / validCount) / 1000 // Convert ms to seconds
+          avgResponseTimeMs = totalGapMs / validCount // Keep in ms
         }
       }
 
       // Strategy 2 (fallback): Calculate from consecutive customer→agent timestamps
-      if (avgResponseTimeSeconds === 0 && messages && messages.length > 0) {
-        let totalGapSeconds = 0
+      if (avgResponseTimeMs === 0 && messages && messages.length > 0) {
+        let totalGapMs2 = 0
         let pairCount = 0
 
         // Group messages by lead_id, then find customer→agent pairs
@@ -392,11 +392,11 @@ export async function GET(request: NextRequest) {
             if (current.sender === 'customer' && next.sender === 'agent') {
               const customerTime = new Date(current.created_at).getTime()
               const agentTime = new Date(next.created_at).getTime()
-              const gapSeconds = (agentTime - customerTime) / 1000
+              const gapMs = agentTime - customerTime
 
-              // Only count reasonable response times (between 0.1s and 300s / 5 minutes)
-              if (gapSeconds > 0.1 && gapSeconds < 300) {
-                totalGapSeconds += gapSeconds
+              // Only count reasonable response times (between 100ms and 300000ms / 5 minutes)
+              if (gapMs > 100 && gapMs < 300000) {
+                totalGapMs2 += gapMs
                 pairCount++
               }
             }
@@ -404,7 +404,7 @@ export async function GET(request: NextRequest) {
         })
 
         if (pairCount > 0) {
-          avgResponseTimeSeconds = totalGapSeconds / pairCount
+          avgResponseTimeMs = totalGapMs2 / pairCount
         }
       }
 
@@ -903,11 +903,11 @@ export async function GET(request: NextRequest) {
       let dayResponseCount = 0
       dayMessages.forEach((msg: any) => {
         if (msg.metadata?.input_to_output_gap_ms) {
-          const gapMs = typeof msg.metadata.input_to_output_gap_ms === 'number' 
-            ? msg.metadata.input_to_output_gap_ms 
+          const gapMs = typeof msg.metadata.input_to_output_gap_ms === 'number'
+            ? msg.metadata.input_to_output_gap_ms
             : parseFloat(msg.metadata.input_to_output_gap_ms)
           if (!isNaN(gapMs) && gapMs > 0) {
-            dayTotalResponse += gapMs / 1000 // Convert ms to seconds
+            dayTotalResponse += gapMs // Keep in ms
             dayResponseCount++
           }
         }
@@ -1245,7 +1245,7 @@ export async function GET(request: NextRequest) {
             ? msg.metadata.input_to_output_gap_ms
             : parseFloat(msg.metadata.input_to_output_gap_ms)
           if (!isNaN(gapMs) && gapMs > 0) {
-            dailyTotalResponseTime += gapMs / 1000 // Convert ms to seconds
+            dailyTotalResponseTime += gapMs // Keep in ms
             dailyResponseCount++
           }
         }
@@ -1257,7 +1257,7 @@ export async function GET(request: NextRequest) {
       dailyTrends.avgScore.push({ date: dateStr, value: Math.round(dailyAvgScore) })
       dailyTrends.responseRate.push({ date: dateStr, value: Math.round(dailyResponseRate) })
       dailyTrends.bookingRate.push({ date: dateStr, value: Math.round(dailyBookingRate) })
-      dailyTrends.avgResponseTime.push({ date: dateStr, value: Math.round(dailyAvgResponseTime * 10) / 10 }) // Round to 1 decimal
+      dailyTrends.avgResponseTime.push({ date: dateStr, value: Math.round(dailyAvgResponseTime) }) // Round to whole ms
     }
 
     // Prepare response data
@@ -1284,8 +1284,8 @@ export async function GET(request: NextRequest) {
         newLeads: todayNewLeads.length,
       },
       responseHealth: {
-        avgSeconds: avgResponseTimeSeconds,
-        status: avgResponseTimeSeconds < 5 ? 'good' : avgResponseTimeSeconds < 10 ? 'warning' : 'critical',
+        avgMs: avgResponseTimeMs,
+        status: avgResponseTimeMs < 5000 ? 'good' : avgResponseTimeMs < 10000 ? 'warning' : 'critical',
       },
       leadsNeedingAttention,
       upcomingBookings,
@@ -1339,7 +1339,7 @@ export async function GET(request: NextRequest) {
         avgScore,
         responseRate,
         bookingRate,
-        avgResponseTime: Math.round(avgResponseTimeSeconds * 10) / 10, // Round to 1 decimal (seconds)
+        avgResponseTime: Math.round(avgResponseTimeMs), // Round to whole ms
       },
       radialTrends: {
         avgScore: dailyTrends.avgScore.map(d => ({ value: d.value })),

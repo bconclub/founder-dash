@@ -102,6 +102,9 @@ export default function InboxPage() {
   const [summaryLoading, setSummaryLoading] = useState(false)
   const [conversationSummary, setConversationSummary] = useState<string | null>(null)
   const [showSummary, setShowSummary] = useState(false)
+  const [replyText, setReplyText] = useState('')
+  const [isSending, setIsSending] = useState(false)
+  const [isGenerating, setIsGenerating] = useState(false)
 
   // Handle URL parameters to open specific conversation
   useEffect(() => {
@@ -678,6 +681,81 @@ export default function InboxPage() {
     setSummaryLoading(false);
   }
 
+  // Generate AI response for the current conversation
+  async function generateAIResponse() {
+    if (!selectedLeadId || !selectedChannel || messages.length === 0) return;
+
+    setIsGenerating(true);
+    try {
+      const conversationHistory = messages.map(msg => ({
+        sender: msg.sender,
+        content: msg.content,
+      }));
+
+      const response = await fetch('/api/dashboard/inbox/reply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          leadId: selectedLeadId,
+          channel: selectedChannel,
+          action: 'generate',
+          conversationHistory,
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.generatedMessage) {
+          setReplyText(data.generatedMessage);
+        }
+      } else {
+        const err = await response.json();
+        console.error('Failed to generate AI response:', err);
+        alert(err.error || 'Failed to generate AI response');
+      }
+    } catch (err) {
+      console.error('Error generating AI response:', err);
+      alert('Failed to generate AI response');
+    } finally {
+      setIsGenerating(false);
+    }
+  }
+
+  // Send reply to customer
+  async function sendReply() {
+    if (!selectedLeadId || !selectedChannel || !replyText.trim() || isSending) return;
+
+    setIsSending(true);
+    try {
+      const response = await fetch('/api/dashboard/inbox/reply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          leadId: selectedLeadId,
+          channel: selectedChannel,
+          action: 'send',
+          message: replyText.trim(),
+        }),
+      });
+
+      if (response.ok) {
+        setReplyText('');
+        // Refresh messages to show the sent message
+        fetchMessages(selectedLeadId);
+        fetchConversations();
+      } else {
+        const err = await response.json();
+        console.error('Failed to send reply:', err);
+        alert(err.error || 'Failed to send message');
+      }
+    } catch (err) {
+      console.error('Error sending reply:', err);
+      alert('Failed to send message');
+    } finally {
+      setIsSending(false);
+    }
+  }
+
   // Time ago helper
   function timeAgo(timestamp: string) {
     const now = new Date()
@@ -1082,7 +1160,7 @@ export default function InboxPage() {
               )}
             </div>
 
-            {/* Message Input (Read-only for now) */}
+            {/* Message Input */}
             <div
               className="p-4 border-t"
               style={{ borderColor: 'var(--border-primary)' }}
@@ -1091,17 +1169,49 @@ export default function InboxPage() {
                 className="flex items-center gap-2 px-4 py-3 rounded-lg"
                 style={{ background: 'var(--bg-tertiary)' }}
               >
+                {/* Generate AI Response button */}
+                <button
+                  onClick={generateAIResponse}
+                  disabled={isGenerating || messages.length === 0}
+                  className="p-2 rounded-lg transition-colors flex-shrink-0"
+                  style={{
+                    background: isGenerating ? 'var(--accent-primary)' : 'transparent',
+                    color: isGenerating ? 'white' : 'var(--text-secondary)',
+                    opacity: messages.length === 0 ? 0.3 : 1,
+                  }}
+                  title="Generate AI Response"
+                >
+                  <MdAutoAwesome size={20} className={isGenerating ? 'animate-spin' : ''} />
+                </button>
+
                 <input
                   type="text"
-                  placeholder="Reply feature coming soon..."
-                  disabled
+                  placeholder={
+                    isGenerating ? 'Generating AI response...'
+                    : selectedChannel === 'whatsapp' ? 'Type a reply (24h window)...'
+                    : 'Type a reply...'
+                  }
+                  value={replyText}
+                  onChange={(e) => setReplyText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey && replyText.trim()) {
+                      e.preventDefault();
+                      sendReply();
+                    }
+                  }}
+                  disabled={isSending || isGenerating}
                   className="bg-transparent border-none outline-none flex-1 text-sm"
-                  style={{ color: 'var(--text-secondary)' }}
+                  style={{ color: 'var(--text-primary)' }}
                 />
                 <button
-                  disabled
-                  className="p-2 rounded-lg opacity-50"
-                  style={{ background: 'var(--accent-primary)' }}
+                  onClick={sendReply}
+                  disabled={!replyText.trim() || isSending}
+                  className="p-2 rounded-lg transition-opacity flex-shrink-0"
+                  style={{
+                    background: 'var(--accent-primary)',
+                    opacity: !replyText.trim() || isSending ? 0.4 : 1,
+                  }}
+                  title="Send Message"
                 >
                   <MdSend size={20} color="white" />
                 </button>

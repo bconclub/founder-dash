@@ -12,17 +12,13 @@ import {
   MdPeople,
   MdCalendarToday,
   MdSettings,
-  MdCreditCard,
   MdMenuBook,
-  MdSupport,
   MdChevronLeft,
   MdChevronRight,
   MdClose,
   MdMenu,
   MdLightMode,
   MdDarkMode,
-  MdAccountTree,
-  MdGroup,
   MdChatBubbleOutline,
   MdHelp,
   MdMonitorHeart,
@@ -48,14 +44,11 @@ interface NavItem {
 
 // Navigation items in order
 const navigation: NavItem[] = [
-  // PRIMARY (Active)
+  // PRIMARY
   { name: 'Overview', href: '/dashboard', icon: MdDashboard },
   { name: 'Conversations', href: '/dashboard/inbox', icon: MdInbox },
   { name: 'Leads', href: '/dashboard/leads', icon: MdPeople },
   { name: 'Events', href: '/dashboard/bookings', icon: MdCalendarToday },
-  // AUTOMATION (Active)
-  { name: 'Flows', href: '/dashboard/flows', icon: MdAccountTree },
-  { name: 'Audience', href: '/dashboard/audience', icon: MdGroup, comingSoon: true },
   // SYSTEM
   {
     name: 'Configure',
@@ -67,13 +60,10 @@ const navigation: NavItem[] = [
       { name: 'Sequences', href: '/dashboard/settings/sequences', icon: MdTimeline },
     ]
   },
-  { name: 'Billing', href: '/dashboard/billing', icon: MdCreditCard, comingSoon: true },
-  { name: 'Docs', href: '#', icon: MdMenuBook, external: false, comingSoon: true },
-  { name: 'Support', href: '#', icon: MdSupport, external: false, comingSoon: true },
 ]
 
-// Divider positions: after Events (index 3), after Audience (index 5), after Configure (index 6)
-const DIVIDER_AFTER_INDICES = [3, 5, 6]
+// Divider positions: after Events (index 3)
+const DIVIDER_AFTER_INDICES = [3]
 
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const pathname = usePathname()
@@ -647,7 +637,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             </div>
           </div>
 
-          {/* 2. Icon Bar - Below User Section (only show when expanded, or show three-dot menu when collapsed) */}
+          {/* 2. Three-dot menu — all secondary actions (Help, Theme, Status, etc.) */}
           {!isCollapsed ? (
             <div
               className="dashboard-layout-icon-bar flex-shrink-0 border-t flex items-center justify-center"
@@ -658,81 +648,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 gap: '12px',
               }}
             >
-              {/* Help Icon */}
-              <button
-                onClick={() => window.open('https://docs.goproxe.com', '_blank')}
-                className="dashboard-layout-icon-button flex items-center justify-center rounded-md transition-colors"
-                style={{
-                  width: '24px',
-                  height: '24px',
-                  minWidth: '24px',
-                  minHeight: '24px',
-                  color: 'var(--text-primary)',
-                  backgroundColor: 'transparent',
-                }}
-                title="Help & Documentation"
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'transparent'
-                }}
-              >
-                <MdHelp size={24} />
-              </button>
-
-              {/* Theme Toggle */}
-              <button
-                onClick={toggleTheme}
-                className="dashboard-layout-icon-button flex items-center justify-center rounded-md transition-colors"
-                style={{
-                  width: '24px',
-                  height: '24px',
-                  minWidth: '24px',
-                  minHeight: '24px',
-                  color: 'var(--text-primary)',
-                  backgroundColor: 'transparent',
-                }}
-                title="Toggle Theme"
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'transparent'
-                }}
-              >
-                {isDarkMode ? <MdLightMode size={24} /> : <MdDarkMode size={24} />}
-              </button>
-
-              {/* Status Icon */}
-              <Link
-                href="/dashboard/status"
-                className="dashboard-layout-icon-button flex items-center justify-center rounded-md transition-colors"
-                style={{
-                  width: '24px',
-                  height: '24px',
-                  minWidth: '24px',
-                  minHeight: '24px',
-                  color: 'var(--text-primary)',
-                  backgroundColor: 'transparent',
-                }}
-                title="System Status"
-                onClick={() => {
-                  if (isMobile) {
-                    setMobileSidebarOpen(false)
-                  }
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'transparent'
-                }}
-              >
-                <MdMonitorHeart size={24} />
-              </Link>
-
-              {/* More Options */}
               <div className="dashboard-layout-more-options relative">
                 <button
                   onClick={() => setMoreOptionsOpen(!moreOptionsOpen)}
@@ -773,7 +688,75 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                     <button
                       onClick={() => {
                         setMoreOptionsOpen(false)
-                        // TODO: Implement keyboard shortcuts modal
+                        window.open('https://docs.goproxe.com', '_blank')
+                      }}
+                      className="dashboard-layout-more-options-item flex items-center w-full text-left px-4 py-2 text-sm transition-colors duration-200"
+                      style={{
+                        color: 'var(--text-primary)',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent'
+                      }}
+                    >
+                      <MdHelp size={18} style={{ marginRight: '12px' }} />
+                      Help & Docs
+                    </button>
+                    <button
+                      onClick={() => {
+                        setMoreOptionsOpen(false)
+                        toggleTheme()
+                      }}
+                      className="dashboard-layout-more-options-item flex items-center w-full text-left px-4 py-2 text-sm transition-colors duration-200"
+                      style={{
+                        color: 'var(--text-primary)',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent'
+                      }}
+                    >
+                      {isDarkMode ? (
+                        <>
+                          <MdLightMode size={18} style={{ marginRight: '12px' }} />
+                          Light Mode
+                        </>
+                      ) : (
+                        <>
+                          <MdDarkMode size={18} style={{ marginRight: '12px' }} />
+                          Dark Mode
+                        </>
+                      )}
+                    </button>
+                    <Link
+                      href="/dashboard/status"
+                      onClick={() => {
+                        setMoreOptionsOpen(false)
+                        if (isMobile) {
+                          setMobileSidebarOpen(false)
+                        }
+                      }}
+                      className="dashboard-layout-more-options-item flex items-center w-full text-left px-4 py-2 text-sm transition-colors duration-200"
+                      style={{
+                        color: 'var(--text-primary)',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent'
+                      }}
+                    >
+                      <MdMonitorHeart size={18} style={{ marginRight: '12px' }} />
+                      System Status
+                    </Link>
+                    <button
+                      onClick={() => {
+                        setMoreOptionsOpen(false)
                         console.log('Keyboard Shortcuts')
                       }}
                       className="dashboard-layout-more-options-item flex items-center w-full text-left px-4 py-2 text-sm transition-colors duration-200"
@@ -793,7 +776,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                     <button
                       onClick={() => {
                         setMoreOptionsOpen(false)
-                        // TODO: Implement report issue
                         window.open('https://github.com/bconclub/proxe-dashboard/issues/new', '_blank')
                       }}
                       className="dashboard-layout-more-options-item flex items-center w-full text-left px-4 py-2 text-sm transition-colors duration-200"
@@ -813,7 +795,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                     <button
                       onClick={() => {
                         setMoreOptionsOpen(false)
-                        // TODO: Implement send feedback
                         window.open('mailto:support@goproxe.com?subject=Dashboard Feedback', '_blank')
                       }}
                       className="dashboard-layout-more-options-item flex items-center w-full text-left px-4 py-2 text-sm transition-colors duration-200"
