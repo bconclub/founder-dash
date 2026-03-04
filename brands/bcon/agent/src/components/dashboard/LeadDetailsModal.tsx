@@ -409,7 +409,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
   useEffect(() => {
     if (lead && isOpen) {
       loadFreshLeadData()
-      loadUnifiedSummary()
+      loadUnifiedSummary(true) // Always regenerate fresh summary on open
       loadActivities()
       loadChannelData()
       loadQuickStats()
