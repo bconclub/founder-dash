@@ -483,7 +483,7 @@ export default function FounderDashboard() {
       )}
 
       {/* NUMBER CARDS ROW */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
         {/* Card 1: Total Conversations */}
         <div 
           className="rounded-lg p-4 sm:p-6 border transition-all hover:shadow-lg flex flex-col"
@@ -578,7 +578,58 @@ export default function FounderDashboard() {
           </div>
         </div>
 
-        {/* Card 2: Warm Leads - Score 40-69, warming up */}
+        {/* Card 2: Engaged Leads - Stage-based engagement */}
+        <div
+          className="rounded-lg p-4 sm:p-6 border transition-all hover:shadow-lg flex flex-col"
+          style={{
+            backgroundColor: 'rgba(34, 197, 94, 0.05)',
+            borderColor: 'rgba(34, 197, 94, 0.2)',
+            justifyContent: 'space-between'
+          }}
+        >
+          {/* Title */}
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <MdLocalFireDepartment className="text-green-500" size={20} />
+              <h3 className="text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>Engaged Leads</h3>
+            </div>
+          </div>
+          {/* Big Number */}
+          <p className="text-3xl sm:text-4xl font-bold mb-2" style={{ color: 'var(--text-primary)' }}>
+            {metrics.engagedLeads?.count ?? 0}
+          </p>
+          {/* Metric Details */}
+          <div className="flex flex-col gap-1 mb-2">
+            <p className="text-sm font-medium" style={{ color: '#22C55E' }}>
+              {metrics.engagedLeads?.engagementRate?.toFixed(1) ?? '0.0'}% of total
+            </p>
+            <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+              From {metrics.engagedLeads?.total ?? metrics.totalLeads.count} leads
+            </p>
+          </div>
+          {/* Sparkline */}
+          <div className="mt-auto">
+            {metrics.trends?.leads && (
+              <div className="w-full mb-2" style={{ height: '40px' }}>
+                <Sparkline
+                  data={metrics.trends.leads.data}
+                  color="#22C55E"
+                  height={40}
+                  showGradient={true}
+                />
+              </div>
+            )}
+            <button
+              onClick={() => router.push('/dashboard/leads')}
+              className="text-xs font-medium flex items-center gap-1 hover:underline"
+              style={{ color: '#22C55E' }}
+            >
+              View All <MdArrowForward size={14} />
+            </button>
+          </div>
+        </div>
+
+        {/* Card 3: Warm Leads - Score 40-69, warming up */}
         <div
           className="rounded-lg p-4 sm:p-6 border transition-all hover:shadow-lg flex flex-col"
           style={{
