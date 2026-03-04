@@ -16,8 +16,12 @@ import {
   MdChevronRight,
   MdHistory,
   MdAccessTime,
-  MdOutlineInsights
+  MdOutlineInsights,
+  MdTrendingUp,
+  MdTrendingDown,
+  MdRemove
 } from 'react-icons/md'
+import { createClient } from '@/lib/supabase/client'
 import { FaWhatsapp } from 'react-icons/fa'
 
 const STATUS_OPTIONS = [
@@ -149,6 +153,8 @@ export default function LeadsTable({
   const [filteredLeads, setFilteredLeads] = useState<ExtendedLead[]>([])
   const [calculatedScores, setCalculatedScores] = useState<Record<string, number>>({})
   const [calculatingScores, setCalculatingScores] = useState(false)
+  const [scoreTrends, setScoreTrends] = useState<Record<string, { prev: number; diff: number }>>({})
+
   const [dateFilter, setDateFilter] = useState<string>('all')
   const [sourceFilter, setSourceFilter] = useState<string>(initialSourceFilter || 'all')
   const [statusFilter, setStatusFilter] = useState<string>('all')
@@ -229,6 +235,43 @@ export default function LeadsTable({
 
     setFilteredLeads(filtered as ExtendedLead[])
   }, [leads, dateFilter, sourceFilter, statusFilter, userTypeFilter, courseInterestFilter, limit])
+
+  // Fetch previous scores for trend arrows (from lead_stage_changes)
+  useEffect(() => {
+    if (filteredLeads.length === 0) return
+
+    const fetchTrends = async () => {
+      try {
+        const supabase = createClient()
+        const leadIds = filteredLeads.slice(0, 50).map(l => l.id)
+
+        // Get the most recent stage change per lead (which has old_score and new_score)
+        const { data: changes } = await supabase
+          .from('lead_stage_changes')
+          .select('lead_id, old_score, new_score, created_at')
+          .in('lead_id', leadIds)
+          .order('created_at', { ascending: false })
+
+        if (changes && changes.length > 0) {
+          const trends: Record<string, { prev: number; diff: number }> = {}
+          // Get the latest change per lead
+          for (const change of changes) {
+            if (!trends[change.lead_id] && change.old_score !== null && change.new_score !== null) {
+              trends[change.lead_id] = {
+                prev: change.old_score,
+                diff: change.new_score - change.old_score,
+              }
+            }
+          }
+          setScoreTrends(trends)
+        }
+      } catch (err) {
+        console.error('Error fetching score trends:', err)
+      }
+    }
+
+    fetchTrends()
+  }, [filteredLeads])
 
   // Calculate scores for filtered leads (same calculation as modal)
   useEffect(() => {
@@ -700,6 +743,7 @@ export default function LeadsTable({
                       const calculatedScore = calculatedScores[lead.id]
                       const score = calculatedScore !== undefined ? calculatedScore : (lead.lead_score ?? (lead as any).leadScore ?? (lead as any).score ?? null)
                       const badgeStyle = getScoreBadgeStyle(score)
+                      const trend = scoreTrends[lead.id]
                       return (
                         <div
                           className="leads-table-score-badge relative rounded-lg px-3 py-1.5 transition-all hover:scale-105 shadow-sm group border"
@@ -713,12 +757,40 @@ export default function LeadsTable({
                             className="absolute top-0 left-0 right-0 h-0.5 rounded-t-lg transition-all group-hover:h-1.5"
                             style={{ backgroundColor: badgeStyle.hex }}
                           ></div>
-                          <div className="flex items-center justify-center">
-                            <span className={`leads-table-score-value font-extrabold text-base ${badgeStyle.textColor}`}>
-                              {score !== null && score !== undefined ? score : '--'}
-                            </span>
-                            {(lead.stage_override || (lead as any).stageOverride) && (
-                              <span className="leads-table-score-override text-[10px] ml-1 opacity-50" title="Manual override">🔒</span>
+                          <div className="flex flex-col items-center justify-center gap-0.5">
+                            <div className="flex items-center gap-1">
+                              <span className={`leads-table-score-value font-extrabold text-base ${badgeStyle.textColor}`}>
+                                {score !== null && score !== undefined ? score : '--'}
+                              </span>
+                              {(lead.stage_override || (lead as any).stageOverride) && (
+                                <span className="leads-table-score-override text-[10px] opacity-50" title="Manual override">🔒</span>
+                              )}
+                            </div>
+                            {/* Trend indicator */}
+                            {trend && trend.diff !== 0 && (
+                              <div
+                                className="flex items-center gap-0.5"
+                                title={`Previous: ${trend.prev}`}
+                              >
+                                {trend.diff > 5 ? (
+                                  <MdTrendingUp size={12} className="text-green-500" />
+                                ) : trend.diff < -5 ? (
+                                  <MdTrendingDown size={12} className="text-red-500" />
+                                ) : (
+                                  <MdRemove size={10} className="text-gray-400" />
+                                )}
+                                <span
+                                  className={`text-[10px] font-bold ${
+                                    trend.diff > 5
+                                      ? 'text-green-600 dark:text-green-400'
+                                      : trend.diff < -5
+                                        ? 'text-red-600 dark:text-red-400'
+                                        : 'text-gray-500 dark:text-gray-400'
+                                  }`}
+                                >
+                                  {trend.diff > 0 ? '+' : ''}{trend.diff}
+                                </span>
+                              </div>
                             )}
                           </div>
                         </div>

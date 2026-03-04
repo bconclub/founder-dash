@@ -1027,16 +1027,16 @@ export async function GET(request: NextRequest) {
     console.log(`📊 Hot Leads (after score calc): ${hotLeads.length} leads with score >= ${hotLeadThreshold}`)
     console.log(`📊 Score Distribution: hot=${scoreDistribution.hot} warm=${scoreDistribution.warm} cold=${scoreDistribution.cold}`)
 
-    // ENGAGED LEADS: People who actually showed interest (engaged stage or beyond, or has booking)
+    // ENGAGED LEADS: People who actually showed real interest
+    // Criteria: stage-based (Engaged or above) OR has a confirmed booking
+    // Score alone is NOT sufficient -- many new leads get moderate scores from basic info
     const engagedStages = ['Engaged', 'Qualified', 'High Intent', 'Booking Made', 'Converted']
     const engagedLeadsList = safeLeads.filter(lead => {
-      // Has an engaged+ stage
+      // Has an engaged+ stage (set by scoring engine or manual override)
       if (engagedStages.includes(lead.lead_stage || '')) return true
       // Has a booking (definitely engaged)
       const { bookingDate } = getBookingData(lead)
       if (bookingDate) return true
-      // Has a meaningful score (40+) indicating real interaction
-      if ((lead.lead_score || 0) >= 40) return true
       return false
     })
     const engagedLeadsCount = engagedLeadsList.length
