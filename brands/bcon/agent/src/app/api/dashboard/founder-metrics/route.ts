@@ -1027,6 +1027,22 @@ export async function GET(request: NextRequest) {
     console.log(`📊 Hot Leads (after score calc): ${hotLeads.length} leads with score >= ${hotLeadThreshold}`)
     console.log(`📊 Score Distribution: hot=${scoreDistribution.hot} warm=${scoreDistribution.warm} cold=${scoreDistribution.cold}`)
 
+    // ENGAGED LEADS: People who actually showed interest (engaged stage or beyond, or has booking)
+    const engagedStages = ['Engaged', 'Qualified', 'High Intent', 'Booking Made', 'Converted']
+    const engagedLeadsList = safeLeads.filter(lead => {
+      // Has an engaged+ stage
+      if (engagedStages.includes(lead.lead_stage || '')) return true
+      // Has a booking (definitely engaged)
+      const { bookingDate } = getBookingData(lead)
+      if (bookingDate) return true
+      // Has a meaningful score (40+) indicating real interaction
+      if ((lead.lead_score || 0) >= 40) return true
+      return false
+    })
+    const engagedLeadsCount = engagedLeadsList.length
+    const engagementRate = totalLeadsCount > 0 ? Math.round((engagedLeadsCount / totalLeadsCount) * 100 * 10) / 10 : 0
+    console.log(`📊 Engaged Leads: ${engagedLeadsCount} / ${totalLeadsCount} = ${engagementRate}%`)
+
     // ----------------------------------------------------------------------------
     // 2. RESPONSE RATE (0-100%)
     // ----------------------------------------------------------------------------
@@ -1272,6 +1288,12 @@ export async function GET(request: NextRequest) {
         count: totalLeadsCount,
         fromConversations: totalConversationsCount,
         conversionRate: conversionRate,
+      },
+      engagedLeads: {
+        count: engagedLeadsCount,
+        total: totalLeadsCount,
+        engagementRate: engagementRate,
+        leads: engagedLeadsList.slice(0, 5).map(l => ({ id: l.id, name: l.customer_name || 'Unknown', score: l.lead_score || 0 })),
       },
       todayActivity: {
         messages: todayMessages.length,

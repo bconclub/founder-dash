@@ -24,6 +24,7 @@ interface FounderMetrics {
   hotLeads: { count: number; leads: Array<{ id: string; name: string; score: number }> }
   totalConversations: { total: number; count7D: number; count14D: number; count30D: number; trend7D: number }
   totalLeads: { count: number; fromConversations: number; conversionRate: number }
+  engagedLeads: { count: number; total: number; engagementRate: number; leads: Array<{ id: string; name: string; score: number }> }
   responseHealth: { avgMs: number; status: 'good' | 'warning' | 'critical' }
   leadsNeedingAttention: Array<{ id: string; name: string; score: number; lastContact: string; stage: string }>
   upcomingBookings: Array<{ id: string; name: string; date: string; time: string; datetime: string }>
@@ -576,10 +577,62 @@ export default function FounderDashboard() {
           </div>
         </div>
 
-        {/* Card 2: Total Leads */}
-        <div 
+        {/* Card 2: Engaged Leads - People who showed real interest */}
+        <div
           className="rounded-lg p-4 sm:p-6 border transition-all hover:shadow-lg flex flex-col"
-          style={{ 
+          style={{
+            backgroundColor: 'rgba(34, 197, 94, 0.05)',
+            borderColor: 'rgba(34, 197, 94, 0.2)',
+            justifyContent: 'space-between'
+          }}
+        >
+          {/* 1. Title */}
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <MdLocalFireDepartment className="text-green-500" size={20} />
+              <h3 className="text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>Engaged Leads</h3>
+            </div>
+          </div>
+          {/* 2. Big Number */}
+          <p className="text-3xl sm:text-4xl font-bold mb-2" style={{ color: 'var(--text-primary)' }}>
+            {metrics.engagedLeads?.count ?? 0}
+          </p>
+          {/* 3. Metric Details - Conversion % */}
+          <div className="flex flex-col gap-1 mb-2">
+            <p className="text-sm font-medium" style={{ color: '#22C55E' }}>
+              {metrics.engagedLeads?.engagementRate?.toFixed(1) ?? '0.0'}% conversion
+            </p>
+            <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+              From {metrics.engagedLeads?.total ?? metrics.totalLeads.count} total leads
+            </p>
+          </div>
+          {/* 4. Sparkline Graph */}
+          <div className="mt-auto">
+            {metrics.trends?.leads && (
+              <div className="w-full mb-2" style={{ height: '40px' }}>
+                <Sparkline
+                  data={metrics.trends.leads.data}
+                  color="#22C55E"
+                  height={40}
+                  showGradient={true}
+                />
+              </div>
+            )}
+            {/* 5. Action Link */}
+            <button
+              onClick={() => router.push('/dashboard/leads')}
+              className="text-xs font-medium flex items-center gap-1 hover:underline"
+              style={{ color: '#22C55E' }}
+            >
+              View All <MdArrowForward size={14} />
+            </button>
+          </div>
+        </div>
+
+        {/* Card 3: Total Leads */}
+        <div
+          className="rounded-lg p-4 sm:p-6 border transition-all hover:shadow-lg flex flex-col"
+          style={{
             backgroundColor: 'var(--accent-subtle)',
             borderColor: 'var(--accent-primary)',
             justifyContent: 'space-between'
@@ -598,9 +651,9 @@ export default function FounderDashboard() {
                       ? 'text-white'
                       : ''
                   }`}
-                  style={leadsFilter === period 
+                  style={leadsFilter === period
                     ? { backgroundColor: 'var(--accent-primary)' }
-                    : { 
+                    : {
                         backgroundColor: 'var(--accent-subtle)',
                         color: 'var(--text-secondary)'
                       }
@@ -627,154 +680,27 @@ export default function FounderDashboard() {
           <p className="text-3xl sm:text-4xl font-bold mb-2" style={{ color: 'var(--text-primary)' }}>
             {metrics.totalLeads.count}
           </p>
-          {/* 3. Metric Details - Stacked */}
+          {/* 3. Metric Details */}
           <div className="flex flex-col gap-1 mb-2">
-            {/* Row 1: Main metric */}
             <p className="text-sm font-medium" style={{ color: 'var(--accent-primary)' }}>
-              {metrics.totalLeads.conversionRate.toFixed(1)}% conversion
-            </p>
-            {/* Row 2: Context */}
-            <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-              From {metrics.totalLeads.fromConversations} conversations
+              From {metrics.totalConversations.total} conversations
             </p>
           </div>
           {/* 4. Sparkline Graph */}
           <div className="mt-auto">
             {metrics.trends?.leads && (
               <div className="w-full mb-2" style={{ height: '40px' }}>
-                <Sparkline 
-                  data={metrics.trends.leads.data} 
-                  color="var(--accent-primary)" 
+                <Sparkline
+                  data={metrics.trends.leads.data}
+                  color="var(--accent-primary)"
                   height={40}
                   showGradient={true}
                 />
               </div>
             )}
             {/* 5. Action Link */}
-            <button 
+            <button
               onClick={() => router.push('/dashboard/leads')}
-              className="text-xs font-medium flex items-center gap-1 hover:underline"
-              style={{ color: 'var(--accent-primary)' }}
-            >
-              View All <MdArrowForward size={14} />
-            </button>
-          </div>
-        </div>
-
-        {/* Card 3: Hot Leads - Semantic green for success/positive */}
-        <div 
-          className="rounded-lg p-4 sm:p-6 border transition-all hover:shadow-lg flex flex-col"
-          style={{ 
-            backgroundColor: 'rgba(34, 197, 94, 0.05)',
-            borderColor: 'rgba(34, 197, 94, 0.2)',
-            justifyContent: 'space-between'
-          }}
-        >
-          {/* 1. Title + Filter */}
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <MdLocalFireDepartment className="text-green-600 dark:text-green-400" size={20} />
-              <h3 className="text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>Hot Leads</h3>
-            </div>
-            <div className="flex gap-1">
-              {(['7D', '14D', '30D'] as const).map((period) => (
-                <button
-                  key={period}
-                  onClick={() => setHotLeadsFilter(period)}
-                  className={`px-2 py-1 text-xs rounded transition-colors ${
-                    hotLeadsFilter === period
-                      ? 'text-white'
-                      : ''
-                  }`}
-                  style={hotLeadsFilter === period 
-                    ? { backgroundColor: 'var(--accent-primary)' }
-                    : { 
-                        backgroundColor: 'var(--accent-subtle)',
-                        color: 'var(--text-secondary)'
-                      }
-                  }
-                  onMouseEnter={(e) => {
-                    if (hotLeadsFilter !== period) {
-                      e.currentTarget.style.backgroundColor = 'var(--accent-primary)'
-                      e.currentTarget.style.opacity = '0.8'
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (hotLeadsFilter !== period) {
-                      e.currentTarget.style.backgroundColor = 'var(--accent-subtle)'
-                      e.currentTarget.style.opacity = '1'
-                    }
-                  }}
-                >
-                  {period}
-                </button>
-              ))}
-            </div>
-          </div>
-          {/* 2. Big Number */}
-          <p className="text-3xl sm:text-4xl font-bold mb-2" style={{ color: 'var(--text-primary)' }}>
-            {metrics.hotLeads.count}
-          </p>
-          {/* 3. Metric Details */}
-          <div className="mb-2 relative">
-            <div className="flex items-center gap-1">
-              <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>Score &gt;</span>
-              <button
-                onClick={() => setShowThresholdDropdown(!showThresholdDropdown)}
-                className="flex items-center gap-1 text-xs font-medium px-1.5 py-0.5 rounded transition-colors hover:bg-opacity-10"
-                style={{ 
-                  color: 'var(--accent-primary)',
-                  backgroundColor: showThresholdDropdown ? 'var(--accent-subtle)' : 'transparent'
-                }}
-                onBlur={() => setTimeout(() => setShowThresholdDropdown(false), 200)}
-              >
-                {hotLeadThreshold}
-                <MdArrowDropDown size={14} />
-              </button>
-            </div>
-            {showThresholdDropdown && (
-              <div 
-                className="absolute left-0 top-6 z-10 mt-1 rounded-md shadow-lg border"
-                style={{
-                  backgroundColor: 'var(--bg-secondary)',
-                  borderColor: 'var(--accent-subtle)',
-                  minWidth: '80px'
-                }}
-              >
-                {[70, 80, 90, 100].map((threshold) => (
-                  <button
-                    key={threshold}
-                    onClick={() => {
-                      setHotLeadThreshold(threshold)
-                      localStorage.setItem('hot-lead-threshold', threshold.toString())
-                      setShowThresholdDropdown(false)
-                    }}
-                    className="w-full text-left px-3 py-2 text-xs transition-colors hover:bg-opacity-20"
-                    style={{
-                      color: threshold === hotLeadThreshold ? 'var(--accent-primary)' : 'var(--text-secondary)',
-                      backgroundColor: threshold === hotLeadThreshold ? 'var(--accent-subtle)' : 'transparent'
-                    }}
-                  >
-                    {threshold}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-          {/* 4. Sparkline Graph */}
-          <div className="mt-auto">
-            {metrics.trends?.hotLeads && (
-              <div className="w-full mb-2" style={{ height: '40px' }}>
-                <Sparkline 
-                  data={metrics.trends.hotLeads.data} 
-                  color="#22C55E" 
-                  height={40} 
-                />
-              </div>
-            )}
-            {/* 5. Action Link */}
-            <button 
-              onClick={() => router.push('/dashboard/inbox?filter=hot')}
               className="text-xs font-medium flex items-center gap-1 hover:underline"
               style={{ color: 'var(--accent-primary)' }}
             >
