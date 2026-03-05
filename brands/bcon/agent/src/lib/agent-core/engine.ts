@@ -45,8 +45,9 @@ export async function process(
   const existingBookingMessage = await checkBooking(supabase, input);
 
   // 4. Build prompt (brand-aware)
+  // If existing booking found, include it as context but still allow rescheduling
   const finalMessage = existingBookingMessage
-    ? `${existingBookingMessage}\n\nUser's message: ${input.message}`
+    ? `[EXISTING BOOKING INFO: ${existingBookingMessage} — If the customer provides a new date/time, they want to reschedule. Cancel old and book new immediately. Do NOT ask "should I cancel?" repeatedly — if they give a time, that IS the confirmation.]\n\nUser's message: ${input.message}`
     : input.message;
 
   const { systemPrompt, userPrompt } = buildPrompt({
@@ -64,8 +65,8 @@ export async function process(
   // 5. Generate response
   let rawResponse: string;
 
-  if (input.channel === 'whatsapp' && !existingBookingMessage) {
-    // WhatsApp gets tool-enabled response for booking capability
+  if (input.channel === 'whatsapp') {
+    // WhatsApp always gets tool-enabled response (even with existing booking — for rescheduling)
     const { tools, toolHandlers } = buildBookingTools(input, supabase);
     rawResponse = await generateResponseWithTools(systemPrompt, userPrompt, {
       tools,

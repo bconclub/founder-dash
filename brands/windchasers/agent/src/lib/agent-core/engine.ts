@@ -45,8 +45,9 @@ export async function process(
   const existingBookingMessage = await checkBooking(supabase, input);
 
   // 4. Build prompt (brand-aware)
+  // If existing booking found, include it as context but still allow rescheduling
   const finalMessage = existingBookingMessage
-    ? `${existingBookingMessage}\n\nUser's message: ${input.message}`
+    ? `[EXISTING BOOKING INFO: ${existingBookingMessage} — If the customer provides a new date/time, they want to reschedule. Cancel old and book new immediately. Do NOT ask "should I cancel?" repeatedly — if they give a time, that IS the confirmation.]\n\nUser's message: ${input.message}`
     : input.message;
 
   const { systemPrompt, userPrompt } = buildPrompt({
@@ -64,8 +65,8 @@ export async function process(
   // 5. Generate response
   let rawResponse: string;
 
-  if (input.channel === 'whatsapp' && !existingBookingMessage) {
-    // WhatsApp gets tool-enabled response for booking capability
+  if (input.channel === 'whatsapp') {
+    // WhatsApp always gets tool-enabled response (even with existing booking — for rescheduling)
     const { tools, toolHandlers } = buildBookingTools(input, supabase);
     rawResponse = await generateResponseWithTools(systemPrompt, userPrompt, {
       tools,
@@ -256,7 +257,7 @@ function buildBookingTools(
     },
     {
       name: 'book_consultation',
-      description: 'Book a consultation call. Use ONLY after: (1) confirming date and time with the user, (2) having the user name, (3) verifying slot is available via check_availability. Email is optional.',
+      description: 'Book a consultation call. Use ONLY after: (1) confirming date and time with the user, (2) having the user name, (3) verifying slot is available via check_availability. Email is optional. You MUST generate a specific call title based on the conversation context.',
       input_schema: {
         type: 'object',
         properties: {
@@ -280,13 +281,51 @@ function buildBookingTools(
             type: 'string',
             description: 'Phone number of the person booking',
           },
+          title: {
+            type: 'string',
+            description: 'AI-generated call title based on discussion. Format: "[Topic/Solution] - [Brand Name]". Examples: "AI Lead Qualification for Meta Ads - Acme Corp", "Online Customer Acquisition - Fresh Foods". Never use generic titles.',
+          },
           course_interest: {
             type: 'string',
             enum: ['pilot', 'helicopter', 'drone', 'cabin', 'general'],
             description: 'Which training program they are interested in',
           },
         },
-        required: ['date', 'time', 'name', 'phone'],
+        required: ['date', 'time', 'name', 'phone', 'title'],
+      },
+    },
+    {
+      name: 'update_lead_profile',
+      description: 'Save lead profile details whenever the user shares personal or business information. Call IMMEDIATELY when the user mentions their name, email, city, company/brand, or business type. Can be called multiple times as new details emerge. Only include fields explicitly shared — never guess.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          full_name: {
+            type: 'string',
+            description: 'User\'s full name if shared (e.g. "Rajesh Kumar")',
+          },
+          email: {
+            type: 'string',
+            description: 'User\'s email address if shared',
+          },
+          city: {
+            type: 'string',
+            description: 'City the user is based in (e.g. "Hyderabad")',
+          },
+          company: {
+            type: 'string',
+            description: 'User\'s company or brand name (e.g. "Door2Shine")',
+          },
+          business_type: {
+            type: 'string',
+            description: 'What kind of business they run (e.g. "doorstep car wash")',
+          },
+          notes: {
+            type: 'string',
+            description: 'Any other notable detail (e.g. "has 3 employees", "launched 2 months ago")',
+          },
+        },
+        required: [],
       },
     },
   ];
@@ -335,11 +374,12 @@ function buildBookingTools(
     },
 
     book_consultation: async (toolInput: Record<string, any>) => {
-      const { date, time, name, email, phone, course_interest } = toolInput;
+      const { date, time, name, email, phone, course_interest, title } = toolInput;
 
       const bookingPhone = phone || input.userProfile.phone;
       const bookingName = name || input.userProfile.name || 'WhatsApp User';
       const bookingEmail = email || input.userProfile.email || '';
+      const bookingTitle = title || `AI Strategy Call - ${bookingName}`;
 
       if (!bookingPhone) {
         return JSON.stringify({
@@ -357,8 +397,8 @@ function buildBookingTools(
         });
       }
 
-      // Create Google Calendar event
-      let calendarResult: { eventId: string; eventLink: string; hasAttendees: boolean } | null = null;
+      // Create Google Calendar event (now includes Meet link)
+      let calendarResult: { eventId: string; eventLink: string; hasAttendees: boolean; meetLink: string | null } | null = null;
       try {
         calendarResult = await createCalendarEvent({
           date,
@@ -369,6 +409,7 @@ function buildBookingTools(
           courseInterest: course_interest,
           sessionType: 'online',
           conversationSummary: input.summary || undefined,
+          title: bookingTitle,
         });
       } catch (calendarError: any) {
         console.error('[Engine] Calendar event creation failed:', calendarError);
@@ -389,6 +430,8 @@ function buildBookingTools(
             courseInterest: course_interest,
             sessionType: 'online',
             conversationSummary: input.summary || undefined,
+            title: bookingTitle,
+            meetLink: calendarResult?.meetLink || undefined,
           },
           'whatsapp',
           supabase,
@@ -401,14 +444,135 @@ function buildBookingTools(
         });
       }
 
+      // Send WhatsApp confirmation with Meet link (fire-and-forget)
+      if (bookingPhone) {
+        const { sendBookingConfirmation } = await import('@/lib/services/whatsappSender');
+        const bookingDate = new Date(date + 'T00:00:00+05:30');
+        const dateDisplay = bookingDate.toLocaleDateString('en-IN', {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+          timeZone: 'Asia/Kolkata',
+        });
+        sendBookingConfirmation(
+          bookingPhone,
+          bookingName,
+          bookingTitle,
+          `${dateDisplay} at ${time}`,
+          calendarResult?.meetLink || '',
+        ).catch((err: any) => console.error('[Engine] WhatsApp confirmation failed:', err));
+      }
+
       return JSON.stringify({
         success: true,
         date,
         time,
         name: bookingName,
+        title: bookingTitle,
         google_event_created: !!calendarResult,
+        meet_link: calendarResult?.meetLink || null,
         message: `Booking confirmed for ${bookingName} on ${date} at ${time}.`,
       });
+    },
+
+    update_lead_profile: async (toolInput: Record<string, any>) => {
+      const { full_name, email, city, company, business_type, notes } = toolInput;
+
+      if (!full_name && !email && !city && !company && !business_type && !notes) {
+        return JSON.stringify({ success: false, error: 'No profile data provided.' });
+      }
+
+      const phone = input.userProfile.phone;
+      if (!phone) {
+        return JSON.stringify({ success: false, error: 'No phone number available.' });
+      }
+
+      try {
+        const normalizedPhone = phone.replace(/\D/g, '').slice(-10);
+
+        // Fetch existing lead
+        const { data: lead } = await supabase
+          .from('all_leads')
+          .select('id, unified_context, email, customer_name')
+          .eq('customer_phone_normalized', normalizedPhone)
+          .maybeSingle();
+
+        if (!lead) {
+          return JSON.stringify({ success: false, error: 'Lead not found.' });
+        }
+
+        // Build top-level updates
+        const leadUpdates: Record<string, any> = {};
+        if (email) leadUpdates.email = email.trim().toLowerCase();
+        if (full_name) leadUpdates.customer_name = full_name.trim();
+
+        // Build unified_context.whatsapp.profile
+        const existingCtx = lead.unified_context || {};
+        const existingWA = existingCtx.whatsapp || {};
+        const existingProfile = existingWA.profile || {};
+
+        const profile: Record<string, any> = { ...existingProfile };
+        if (full_name) profile.full_name = full_name.trim();
+        if (email) profile.email = email.trim().toLowerCase();
+        if (city) profile.city = city.trim();
+        if (company) profile.company = company.trim();
+        if (business_type) profile.business_type = business_type.trim();
+        if (notes) {
+          profile.notes = existingProfile.notes
+            ? `${existingProfile.notes}; ${notes.trim()}`
+            : notes.trim();
+        }
+
+        leadUpdates.unified_context = {
+          ...existingCtx,
+          whatsapp: { ...existingWA, profile },
+        };
+
+        await supabase
+          .from('all_leads')
+          .update(leadUpdates)
+          .eq('id', lead.id);
+
+        // Also update whatsapp_sessions
+        const sessionUpdates: Record<string, any> = {};
+        if (email) sessionUpdates.customer_email = email.trim().toLowerCase();
+        if (full_name) sessionUpdates.customer_name = full_name.trim();
+
+        const { data: waSession } = await supabase
+          .from('whatsapp_sessions')
+          .select('id, channel_data')
+          .eq('external_session_id', input.sessionId)
+          .maybeSingle();
+
+        if (waSession) {
+          const existingData = waSession.channel_data || {};
+          sessionUpdates.channel_data = {
+            ...existingData,
+            ...(city ? { city: city.trim() } : {}),
+            ...(company ? { company: company.trim() } : {}),
+            ...(business_type ? { business_type: business_type.trim() } : {}),
+          };
+          await supabase
+            .from('whatsapp_sessions')
+            .update(sessionUpdates)
+            .eq('id', waSession.id);
+        }
+
+        const saved: string[] = [];
+        if (full_name) saved.push(`name: ${full_name}`);
+        if (email) saved.push(`email: ${email}`);
+        if (city) saved.push(`city: ${city}`);
+        if (company) saved.push(`company: ${company}`);
+        if (business_type) saved.push(`type: ${business_type}`);
+        if (notes) saved.push(`notes: ${notes}`);
+
+        console.log(`[Engine] Lead profile updated: ${saved.join(', ')}`);
+        return JSON.stringify({ success: true, updated: saved });
+      } catch (err: any) {
+        console.error('[Engine] update_lead_profile failed:', err);
+        return JSON.stringify({ success: false, error: 'Failed to save profile.' });
+      }
     },
   };
 

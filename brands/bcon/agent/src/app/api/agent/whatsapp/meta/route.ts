@@ -28,9 +28,26 @@ import {
 } from '@/lib/services';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 30;
 
 const GRAPH_API_VERSION = 'v21.0';
 const GRAPH_API_BASE = `https://graph.facebook.com/${GRAPH_API_VERSION}`;
+
+// ─── Deduplication ────────────────────────────────────────────────────────────
+// In-memory set of recently processed WhatsApp message IDs to prevent duplicates
+// (Meta can send the same webhook multiple times)
+const processedMessageIds = new Set<string>();
+const MESSAGE_DEDUP_TTL_MS = 60_000; // 1 minute TTL
+
+function isMessageAlreadyProcessed(messageId: string): boolean {
+  if (processedMessageIds.has(messageId)) {
+    return true;
+  }
+  processedMessageIds.add(messageId);
+  // Clean up after TTL
+  setTimeout(() => processedMessageIds.delete(messageId), MESSAGE_DEDUP_TTL_MS);
+  return false;
+}
 
 // ─── Meta Graph API helpers ───────────────────────────────────────────────────
 
@@ -163,6 +180,12 @@ export async function POST(request: NextRequest) {
 
       if (!messageText) continue;
 
+      // ── Deduplication: skip if this exact message was already processed ──
+      if (isMessageAlreadyProcessed(whatsappMessageId)) {
+        console.log(`[meta/webhook] DUPLICATE skipped: ${whatsappMessageId} from ${customerPhone}`);
+        continue;
+      }
+
       console.log(`[meta/webhook] Message from ${customerPhone}: "${messageText.substring(0, 50)}..."`);
 
       // Mark message as read (fire and forget)
@@ -231,6 +254,25 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
       console.error('[meta/webhook] Failed to create/update lead');
       await sendWhatsAppReply(customerPhone, "Sorry, I'm having a technical issue. Please try again shortly.");
       return;
+    }
+
+    // 1b. DB-level dedup: check if agent already responded in the last 10 seconds
+    const { data: recentAgentMsg } = await supabase
+      .from('conversations')
+      .select('created_at')
+      .eq('lead_id', leadId)
+      .eq('channel', 'whatsapp')
+      .eq('sender', 'agent')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (recentAgentMsg?.created_at) {
+      const agentMsgAge = Date.now() - new Date(recentAgentMsg.created_at).getTime();
+      if (agentMsgAge < 10_000) { // 10 seconds
+        console.log(`[meta/webhook] DEDUP: Agent responded ${agentMsgAge}ms ago for lead ${leadId}, skipping`);
+        return;
+      }
     }
 
     // 2. Ensure whatsapp session exists and increment message_count
