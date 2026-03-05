@@ -161,9 +161,9 @@ export async function GET(
           budget: lead.unified_context?.budget || lead.unified_context?.web?.budget || lead.unified_context?.whatsapp?.budget,
           serviceInterest: lead.unified_context?.service_interest || lead.unified_context?.web?.service_interest,
           painPoints: lead.unified_context?.pain_points || lead.unified_context?.web?.pain_points,
-          userType: lead.unified_context?.windchasers?.user_type || null,
-          courseInterest: lead.unified_context?.windchasers?.course_interest || null,
-          planToFly: lead.unified_context?.windchasers?.plan_to_fly || lead.unified_context?.windchasers?.timeline || null,
+          userType: lead.unified_context?.bcon?.user_type || lead.unified_context?.windchasers?.user_type || null,
+          courseInterest: lead.unified_context?.bcon?.service_interest || lead.unified_context?.bcon?.course_interest || lead.unified_context?.windchasers?.course_interest || null,
+          planToFly: lead.unified_context?.bcon?.timeline || lead.unified_context?.windchasers?.plan_to_fly || null,
         },
         leadStage: lead.lead_stage,
         subStage: lead.sub_stage,
@@ -229,15 +229,15 @@ export async function GET(
       }
 
       // Extract key info
-      const windchasersData = lead.unified_context?.windchasers || {}
+      const brandContextData = lead.unified_context?.bcon || lead.unified_context?.windchasers || {}
       const keyInfo = {
         budget: lead.unified_context?.budget || lead.unified_context?.web?.budget || lead.unified_context?.whatsapp?.budget,
         serviceInterest: lead.unified_context?.service_interest || lead.unified_context?.web?.service_interest,
         painPoints: lead.unified_context?.pain_points || lead.unified_context?.web?.pain_points,
-        userType: windchasersData.user_type || null,
-        courseInterest: windchasersData.course_interest || null,
-        planToFly: windchasersData.plan_to_fly || windchasersData.timeline || null,
-        education: windchasersData.education || null,
+        userType: brandContextData.user_type || null,
+        courseInterest: brandContextData.course_interest || null,
+        planToFly: brandContextData.plan_to_fly || brandContextData.timeline || null,
+        education: brandContextData.education || null,
       }
 
       // Build activities context
@@ -251,9 +251,9 @@ export async function GET(
         .join('\n') || 'No team activities'
 
       // Build windchasers-specific info
-      const windchasersInfo = []
+      const brandInfo = []
       if (keyInfo.userType) {
-        windchasersInfo.push(`User Type: ${keyInfo.userType}`)
+        brandInfo.push(`User Type: ${keyInfo.userType}`)
       }
       if (keyInfo.courseInterest) {
         const courseMap: Record<string, string> = {
@@ -267,7 +267,7 @@ export async function GET(
           'Cabin': 'Cabin Crew Training',
           'Drone': 'Drone Training'
         }
-        windchasersInfo.push(`Course Interest: ${courseMap[keyInfo.courseInterest] || keyInfo.courseInterest}`)
+        brandInfo.push(`Course Interest: ${courseMap[keyInfo.courseInterest] || keyInfo.courseInterest}`)
       }
       if (keyInfo.planToFly) {
         const timelineMap: Record<string, string> = {
@@ -276,41 +276,41 @@ export async function GET(
           '6+mo': '6+ Months',
           '1yr+': '1 Year+'
         }
-        windchasersInfo.push(`Timeline: ${timelineMap[keyInfo.planToFly] || keyInfo.planToFly}`)
+        brandInfo.push(`Timeline: ${timelineMap[keyInfo.planToFly] || keyInfo.planToFly}`)
       }
       if (keyInfo.education) {
-        windchasersInfo.push(`Education: ${keyInfo.education === '12th_completed' ? '12th Completed' : 'In School'}`)
+        brandInfo.push(`Education: ${keyInfo.education === '12th_completed' ? '12th Completed' : 'In School'}`)
       }
 
       // Try to generate unified summary using Claude API
       const apiKey = process.env.CLAUDE_API_KEY
       if (apiKey) {
         try {
-          const prompt = `Generate a comprehensive, detailed unified summary for this aviation training lead by intelligently combining information from multiple communication channels. The summary should be informative and provide a complete picture of the lead's journey and status.
+          const prompt = `Generate a useful summary for this business lead by combining information from their communication channels.
 
 FORMAT REQUIREMENTS:
 - Write exactly 2-3 concise, punchy sentences.
 - Use markdown **bolding** for critical information like course interest, status, or intent.
 - Intelligently merge information from all channels into a single narrative.
-- Summarize first contact, current status, and next steps.
+- Summarize the conversation, current status, and next steps.
 
 CRITICAL RULES:
 - BE CONCISE. No fluff. No "This user is...". Just the facts.
 - ONLY state actions explicitly confirmed in messages.
 - If no explicit confirmation of signup/payment, state: "Inquiring about [topic]".
 - NEVER assume actions that aren't explicitly stated.
-- Use markdown to make the summary scannable.
+- NEVER say "no communication summaries available" or "no interaction details" - always provide a useful summary.
 
 Lead Information:
 Name: ${lead.customer_name || 'Customer'}
 Stage: ${lead.lead_stage || 'Unknown'}${lead.sub_stage ? ` (${lead.sub_stage})` : ''}
 Days Inactive: ${daysInactive}
 Response Rate: ${responseRate}%
-${windchasersInfo.length > 0 ? `\nAviation-Specific Details:\n${windchasersInfo.join('\n')}` : ''}
+${brandInfo.length > 0 ? `\nLead-Specific Details:\n${brandInfo.join('\n')}` : ''}
 
-Channel Summaries to Unify:
-${webSummary ? `Web Channel Summary:\n${webSummary}\n` : ''}
-${whatsappSummary ? `WhatsApp Channel Summary:\n${whatsappSummary}\n` : ''}
+Channel Summaries:
+${webSummary ? `Web Channel:\n${webSummary}\n` : ''}
+${whatsappSummary ? `WhatsApp Channel:\n${whatsappSummary}\n` : ''}
 
 Recent Activities:
 ${activitiesContext}
@@ -320,7 +320,7 @@ ${keyInfo.serviceInterest ? `Service interest: ${keyInfo.serviceInterest}` : ''}
 ${keyInfo.painPoints ? `Pain points: ${keyInfo.painPoints}` : ''}
 ${lead.unified_context?.next_touchpoint ? `Next Touchpoint: ${lead.unified_context.next_touchpoint}` : ''}
 
-Generate a comprehensive 3-5 sentence unified summary that intelligently combines information from all channels into a cohesive narrative. Include context, current status, key details, and next steps. Make it informative and actionable. Follow the CRITICAL RULES - only state explicitly confirmed actions.`
+Generate a 2-3 sentence summary focusing on what was discussed, the lead's current status, and recommended next steps.`
 
           // Add timeout to prevent hanging
           const controller = new AbortController()
@@ -568,15 +568,15 @@ Generate a comprehensive 3-5 sentence unified summary that intelligently combine
     const nextTouchpoint = lead.unified_context?.next_touchpoint || lead.unified_context?.sequence?.next_step
 
     // Extract key info from unified_context
-    const windchasersData = lead.unified_context?.windchasers || {}
+    const brandContextData = lead.unified_context?.bcon || lead.unified_context?.windchasers || {}
     const keyInfo = {
       budget: lead.unified_context?.budget || lead.unified_context?.web?.budget || lead.unified_context?.whatsapp?.budget,
       serviceInterest: lead.unified_context?.service_interest || lead.unified_context?.web?.service_interest,
       painPoints: lead.unified_context?.pain_points || lead.unified_context?.web?.pain_points,
-      userType: windchasersData.user_type || null,
-      courseInterest: windchasersData.course_interest || null,
-      planToFly: windchasersData.plan_to_fly || windchasersData.timeline || null,
-      education: windchasersData.education || null,
+      userType: brandContextData.user_type || null,
+      courseInterest: brandContextData.course_interest || null,
+      planToFly: brandContextData.plan_to_fly || brandContextData.timeline || null,
+      education: brandContextData.education || null,
     }
 
     // Determine conversation status
@@ -666,9 +666,9 @@ Generate a comprehensive 3-5 sentence unified summary that intelligently combine
           .join('\n') || 'No team activities'
 
         // Build comprehensive context for summary
-        const windchasersInfo = []
+        const brandInfo = []
         if (keyInfo.userType) {
-          windchasersInfo.push(`User Type: ${keyInfo.userType}`)
+          brandInfo.push(`User Type: ${keyInfo.userType}`)
         }
         if (keyInfo.courseInterest) {
           const courseMap: Record<string, string> = {
@@ -682,7 +682,7 @@ Generate a comprehensive 3-5 sentence unified summary that intelligently combine
             'Cabin': 'Cabin Crew Training',
             'Drone': 'Drone Training'
           }
-          windchasersInfo.push(`Course Interest: ${courseMap[keyInfo.courseInterest] || keyInfo.courseInterest}`)
+          brandInfo.push(`Course Interest: ${courseMap[keyInfo.courseInterest] || keyInfo.courseInterest}`)
         }
         if (keyInfo.planToFly) {
           const timelineMap: Record<string, string> = {
@@ -691,40 +691,42 @@ Generate a comprehensive 3-5 sentence unified summary that intelligently combine
             '6+mo': '6+ Months',
             '1yr+': '1 Year+'
           }
-          windchasersInfo.push(`Timeline: ${timelineMap[keyInfo.planToFly] || keyInfo.planToFly}`)
+          brandInfo.push(`Timeline: ${timelineMap[keyInfo.planToFly] || keyInfo.planToFly}`)
         }
         if (keyInfo.education) {
-          windchasersInfo.push(`Education: ${keyInfo.education === '12th_completed' ? '12th Completed' : 'In School'}`)
+          brandInfo.push(`Education: ${keyInfo.education === '12th_completed' ? '12th Completed' : 'In School'}`)
         }
 
-        const prompt = `Generate a comprehensive, detailed unified summary for this aviation training lead. The summary should be informative and provide a complete picture of the lead's journey and status.
+        const prompt = `Generate a useful summary for this business lead based on their conversation history and available data.
 
 FORMAT REQUIREMENTS:
 - Write exactly 2-3 concise, punchy sentences.
 - Use markdown **bolding** for critical information like course interest, status, or intent.
-- Summarize first contact, current status, and next steps.
+- Summarize the conversation, current status, and next steps.
 
 CRITICAL RULES:
 - BE CONCISE. No fluff or filler phrases.
 - ONLY state actions explicitly confirmed in messages.
 - If no explicit confirmation of signup/payment, state: "Inquiring about [topic]".
 - NEVER assume actions that aren't explicitly stated.
-- Use markdown to make the summary scannable.
+- NEVER say "no communication summaries available" or "no interaction details" - always provide a useful summary based on whatever data exists.
+- If messages exist, summarize the actual conversation content.
+- If no messages exist, describe the lead's current stage and suggest next steps.
 
 Lead Information:
 Name: ${summaryData.leadName}
 Stage: ${lead.lead_stage || 'Unknown'}${lead.sub_stage ? ` (${lead.sub_stage})` : ''}
 Days Inactive: ${daysInactive}
 Response Rate: ${responseRate}%
-${windchasersInfo.length > 0 ? `\nAviation-Specific Details:\n${windchasersInfo.join('\n')}` : ''}
+${brandInfo.length > 0 ? `\nLead-Specific Details:\n${brandInfo.join('\n')}` : ''}
 
-Last 10 Messages:
-${conversationContext || 'No messages yet'}
+Conversation Messages:
+${conversationContext || 'No messages recorded yet.'}
 
 Recent Activities:
 ${activitiesContext}
 
-${summaryData.lastMessage ? `Last Message: ${summaryData.lastMessage.sender === 'customer' ? 'Customer' : 'PROXe'} sent "${summaryData.lastMessage.content.substring(0, 200)}" via ${summaryData.lastMessage.channel} at ${new Date(summaryData.lastMessage.timestamp).toLocaleString()}` : 'No messages yet'}
+${summaryData.lastMessage ? `Last Message: ${summaryData.lastMessage.sender === 'customer' ? 'Customer' : 'PROXe'} sent "${summaryData.lastMessage.content.substring(0, 200)}" via ${summaryData.lastMessage.channel} at ${new Date(summaryData.lastMessage.timestamp).toLocaleString()}` : ''}
 
 Conversation Status: ${conversationStatus}
 ${summaryData.nextTouchpoint ? `Next Touchpoint: ${summaryData.nextTouchpoint}` : ''}
@@ -732,7 +734,7 @@ ${keyInfo.budget ? `Budget mentioned: ${keyInfo.budget}` : ''}
 ${keyInfo.serviceInterest ? `Service interest: ${keyInfo.serviceInterest}` : ''}
 ${keyInfo.painPoints ? `Pain points: ${keyInfo.painPoints}` : ''}
 
-Generate a comprehensive 3-5 sentence summary that provides a complete picture of this lead. Include context, current status, key details, and next steps. Make it informative and actionable. Follow the CRITICAL RULES - only state explicitly confirmed actions.`
+Generate a 2-3 sentence summary focusing on what was discussed in the conversation, the lead's current status, and recommended next steps.`
 
         // Add timeout to prevent hanging
         const controller = new AbortController()
@@ -848,10 +850,10 @@ Generate a comprehensive 3-5 sentence summary that provides a complete picture o
     }
     fallbackSummary += `. `
 
-    // Add windchasers-specific info
-    const windchasersDetails = []
+    // Add brand-specific lead info
+    const brandDetails = []
     if (keyInfo.userType) {
-      windchasersDetails.push(`User Type: ${keyInfo.userType}`)
+      brandDetails.push(`User Type: ${keyInfo.userType}`)
     }
     if (keyInfo.courseInterest) {
       const courseMap: Record<string, string> = {
@@ -865,7 +867,7 @@ Generate a comprehensive 3-5 sentence summary that provides a complete picture o
         'Cabin': 'Cabin Crew Training',
         'Drone': 'Drone Training'
       }
-      windchasersDetails.push(`Course Interest: ${courseMap[keyInfo.courseInterest] || keyInfo.courseInterest}`)
+      brandDetails.push(`Course Interest: ${courseMap[keyInfo.courseInterest] || keyInfo.courseInterest}`)
     }
     if (keyInfo.planToFly) {
       const timelineMap: Record<string, string> = {
@@ -874,10 +876,10 @@ Generate a comprehensive 3-5 sentence summary that provides a complete picture o
         '6+mo': '6+ Months',
         '1yr+': '1 Year+'
       }
-      windchasersDetails.push(`Timeline: ${timelineMap[keyInfo.planToFly] || keyInfo.planToFly}`)
+      brandDetails.push(`Timeline: ${timelineMap[keyInfo.planToFly] || keyInfo.planToFly}`)
     }
-    if (windchasersDetails.length > 0) {
-      fallbackSummary += `${windchasersDetails.join(', ')}. `
+    if (brandDetails.length > 0) {
+      fallbackSummary += `${brandDetails.join(', ')}. `
     }
 
     if (summaryData.lastMessage) {

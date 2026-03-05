@@ -766,32 +766,6 @@ export default function LeadsTable({
                                 <span className="leads-table-score-override text-[10px] opacity-50" title="Manual override">🔒</span>
                               )}
                             </div>
-                            {/* Trend indicator */}
-                            {trend && trend.diff !== 0 && (
-                              <div
-                                className="flex items-center gap-0.5"
-                                title={`Previous: ${trend.prev}`}
-                              >
-                                {trend.diff > 5 ? (
-                                  <MdTrendingUp size={12} className="text-green-500" />
-                                ) : trend.diff < -5 ? (
-                                  <MdTrendingDown size={12} className="text-red-500" />
-                                ) : (
-                                  <MdRemove size={10} className="text-gray-400" />
-                                )}
-                                <span
-                                  className={`text-[10px] font-bold ${
-                                    trend.diff > 5
-                                      ? 'text-green-600 dark:text-green-400'
-                                      : trend.diff < -5
-                                        ? 'text-red-600 dark:text-red-400'
-                                        : 'text-gray-500 dark:text-gray-400'
-                                  }`}
-                                >
-                                  {trend.diff > 0 ? '+' : ''}{trend.diff}
-                                </span>
-                              </div>
-                            )}
                           </div>
                         </div>
                       )

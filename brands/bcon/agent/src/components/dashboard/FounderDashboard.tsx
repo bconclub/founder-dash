@@ -483,54 +483,18 @@ export default function FounderDashboard() {
       )}
 
       {/* NUMBER CARDS ROW */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
         {/* Card 1: Total Conversations */}
-        <div 
+        <div
           className="rounded-lg p-4 sm:p-6 border transition-all hover:shadow-lg flex flex-col"
-          style={{ 
+          style={{
             backgroundColor: 'rgba(59, 130, 246, 0.05)',
             borderColor: 'rgba(59, 130, 246, 0.2)',
             justifyContent: 'space-between'
           }}
         >
-          {/* 1. Title + Filter */}
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>Total Conversations</h3>
-            <div className="flex gap-1">
-              {(['7D', '14D', '30D'] as const).map((period) => (
-                <button
-                  key={period}
-                  onClick={() => setConversationTimeFilter(period)}
-                  className={`px-2 py-1 text-xs rounded transition-colors ${
-                    conversationTimeFilter === period
-                      ? 'text-white'
-                      : ''
-                  }`}
-                  style={conversationTimeFilter === period
-                    ? { backgroundColor: '#3B82F6' }
-                    : {
-                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                        color: 'var(--text-secondary)'
-                      }
-                  }
-                  onMouseEnter={(e) => {
-                    if (conversationTimeFilter !== period) {
-                      e.currentTarget.style.backgroundColor = '#3B82F6'
-                      e.currentTarget.style.opacity = '0.8'
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (conversationTimeFilter !== period) {
-                      e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.1)'
-                      e.currentTarget.style.opacity = '1'
-                    }
-                  }}
-                >
-                  {period}
-                </button>
-              ))}
-            </div>
-          </div>
+          {/* 1. Title */}
+          <h3 className="text-sm font-semibold mb-4" style={{ color: 'var(--text-secondary)' }}>Total Conversations</h3>
           {/* 2. Big Number */}
           <p className="text-3xl sm:text-4xl font-bold mb-2" style={{ color: 'var(--text-primary)' }}>
             {conversationTimeFilter === '7D' && metrics.totalConversations.count7D}
@@ -556,25 +520,55 @@ export default function FounderDashboard() {
               </>
             )}
           </div>
-          {/* 4. Sparkline Graph */}
+          {/* 4. Sparkline Graph + Filter + Action */}
           <div className="mt-auto">
             {metrics.trends?.conversations && (
               <div className="w-full mb-2" style={{ height: '40px' }}>
-                <Sparkline 
-                  data={metrics.trends.conversations.data} 
-                  color="#3B82F6" 
-                  height={40} 
+                <Sparkline
+                  data={metrics.trends.conversations.data}
+                  color="#3B82F6"
+                  height={40}
                 />
               </div>
             )}
-            {/* 5. Action Link */}
-            <button 
-              onClick={() => router.push('/dashboard/inbox')}
-              className="text-xs font-medium flex items-center gap-1 hover:underline"
-              style={{ color: '#3B82F6' }}
-            >
-              View All <MdArrowForward size={14} />
-            </button>
+            <div className="flex items-center justify-between">
+              <button
+                onClick={() => router.push('/dashboard/inbox')}
+                className="text-xs font-medium flex items-center gap-1 hover:underline"
+                style={{ color: '#3B82F6' }}
+              >
+                View All <MdArrowForward size={14} />
+              </button>
+              <div className="flex gap-1">
+                {(['7D', '14D', '30D'] as const).map((period) => (
+                  <button
+                    key={period}
+                    onClick={() => setConversationTimeFilter(period)}
+                    className={`px-2 py-0.5 text-[10px] rounded transition-colors ${
+                      conversationTimeFilter === period ? 'text-white' : ''
+                    }`}
+                    style={conversationTimeFilter === period
+                      ? { backgroundColor: '#3B82F6' }
+                      : { backgroundColor: 'rgba(59, 130, 246, 0.1)', color: 'var(--text-secondary)' }
+                    }
+                    onMouseEnter={(e) => {
+                      if (conversationTimeFilter !== period) {
+                        e.currentTarget.style.backgroundColor = '#3B82F6'
+                        e.currentTarget.style.opacity = '0.8'
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (conversationTimeFilter !== period) {
+                        e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.1)'
+                        e.currentTarget.style.opacity = '1'
+                      }
+                    }}
+                  >
+                    {period}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
 
@@ -638,41 +632,10 @@ export default function FounderDashboard() {
             justifyContent: 'space-between'
           }}
         >
-          {/* 1. Title + Filter */}
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <MdLocalFireDepartment className="text-orange-500" size={20} />
-              <h3 className="text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>Warm Leads</h3>
-            </div>
-            <div className="flex gap-1">
-              {(['7D', '14D', '30D'] as const).map((period) => (
-                <button
-                  key={period}
-                  onClick={() => setWarmLeadsFilter(period)}
-                  className={`px-2 py-1 text-xs rounded transition-colors ${
-                    warmLeadsFilter === period ? 'text-white' : ''
-                  }`}
-                  style={warmLeadsFilter === period
-                    ? { backgroundColor: '#F97316' }
-                    : { backgroundColor: 'rgba(249, 115, 22, 0.1)', color: 'var(--text-secondary)' }
-                  }
-                  onMouseEnter={(e) => {
-                    if (warmLeadsFilter !== period) {
-                      e.currentTarget.style.backgroundColor = '#F97316'
-                      e.currentTarget.style.opacity = '0.8'
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (warmLeadsFilter !== period) {
-                      e.currentTarget.style.backgroundColor = 'rgba(249, 115, 22, 0.1)'
-                      e.currentTarget.style.opacity = '1'
-                    }
-                  }}
-                >
-                  {period}
-                </button>
-              ))}
-            </div>
+          {/* 1. Title */}
+          <div className="flex items-center gap-2 mb-4">
+            <MdLocalFireDepartment className="text-orange-500" size={20} />
+            <h3 className="text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>Warm Leads</h3>
           </div>
           {/* 2. Big Number */}
           <p className="text-3xl sm:text-4xl font-bold mb-2" style={{ color: 'var(--text-primary)' }}>
@@ -689,7 +652,7 @@ export default function FounderDashboard() {
               From {metrics.totalLeads.count} total leads
             </p>
           </div>
-          {/* 4. Sparkline Graph */}
+          {/* 4. Sparkline Graph + Filter + Action */}
           <div className="mt-auto">
             {metrics.trends?.leads && (
               <div className="w-full mb-2" style={{ height: '40px' }}>
@@ -701,18 +664,48 @@ export default function FounderDashboard() {
                 />
               </div>
             )}
-            {/* 5. Action Link */}
-            <button
-              onClick={() => router.push('/dashboard/leads')}
-              className="text-xs font-medium flex items-center gap-1 hover:underline"
-              style={{ color: '#F97316' }}
-            >
-              View All <MdArrowForward size={14} />
-            </button>
+            <div className="flex items-center justify-between">
+              <button
+                onClick={() => router.push('/dashboard/leads')}
+                className="text-xs font-medium flex items-center gap-1 hover:underline"
+                style={{ color: '#F97316' }}
+              >
+                View All <MdArrowForward size={14} />
+              </button>
+              <div className="flex gap-1">
+                {(['7D', '14D', '30D'] as const).map((period) => (
+                  <button
+                    key={period}
+                    onClick={() => setWarmLeadsFilter(period)}
+                    className={`px-2 py-0.5 text-[10px] rounded transition-colors ${
+                      warmLeadsFilter === period ? 'text-white' : ''
+                    }`}
+                    style={warmLeadsFilter === period
+                      ? { backgroundColor: '#F97316' }
+                      : { backgroundColor: 'rgba(249, 115, 22, 0.1)', color: 'var(--text-secondary)' }
+                    }
+                    onMouseEnter={(e) => {
+                      if (warmLeadsFilter !== period) {
+                        e.currentTarget.style.backgroundColor = '#F97316'
+                        e.currentTarget.style.opacity = '0.8'
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (warmLeadsFilter !== period) {
+                        e.currentTarget.style.backgroundColor = 'rgba(249, 115, 22, 0.1)'
+                        e.currentTarget.style.opacity = '1'
+                      }
+                    }}
+                  >
+                    {period}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Card 3: Total Leads */}
+        {/* Card 4: Total Leads */}
         <div
           className="rounded-lg p-4 sm:p-6 border transition-all hover:shadow-lg flex flex-col"
           style={{
@@ -721,44 +714,8 @@ export default function FounderDashboard() {
             justifyContent: 'space-between'
           }}
         >
-          {/* 1. Title + Filter */}
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>Total Leads</h3>
-            <div className="flex gap-1">
-              {(['7D', '14D', '30D'] as const).map((period) => (
-                <button
-                  key={period}
-                  onClick={() => setLeadsFilter(period)}
-                  className={`px-2 py-1 text-xs rounded transition-colors ${
-                    leadsFilter === period
-                      ? 'text-white'
-                      : ''
-                  }`}
-                  style={leadsFilter === period
-                    ? { backgroundColor: 'var(--accent-primary)' }
-                    : {
-                        backgroundColor: 'var(--accent-subtle)',
-                        color: 'var(--text-secondary)'
-                      }
-                  }
-                  onMouseEnter={(e) => {
-                    if (leadsFilter !== period) {
-                      e.currentTarget.style.backgroundColor = 'var(--accent-primary)'
-                      e.currentTarget.style.opacity = '0.8'
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (leadsFilter !== period) {
-                      e.currentTarget.style.backgroundColor = 'var(--accent-subtle)'
-                      e.currentTarget.style.opacity = '1'
-                    }
-                  }}
-                >
-                  {period}
-                </button>
-              ))}
-            </div>
-          </div>
+          {/* 1. Title */}
+          <h3 className="text-sm font-semibold mb-4" style={{ color: 'var(--text-secondary)' }}>Total Leads</h3>
           {/* 2. Big Number */}
           <p className="text-3xl sm:text-4xl font-bold mb-2" style={{ color: 'var(--text-primary)' }}>
             {leadsFilter === '7D' && (metrics.totalLeads.count7D ?? metrics.totalLeads.count)}
@@ -771,7 +728,7 @@ export default function FounderDashboard() {
               {metrics.totalLeads.count} all time
             </p>
           </div>
-          {/* 4. Sparkline Graph */}
+          {/* 4. Sparkline Graph + Filter + Action */}
           <div className="mt-auto">
             {metrics.trends?.leads && (
               <div className="w-full mb-2" style={{ height: '40px' }}>
@@ -783,93 +740,118 @@ export default function FounderDashboard() {
                 />
               </div>
             )}
-            {/* 5. Action Link */}
-            <button
-              onClick={() => router.push('/dashboard/leads')}
-              className="text-xs font-medium flex items-center gap-1 hover:underline"
-              style={{ color: 'var(--accent-primary)' }}
-            >
-              View All <MdArrowForward size={14} />
-            </button>
+            <div className="flex items-center justify-between">
+              <button
+                onClick={() => router.push('/dashboard/leads')}
+                className="text-xs font-medium flex items-center gap-1 hover:underline"
+                style={{ color: 'var(--accent-primary)' }}
+              >
+                View All <MdArrowForward size={14} />
+              </button>
+              <div className="flex gap-1">
+                {(['7D', '14D', '30D'] as const).map((period) => (
+                  <button
+                    key={period}
+                    onClick={() => setLeadsFilter(period)}
+                    className={`px-2 py-0.5 text-[10px] rounded transition-colors ${
+                      leadsFilter === period ? 'text-white' : ''
+                    }`}
+                    style={leadsFilter === period
+                      ? { backgroundColor: 'var(--accent-primary)' }
+                      : { backgroundColor: 'var(--accent-subtle)', color: 'var(--text-secondary)' }
+                    }
+                    onMouseEnter={(e) => {
+                      if (leadsFilter !== period) {
+                        e.currentTarget.style.backgroundColor = 'var(--accent-primary)'
+                        e.currentTarget.style.opacity = '0.8'
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (leadsFilter !== period) {
+                        e.currentTarget.style.backgroundColor = 'var(--accent-subtle)'
+                        e.currentTarget.style.opacity = '1'
+                      }
+                    }}
+                  >
+                    {period}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Card 4: Upcoming Events - Semantic blue for info/upcoming */}
-        <div 
-          className="rounded-lg p-4 sm:p-6 border transition-all hover:shadow-lg flex flex-col"
-          style={{ 
-            backgroundColor: 'rgba(59, 130, 246, 0.05)',
-            borderColor: 'rgba(59, 130, 246, 0.2)',
-            justifyContent: 'space-between'
-          }}
-        >
-          {/* 1. Title */}
-          <h3 className="text-sm font-semibold mb-4" style={{ color: 'var(--text-secondary)' }}>Upcoming Events</h3>
-          {/* 2. Big Number */}
-          <p className="text-3xl sm:text-4xl font-bold mb-2" style={{ color: 'var(--text-primary)' }}>
-            {metrics.upcomingBookings.length}
-          </p>
-          {/* 3. Event Items List */}
-          {metrics.upcomingBookings.length > 0 ? (
-            <div className="space-y-2 mb-2">
-              {metrics.upcomingBookings.slice(0, 2).map((booking) => (
-                <div
-                  key={booking.id}
-                  onClick={() => openLeadModal(booking.id)}
-                  className="flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all border"
-                  style={{
-                    borderColor: 'rgba(59, 130, 246, 0.2)',
-                    backgroundColor: 'var(--bg-tertiary)',
-                    borderRadius: '8px',
-                    borderWidth: '1px'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.1)'
-                    e.currentTarget.style.borderColor = '#3B82F6'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)'
-                    e.currentTarget.style.borderColor = 'var(--accent-subtle)'
-                  }}
-                >
-                  {/* Calendar Icon */}
-                  <MdEvent 
-                    className="flex-shrink-0" 
-                    size={18} 
-                    style={{ color: '#3B82F6' }} 
-                  />
-                  {/* Event Info */}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>
-                      {booking.name}
-                    </p>
-                    <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                      {formatCountdown(booking.datetime)}
-                    </p>
-                  </div>
-                  {/* Arrow Icon */}
-                  <MdArrowForward 
-                    className="flex-shrink-0" 
-                    size={16} 
-                    style={{ color: '#3B82F6' }} 
-                  />
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-xs mb-2" style={{ color: 'var(--text-secondary)' }}>No upcoming events</p>
-          )}
-          {/* 4. Action Link */}
-          <div className="mt-auto">
-            <button 
-              onClick={() => router.push('/dashboard/bookings')}
-              className="text-xs font-medium flex items-center gap-1 hover:underline"
-              style={{ color: '#3B82F6' }}
-            >
-              View All <MdArrowForward size={14} />
-            </button>
+      </div>
+
+      {/* Upcoming Events - Full width below cards */}
+      <div
+        className="rounded-lg p-4 sm:p-6 border transition-all hover:shadow-lg mb-6"
+        style={{
+          backgroundColor: 'rgba(59, 130, 246, 0.05)',
+          borderColor: 'rgba(59, 130, 246, 0.2)',
+        }}
+      >
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <h3 className="text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>Upcoming Events</h3>
+            <span className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
+              {metrics.upcomingBookings.length}
+            </span>
           </div>
+          <button
+            onClick={() => router.push('/dashboard/bookings')}
+            className="text-xs font-medium flex items-center gap-1 hover:underline"
+            style={{ color: '#3B82F6' }}
+          >
+            View All <MdArrowForward size={14} />
+          </button>
         </div>
+        {metrics.upcomingBookings.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {metrics.upcomingBookings.slice(0, 4).map((booking) => (
+              <div
+                key={booking.id}
+                onClick={() => openLeadModal(booking.id)}
+                className="flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all border"
+                style={{
+                  borderColor: 'rgba(59, 130, 246, 0.2)',
+                  backgroundColor: 'var(--bg-tertiary)',
+                  borderRadius: '8px',
+                  borderWidth: '1px'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.1)'
+                  e.currentTarget.style.borderColor = '#3B82F6'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)'
+                  e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.2)'
+                }}
+              >
+                <MdEvent
+                  className="flex-shrink-0"
+                  size={18}
+                  style={{ color: '#3B82F6' }}
+                />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>
+                    {booking.name}
+                  </p>
+                  <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                    {formatCountdown(booking.datetime)}
+                  </p>
+                </div>
+                <MdArrowForward
+                  className="flex-shrink-0"
+                  size={16}
+                  style={{ color: '#3B82F6' }}
+                />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>No upcoming events</p>
+        )}
       </div>
 
       {/* BOTTOM ROW - Leads Needing Attention & Recent Activity */}
