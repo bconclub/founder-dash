@@ -70,9 +70,22 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [buildDate, setBuildDate] = useState<string>('')
   const [buildVersion, setBuildVersion] = useState<string>('0.0.1')
   const [moreOptionsOpen, setMoreOptionsOpen] = useState(false)
+  const moreOptionsRef = React.useRef<HTMLDivElement>(null)
   const autoHideTimeoutRef = React.useRef<NodeJS.Timeout | null>(null)
   const sidebarCloseTimeoutRef = React.useRef<NodeJS.Timeout | null>(null)
   const [sidebarInteractionTime, setSidebarInteractionTime] = useState<number | null>(null)
+
+  // Close more-options menu on click outside
+  useEffect(() => {
+    if (!moreOptionsOpen) return
+    function handleClick(e: MouseEvent) {
+      if (moreOptionsRef.current && !moreOptionsRef.current.contains(e.target as Node)) {
+        setMoreOptionsOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [moreOptionsOpen])
 
   // Get build/deployment date and version (only on client to avoid hydration mismatch)
   useEffect(() => {
@@ -563,7 +576,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             }}
           >
             {/* Three-dot menu */}
-            <div className="dashboard-layout-more-options relative">
+            <div className="dashboard-layout-more-options relative" ref={moreOptionsRef}>
               <button
                 onClick={() => setMoreOptionsOpen(!moreOptionsOpen)}
                 className="dashboard-layout-icon-button flex items-center justify-center rounded-md transition-colors"
@@ -592,13 +605,12 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
               {moreOptionsOpen && (
                 <div
-                  className="dashboard-layout-more-options-dropdown absolute bottom-full left-0 mb-2 rounded-md shadow-lg py-1 z-50"
+                  className="dashboard-layout-more-options-dropdown absolute bottom-0 left-full ml-2 rounded-md shadow-lg py-1 z-50"
                   style={{
                     backgroundColor: 'var(--bg-secondary)',
                     border: '1px solid var(--border-primary)',
                     minWidth: '180px',
                   }}
-                  onMouseLeave={() => setMoreOptionsOpen(false)}
                 >
                   <button
                     onClick={() => {

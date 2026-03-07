@@ -162,7 +162,7 @@ export default function LeadsTable({
   const [courseInterestFilter, setCourseInterestFilter] = useState<string>('all')
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [limit, setLimit] = useState<number>(initialLimit || 10)
+  const [limit, setLimit] = useState<number>(initialLimit || 50)
 
   // Update limit when initialLimit prop changes
   useEffect(() => {
@@ -475,8 +475,9 @@ export default function LeadsTable({
                   color: 'var(--text-primary)',
                 }}
               >
-                <option value={5}>5</option>
                 <option value={10}>10</option>
+                <option value={25}>25</option>
+                <option value={50}>50</option>
               </select>
             </div>
           )}

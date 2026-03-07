@@ -77,50 +77,13 @@ function renderMarkdown(text: string) {
   });
 }
 
-/** Parse structured summary (LABEL: content) into compact formatted blocks */
+/** Render summary as plain text — just sentences, no formatting */
 function renderSummary(text: string) {
   if (!text) return null;
-
-  const labelIcons: Record<string, string> = {
-    'BUSINESS': '🏢',
-    'PROBLEM': '⚡',
-    'DISCUSSION': '💬',
-    'BOOKING': '📅',
-    'STATUS': '📊',
-    'RED FLAGS': '🚩',
-    'NEXT STEP': '→',
-  };
-
-  // Try to split on known labels
-  const labelPattern = /\b(BUSINESS|PROBLEM|DISCUSSION|BOOKING|STATUS|RED FLAGS|NEXT STEP)\s*:\s*/g;
-  const matches = [...text.matchAll(labelPattern)];
-
-  if (matches.length < 2) {
-    // Not a structured summary — render as plain markdown
-    return <span>{renderMarkdown(text)}</span>;
-  }
-
-  const sections: { label: string; content: string }[] = [];
-  for (let i = 0; i < matches.length; i++) {
-    const label = matches[i][1];
-    const start = matches[i].index! + matches[i][0].length;
-    const end = i + 1 < matches.length ? matches[i + 1].index! : text.length;
-    const content = text.slice(start, end).trim();
-    if (content) sections.push({ label, content });
-  }
-
   return (
-    <div className="space-y-1.5">
-      {sections.map((s, i) => (
-        <div key={i} className="flex gap-1.5 text-xs leading-snug">
-          <span className="flex-shrink-0 w-4 text-center">{labelIcons[s.label] || '•'}</span>
-          <div>
-            <span className="font-semibold text-gray-900 dark:text-white">{s.label}</span>
-            <span className="text-gray-600 dark:text-gray-400"> {s.content}</span>
-          </div>
-        </div>
-      ))}
-    </div>
+    <p className="text-xs leading-relaxed" style={{ color: 'var(--text-primary)' }}>
+      {text.trim()}
+    </p>
   );
 }
 

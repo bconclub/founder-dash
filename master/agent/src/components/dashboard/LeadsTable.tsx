@@ -16,8 +16,12 @@ import {
   MdChevronRight,
   MdHistory,
   MdAccessTime,
-  MdOutlineInsights
+  MdOutlineInsights,
+  MdTrendingUp,
+  MdTrendingDown,
+  MdRemove
 } from 'react-icons/md'
+import { createClient } from '@/lib/supabase/client'
 import { FaWhatsapp } from 'react-icons/fa'
 
 const STATUS_OPTIONS = [
@@ -52,8 +56,10 @@ const getStageColor = (stage: string | null) => {
     'Booking Made': { bg: 'bg-green-100 dark:bg-green-900', text: 'text-green-800 dark:text-green-200' },
     'Converted': { bg: 'bg-emerald-100 dark:bg-emerald-900', text: 'text-emerald-800 dark:text-emerald-200' },
     'Closed Lost': { bg: 'bg-red-100 dark:bg-red-900', text: 'text-red-800 dark:text-red-200' },
+    'Not Qualified': { bg: 'bg-rose-100 dark:bg-rose-900', text: 'text-rose-800 dark:text-rose-200' },
     'In Sequence': { bg: '', text: '', style: { backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' } },
     'Cold': { bg: 'bg-gray-100 dark:bg-gray-900', text: 'text-gray-800 dark:text-gray-200' },
+    'R&R': { bg: 'bg-amber-100 dark:bg-amber-900', text: 'text-amber-800 dark:text-amber-200' },
   }
   return stageColors[stage || 'New'] || stageColors['New']
 }
@@ -142,10 +148,13 @@ export default function LeadsTable({
 }: LeadsTableProps) {
   const { leads, loading, error } = useRealtimeLeads()
   const brandId = getCurrentBrandId()
-  const isWindchasers = brandId === 'windchasers'
+  // Aviation-specific columns only shown for windchasers brand
+  const showAviationColumns = brandId === 'windchasers'
   const [filteredLeads, setFilteredLeads] = useState<ExtendedLead[]>([])
   const [calculatedScores, setCalculatedScores] = useState<Record<string, number>>({})
   const [calculatingScores, setCalculatingScores] = useState(false)
+  const [scoreTrends, setScoreTrends] = useState<Record<string, { prev: number; diff: number }>>({})
+
   const [dateFilter, setDateFilter] = useState<string>('all')
   const [sourceFilter, setSourceFilter] = useState<string>(initialSourceFilter || 'all')
   const [statusFilter, setStatusFilter] = useState<string>('all')
@@ -153,7 +162,7 @@ export default function LeadsTable({
   const [courseInterestFilter, setCourseInterestFilter] = useState<string>('all')
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [limit, setLimit] = useState<number>(initialLimit || 10)
+  const [limit, setLimit] = useState<number>(initialLimit || 50)
 
   // Update limit when initialLimit prop changes
   useEffect(() => {
@@ -212,7 +221,7 @@ export default function LeadsTable({
       })
     }
 
-    if (isWindchasers && courseInterestFilter !== 'all') {
+    if (courseInterestFilter !== 'all') {
       filtered = filtered.filter((lead) => {
         const brandData = lead.unified_context?.[brandId] || {}
         return brandData.course_interest === courseInterestFilter
@@ -226,6 +235,43 @@ export default function LeadsTable({
 
     setFilteredLeads(filtered as ExtendedLead[])
   }, [leads, dateFilter, sourceFilter, statusFilter, userTypeFilter, courseInterestFilter, limit])
+
+  // Fetch previous scores for trend arrows (from lead_stage_changes)
+  useEffect(() => {
+    if (filteredLeads.length === 0) return
+
+    const fetchTrends = async () => {
+      try {
+        const supabase = createClient()
+        const leadIds = filteredLeads.slice(0, 50).map(l => l.id)
+
+        // Get the most recent stage change per lead (which has old_score and new_score)
+        const { data: changes } = await supabase
+          .from('lead_stage_changes')
+          .select('lead_id, old_score, new_score, created_at')
+          .in('lead_id', leadIds)
+          .order('created_at', { ascending: false })
+
+        if (changes && changes.length > 0) {
+          const trends: Record<string, { prev: number; diff: number }> = {}
+          // Get the latest change per lead
+          for (const change of changes) {
+            if (!trends[change.lead_id] && change.old_score !== null && change.new_score !== null) {
+              trends[change.lead_id] = {
+                prev: change.old_score,
+                diff: change.new_score - change.old_score,
+              }
+            }
+          }
+          setScoreTrends(trends)
+        }
+      } catch (err) {
+        console.error('Error fetching score trends:', err)
+      }
+    }
+
+    fetchTrends()
+  }, [filteredLeads])
 
   // Calculate scores for filtered leads (same calculation as modal)
   useEffect(() => {
@@ -316,7 +362,7 @@ export default function LeadsTable({
   }
 
   const exportToCSV = () => {
-    const headers = isWindchasers
+    const headers = showAviationColumns
       ? ['Name', 'Email', 'Phone', 'First Touch', 'User Type', 'Course Interest', 'Timeline', 'Score', 'Stage', 'Key Event']
       : ['Name', 'Email', 'Phone', 'First Touch', 'Interest', 'Timeline', 'Score', 'Stage', 'Key Event']
     const rows = filteredLeads.map((lead) => {
@@ -361,7 +407,7 @@ export default function LeadsTable({
       const courseInterest = brandData.course_interest || ''
       const timeline = brandData.plan_to_fly || brandData.timeline || ''
       const interest = brandData.pain_point || brandData.course_interest || ''
-      if (isWindchasers) {
+      if (showAviationColumns) {
         return [
           lead.name || '',
           lead.email || '',
@@ -429,8 +475,9 @@ export default function LeadsTable({
                   color: 'var(--text-primary)',
                 }}
               >
-                <option value={5}>5</option>
                 <option value={10}>10</option>
+                <option value={25}>25</option>
+                <option value={50}>50</option>
               </select>
             </div>
           )}
@@ -452,7 +499,7 @@ export default function LeadsTable({
           <select
             value={dateFilter}
             onChange={(e) => setDateFilter(e.target.value)}
-            className="leads-table-filter leads-table-filter-date px-3 py-2 border border-gray-300 dark:border-[#3A2F2A] bg-white dark:bg-[#1A0F0A] text-gray-900 dark:text-white rounded-md text-sm"
+            className="leads-table-filter leads-table-filter-date px-3 py-2 border border-gray-300 dark:border-[#1E1E2E] bg-white dark:bg-[#0A0A0B] text-gray-900 dark:text-white rounded-md text-sm"
           >
             <option value="all">All Dates</option>
             <option value="today">Today</option>
@@ -464,7 +511,7 @@ export default function LeadsTable({
             <select
               value={sourceFilter}
               onChange={(e) => setSourceFilter(e.target.value)}
-              className="leads-table-filter leads-table-filter-source px-3 py-2 border border-gray-300 dark:border-[#3A2F2A] bg-white dark:bg-[#1A0F0A] text-gray-900 dark:text-white rounded-md text-sm"
+              className="leads-table-filter leads-table-filter-source px-3 py-2 border border-gray-300 dark:border-[#1E1E2E] bg-white dark:bg-[#0A0A0B] text-gray-900 dark:text-white rounded-md text-sm"
             >
               <option value="all">All Sources</option>
               <option value="web">Web</option>
@@ -477,7 +524,7 @@ export default function LeadsTable({
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="leads-table-filter leads-table-filter-status px-3 py-2 border border-gray-300 dark:border-[#3A2F2A] bg-white dark:bg-[#1A0F0A] text-gray-900 dark:text-white rounded-md text-sm"
+            className="leads-table-filter leads-table-filter-status px-3 py-2 border border-gray-300 dark:border-[#1E1E2E] bg-white dark:bg-[#0A0A0B] text-gray-900 dark:text-white rounded-md text-sm"
           >
             <option value="all">All Statuses</option>
             {STATUS_OPTIONS.map((status) => (
@@ -488,11 +535,11 @@ export default function LeadsTable({
           </select>
 
           {/* Brand-specific filters */}
-          {isWindchasers && (
+          {showAviationColumns && (
             <select
               value={userTypeFilter}
               onChange={(e) => setUserTypeFilter(e.target.value)}
-              className="leads-table-filter leads-table-filter-user-type px-3 py-2 border border-gray-300 dark:border-[#3A2F2A] bg-white dark:bg-[#1A0F0A] text-gray-900 dark:text-white rounded-md text-sm"
+              className="leads-table-filter leads-table-filter-user-type px-3 py-2 border border-gray-300 dark:border-[#1E1E2E] bg-white dark:bg-[#0A0A0B] text-gray-900 dark:text-white rounded-md text-sm"
             >
               <option value="all">All User Types</option>
               <option value="student">Student</option>
@@ -501,11 +548,11 @@ export default function LeadsTable({
             </select>
           )}
 
-          {isWindchasers && (
+          {showAviationColumns && (
             <select
               value={courseInterestFilter}
               onChange={(e) => setCourseInterestFilter(e.target.value)}
-              className="leads-table-filter leads-table-filter-course-interest px-3 py-2 border border-gray-300 dark:border-[#3A2F2A] bg-white dark:bg-[#1A0F0A] text-gray-900 dark:text-white rounded-md text-sm"
+              className="leads-table-filter leads-table-filter-course-interest px-3 py-2 border border-gray-300 dark:border-[#1E1E2E] bg-white dark:bg-[#0A0A0B] text-gray-900 dark:text-white rounded-md text-sm"
             >
               <option value="all">All Courses</option>
               <option value="DGCA">DGCA</option>
@@ -519,7 +566,7 @@ export default function LeadsTable({
           <button
             onClick={exportToCSV}
             className="leads-table-export-button ml-auto px-4 py-2 text-white rounded-md text-sm transition-colors"
-            style={{ backgroundColor: 'var(--primary-color, #C9A961)' }}
+            style={{ backgroundColor: 'var(--accent-primary, #8B5CF6)' }}
             onMouseEnter={(e) => e.currentTarget.style.opacity = '0.85'}
             onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
           >
@@ -530,49 +577,61 @@ export default function LeadsTable({
 
       {/* Table */}
       <div className="leads-table-container overflow-x-auto overflow-y-visible">
-        <table className="leads-table-table min-w-full divide-y divide-gray-200 dark:divide-[#262626]">
-          <thead className="leads-table-thead bg-gray-50 dark:bg-[#1A0F0A]">
+        <table className="leads-table-table min-w-full divide-y divide-gray-200 dark:divide-[#262626]" style={{ tableLayout: 'fixed' }}>
+          <colgroup>
+            <col style={{ width: '160px' }} /> {/* Name */}
+            <col style={{ width: '170px' }} /> {/* Email */}
+            <col style={{ width: '120px' }} /> {/* Phone */}
+            <col style={{ width: '90px' }} />  {/* First Touch */}
+            {showAviationColumns && <col style={{ width: '100px' }} />} {/* User Type */}
+            {showAviationColumns && <col style={{ width: '110px' }} />} {/* Course Interest */}
+            <col style={{ width: '80px' }} />  {/* Timeline */}
+            <col style={{ width: '70px' }} />  {/* Score */}
+            <col style={{ width: '100px' }} /> {/* Stage */}
+            <col style={{ width: '130px' }} /> {/* Key Event */}
+          </colgroup>
+          <thead className="leads-table-thead bg-gray-50 dark:bg-[#0A0A0B]">
             <tr className="leads-table-thead-row">
-              <th className="leads-table-th leads-table-th-name px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              <th className="leads-table-th leads-table-th-name px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 Name
               </th>
-              <th className="leads-table-th leads-table-th-email px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              <th className="leads-table-th leads-table-th-email px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 Email
               </th>
-              <th className="leads-table-th leads-table-th-phone px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              <th className="leads-table-th leads-table-th-phone px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 Phone
               </th>
-              <th className="leads-table-th leads-table-th-first-touch px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                First Touch
+              <th className="leads-table-th leads-table-th-first-touch px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                Source
               </th>
-              {isWindchasers && (
-                <th className="leads-table-th leads-table-th-user-type px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              {showAviationColumns && (
+                <th className="leads-table-th leads-table-th-user-type px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   User Type
                 </th>
               )}
-              {isWindchasers && (
-                <th className="leads-table-th leads-table-th-course-interest px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              {showAviationColumns && (
+                <th className="leads-table-th leads-table-th-course-interest px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Course Interest
                 </th>
               )}
-              <th className="leads-table-th leads-table-th-timeline px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              <th className="leads-table-th leads-table-th-timeline px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 Timeline
               </th>
-              <th className="leads-table-th leads-table-th-score px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              <th className="leads-table-th leads-table-th-score px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 Score
               </th>
-              <th className="leads-table-th leads-table-th-stage px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              <th className="leads-table-th leads-table-th-stage px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 Stage
               </th>
-              <th className="leads-table-th leads-table-th-key-event px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              <th className="leads-table-th leads-table-th-key-event px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                 Key Event
               </th>
             </tr>
           </thead>
-          <tbody className="leads-table-tbody bg-white dark:bg-[#1A0F0A] divide-y divide-gray-200 dark:divide-[#3A2F2A]">
+          <tbody className="leads-table-tbody bg-white dark:bg-[#0A0A0B] divide-y divide-gray-200 dark:divide-[#1E1E2E]">
             {filteredLeads.length === 0 ? (
               <tr className="leads-table-empty-row">
-                <td colSpan={isWindchasers ? 10 : 8} className="leads-table-empty-cell px-6 py-4 text-center text-gray-500 dark:text-gray-400">
+                <td colSpan={showAviationColumns ? 10 : 8} className="leads-table-empty-cell px-3 py-4 text-center text-gray-500 dark:text-gray-400">
                   No leads found
                 </td>
               </tr>
@@ -580,19 +639,19 @@ export default function LeadsTable({
               filteredLeads.map((lead) => (
                 <tr
                   key={lead.id}
-                  className="leads-table-row hover:bg-gray-50 dark:hover:bg-[#2A1F1A] cursor-pointer transition-colors"
+                  className="leads-table-row hover:bg-gray-50 dark:hover:bg-[#1A1A2E] cursor-pointer transition-colors"
                   onClick={() => handleRowClick(lead)}
                 >
-                  <td className="leads-table-cell leads-table-cell-name px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
+                  <td className="leads-table-cell leads-table-cell-name px-3 py-4 text-sm font-medium text-gray-900 dark:text-white truncate" title={lead.name || '-'}>
                     {lead.name || '-'}
                   </td>
-                  <td className="leads-table-cell leads-table-cell-email px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                  <td className="leads-table-cell leads-table-cell-email px-3 py-4 text-sm text-gray-500 dark:text-gray-400 truncate" title={lead.email || '-'}>
                     {lead.email || '-'}
                   </td>
-                  <td className="leads-table-cell leads-table-cell-phone px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                  <td className="leads-table-cell leads-table-cell-phone px-3 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                     {lead.phone || '-'}
                   </td>
-                  <td className="leads-table-cell leads-table-cell-first-touch px-6 py-4 whitespace-nowrap text-sm">
+                  <td className="leads-table-cell leads-table-cell-first-touch px-3 py-4 whitespace-nowrap text-sm">
                     {(() => {
                       const source = (lead.first_touchpoint || lead.source || 'unknown').toLowerCase()
                       const config: Record<string, any> = {
@@ -614,8 +673,8 @@ export default function LeadsTable({
                       )
                     })()}
                   </td>
-                  {isWindchasers && (
-                    <td className="leads-table-cell leads-table-cell-user-type px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                  {showAviationColumns && (
+                    <td className="leads-table-cell leads-table-cell-user-type px-3 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                       {(() => {
                         const brandData = lead.unified_context?.[brandId] || {}
                         const userType = brandData.user_type
@@ -636,8 +695,8 @@ export default function LeadsTable({
                       })()}
                     </td>
                   )}
-                  {isWindchasers && (
-                    <td className="leads-table-cell leads-table-cell-course-interest px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                  {showAviationColumns && (
+                    <td className="leads-table-cell leads-table-cell-course-interest px-3 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                       {(() => {
                         const brandData = lead.unified_context?.[brandId] || {}
                         const courseInterest = brandData.course_interest
@@ -658,7 +717,7 @@ export default function LeadsTable({
                       })()}
                     </td>
                   )}
-                  <td className="leads-table-cell leads-table-cell-timeline px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                  <td className="leads-table-cell leads-table-cell-timeline px-3 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                     {(() => {
                       const brandData = lead.unified_context?.[brandId] || {}
                       // Check both plan_to_fly and timeline for backward compatibility
@@ -679,12 +738,13 @@ export default function LeadsTable({
                       )
                     })()}
                   </td>
-                  <td className="leads-table-cell leads-table-cell-score px-6 py-4 whitespace-nowrap text-sm">
+                  <td className="leads-table-cell leads-table-cell-score px-3 py-4 whitespace-nowrap text-sm">
                     {(() => {
                       // Use calculated score (same as modal) if available, otherwise fallback to stored score
                       const calculatedScore = calculatedScores[lead.id]
                       const score = calculatedScore !== undefined ? calculatedScore : (lead.lead_score ?? (lead as any).leadScore ?? (lead as any).score ?? null)
                       const badgeStyle = getScoreBadgeStyle(score)
+                      const trend = scoreTrends[lead.id]
                       return (
                         <div
                           className="leads-table-score-badge relative rounded-lg px-3 py-1.5 transition-all hover:scale-105 shadow-sm group border"
@@ -698,19 +758,21 @@ export default function LeadsTable({
                             className="absolute top-0 left-0 right-0 h-0.5 rounded-t-lg transition-all group-hover:h-1.5"
                             style={{ backgroundColor: badgeStyle.hex }}
                           ></div>
-                          <div className="flex items-center justify-center">
-                            <span className={`leads-table-score-value font-extrabold text-base ${badgeStyle.textColor}`}>
-                              {score !== null && score !== undefined ? score : '--'}
-                            </span>
-                            {(lead.stage_override || (lead as any).stageOverride) && (
-                              <span className="leads-table-score-override text-[10px] ml-1 opacity-50" title="Manual override">🔒</span>
-                            )}
+                          <div className="flex flex-col items-center justify-center gap-0.5">
+                            <div className="flex items-center gap-1">
+                              <span className={`leads-table-score-value font-extrabold text-base ${badgeStyle.textColor}`}>
+                                {score !== null && score !== undefined ? score : '--'}
+                              </span>
+                              {(lead.stage_override || (lead as any).stageOverride) && (
+                                <span className="leads-table-score-override text-[10px] opacity-50" title="Manual override">🔒</span>
+                              )}
+                            </div>
                           </div>
                         </div>
                       )
                     })()}
                   </td>
-                  <td className="leads-table-cell leads-table-cell-stage px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                  <td className="leads-table-cell leads-table-cell-stage px-3 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                     {(() => {
                       // Try multiple possible property names for stage
                       const stage = lead.lead_stage ?? (lead as any).leadStage ?? (lead as any).stage ?? null
@@ -734,7 +796,7 @@ export default function LeadsTable({
                       return '-'
                     })()}
                   </td>
-                  <td className="leads-table-cell leads-table-cell-key-event px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                  <td className="leads-table-cell leads-table-cell-key-event px-3 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                     {(() => {
                       const bookingDate = lead.booking_date ||
                         lead.unified_context?.web?.booking_date ||

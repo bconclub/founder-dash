@@ -291,36 +291,25 @@ export async function GET(
       const apiKey = process.env.CLAUDE_API_KEY
       if (apiKey) {
         try {
-          const prompt = `You are summarizing a sales conversation for the BCON team. Read the FULL conversation below and generate a brief but complete summary.
+          const prompt = `Summarize this lead conversation in 2-3 sentences max. Plain text, no emojis, no headers, no labels.
+Sentence 1: Who they are and what they do.
+Sentence 2: What their problem is and what was discussed.
+Sentence 3: What happened (booked/pending/lost) and what to do next.
+If anything went wrong (booking failed, customer frustrated, asked for human), mention it clearly.
 
-REQUIRED SECTIONS (include all that apply):
-1. **BUSINESS**: What does this lead's business do? (from what THEY said in conversation)
-2. **PROBLEM**: What challenges or pain points did they mention?
-3. **DISCUSSION**: What solutions or services were discussed?
-4. **BOOKING**: Was a call booked? Date/time? Did it succeed or fail?
-5. **STATUS**: Are they engaged, cold, frustrated, or lost?
-6. **RED FLAGS**: Did they ask for a human? Get upset? Go silent? Hit errors?
-7. **NEXT STEP**: What should the team do next?
+Example:
+Gopal runs Craft House Inc, a furniture and home decor business in Bangalore. Running Meta ads but losing 70% of leads after they hit the website — discussed an AI system to auto-capture and follow up. Agreed to a call but no time confirmed yet — follow up to lock in a slot.
 
-RULES:
-- 3-5 sentences max. Be specific with actual details from the conversation.
-- Use markdown **bolding** for key info (business name, booking date, red flags).
-- DO NOT use generic phrases like "high intent", "shows interest", "50% response rate".
-- DO NOT describe stats. Describe what ACTUALLY HAPPENED.
+Another example:
+Wasi runs Design Lyf Realty and Interiors in Bangalore. Meta ads bringing fake leads, wants AI qualification. Tried to book Monday 3pm but booking looped and he got frustrated — asked for a human. Call him directly to recover.
 
-BAD: "Lead shows high intent with 50% response rate. Inactive for 2 days."
-GOOD: "**Wasi** runs **Design Lyf Realty & Interiors** in Bangalore — interior design focus. Getting Meta ad leads but quality is poor. Tried to book **Monday 3pm** but booking tool looped. Got frustrated and asked for a human. **Needs manual outreach** — call him directly."
+Keep it under 50 words. Be specific. No fluff.
 
 Lead: ${lead.customer_name || 'Customer'}
 Stage: ${lead.lead_stage || 'Unknown'}${lead.sub_stage ? ' (' + lead.sub_stage + ')' : ''}
-${profileInfo.length > 0 ? 'Extracted Profile: ' + profileInfo.join(' | ') : ''}
+${profileInfo.length > 0 ? 'Profile: ' + profileInfo.join(' | ') : ''}
 
-${fullConversationContext ? `FULL CONVERSATION (${allConversationMessages.length} messages):\n${fullConversationContext}` : `Channel Summaries:\n${webSummary ? 'Web: ' + webSummary + '\n' : ''}${whatsappSummary ? 'WhatsApp: ' + whatsappSummary + '\n' : ''}`}
-
-Recent Activities:
-${activitiesContext}
-
-Generate the summary now. Focus on WHAT WAS DISCUSSED, not metrics.`
+${fullConversationContext ? `CONVERSATION (${allConversationMessages.length} messages):\n${fullConversationContext}` : `Channel Summaries:\n${webSummary ? 'Web: ' + webSummary + '\n' : ''}${whatsappSummary ? 'WhatsApp: ' + whatsappSummary + '\n' : ''}`}`
 
           // Add timeout to prevent hanging
           const controller = new AbortController()
@@ -337,7 +326,7 @@ Generate the summary now. Focus on WHAT WAS DISCUSSED, not metrics.`
               },
               body: JSON.stringify({
                 model: 'claude-sonnet-4-20250514',
-                max_tokens: 800,
+                max_tokens: 200,
                 messages: [
                   {
                     role: 'user',
@@ -672,37 +661,26 @@ Generate the summary now. Focus on WHAT WAS DISCUSSED, not metrics.`
         if (waProfile.city || webProfile.city) profileInfo.push(`City: ${waProfile.city || webProfile.city}`)
         if (waProfile.notes || webProfile.notes) profileInfo.push(`Notes: ${waProfile.notes || webProfile.notes}`)
 
-        const prompt = `You are summarizing a sales conversation for the BCON team. Read the FULL conversation below and generate a brief but complete summary.
+        const prompt = `Summarize this lead conversation in 2-3 sentences max. Plain text, no emojis, no headers, no labels.
+Sentence 1: Who they are and what they do.
+Sentence 2: What their problem is and what was discussed.
+Sentence 3: What happened (booked/pending/lost) and what to do next.
+If anything went wrong (booking failed, customer frustrated, asked for human), mention it clearly.
 
-REQUIRED SECTIONS (include all that apply):
-1. **BUSINESS**: What does this lead's business do? (from what THEY said in conversation, not form data)
-2. **PROBLEM**: What challenges or pain points did they mention?
-3. **DISCUSSION**: What solutions or services were discussed?
-4. **BOOKING**: Was a call booked? Date/time? Did it succeed or fail? Any booking errors?
-5. **STATUS**: Are they engaged, cold, frustrated, or lost?
-6. **RED FLAGS**: Did they ask for a human? Get upset? Go silent? Hit errors?
-7. **NEXT STEP**: What should the team do next?
+Example:
+Gopal runs Craft House Inc, a furniture and home decor business in Bangalore. Running Meta ads but losing 70% of leads after they hit the website — discussed an AI system to auto-capture and follow up. Agreed to a call but no time confirmed yet — follow up to lock in a slot.
 
-RULES:
-- 3-5 sentences max. Be specific with actual details from the conversation.
-- Use markdown **bolding** for key info (business name, booking date, red flags).
-- DO NOT use generic phrases like "high intent", "shows interest", "50% response rate".
-- DO NOT describe stats. Describe what ACTUALLY HAPPENED in the conversation.
+Another example:
+Wasi runs Design Lyf Realty and Interiors in Bangalore. Meta ads bringing fake leads, wants AI qualification. Tried to book Monday 3pm but booking looped and he got frustrated — asked for a human. Call him directly to recover.
 
-BAD: "Lead shows high intent with 50% response rate. Inactive for 2 days. Re-engage with follow-up."
-GOOD: "**Wasi** runs **Design Lyf Realty & Interiors** in Bangalore — interior design focus. Getting Meta ad leads but quality is poor. Tried to book **Monday 3pm** but booking tool looped. Got frustrated and asked for a human. **Needs manual outreach** — call him directly."
+Keep it under 50 words. Be specific. No fluff.
 
 Lead: ${summaryData.leadName}
 Stage: ${lead.lead_stage || 'Unknown'}${lead.sub_stage ? ' (' + lead.sub_stage + ')' : ''}
-${profileInfo.length > 0 ? 'Extracted Profile: ' + profileInfo.join(' | ') : ''}
+${profileInfo.length > 0 ? 'Profile: ' + profileInfo.join(' | ') : ''}
 
-FULL CONVERSATION (${conversationMessages.length} messages):
-${conversationContext || 'No messages yet'}
-
-Recent Team Activities:
-${activitiesContext}
-
-Generate the summary now. Focus on WHAT WAS DISCUSSED, not metrics.`
+CONVERSATION (${conversationMessages.length} messages):
+${conversationContext || 'No messages yet'}`
 
         // Add timeout to prevent hanging
         const controller = new AbortController()
@@ -719,7 +697,7 @@ Generate the summary now. Focus on WHAT WAS DISCUSSED, not metrics.`
             },
             body: JSON.stringify({
               model: 'claude-sonnet-4-20250514',
-              max_tokens: 800, // Increased from 400 to allow for more comprehensive summaries
+              max_tokens: 200, // Increased from 400 to allow for more comprehensive summaries
               messages: [
                 {
                   role: 'user',
