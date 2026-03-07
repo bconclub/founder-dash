@@ -47,6 +47,7 @@ interface Conversation {
   last_message_at: string
   unread_count: number
   booking_status: string | null
+  brand_name: string | null
 }
 
 interface Message {
@@ -86,6 +87,48 @@ function renderMarkdown(text: string) {
     }
     return part;
   });
+}
+
+/** Parse form submission data from a message into structured fields */
+function parseFormFields(content: string): { intro: string; fields: { key: string; value: string }[] } | null {
+  if (!content) return null;
+  const fieldPattern = /\b(\w+(?:_\w+)+\??)\s*:\s*/g;
+  const matches = [...content.matchAll(fieldPattern)];
+  if (matches.length < 3) return null;
+
+  const intro = content.substring(0, matches[0].index!).trim();
+  const fields: { key: string; value: string }[] = [];
+
+  for (let i = 0; i < matches.length; i++) {
+    const rawKey = matches[i][1];
+    const valueStart = matches[i].index! + matches[i][0].length;
+    const valueEnd = i < matches.length - 1 ? matches[i + 1].index! : content.length;
+    const value = content.substring(valueStart, valueEnd).trim();
+    const cleanKey = rawKey
+      .replace(/\?$/, '')
+      .replace(/_/g, ' ')
+      .split(' ')
+      .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(' ');
+    fields.push({ key: cleanKey, value });
+  }
+  return { intro, fields };
+}
+
+/** Extract a short label for a form field */
+function getFormFieldLabel(key: string): string {
+  const k = key.toLowerCase();
+  if (k.includes('brand name') || k.includes('business name')) return 'Brand';
+  if (k.includes('full name') || k === 'name') return 'Name';
+  if (k.includes('email')) return 'Email';
+  if (k.includes('phone')) return 'Phone';
+  if (k.includes('city') || k.includes('location')) return 'City';
+  if (k.includes('how fast') || k.includes('urgency')) return 'Urgency';
+  if (k.includes('business type') || k.includes('choose business')) return 'Type';
+  if (k.includes('website')) return 'Website';
+  if (k.includes('leads') || k.includes('handle')) return 'Volume';
+  if (k.includes('ai system')) return 'AI Systems';
+  return key.length > 15 ? key.substring(0, 15) + '…' : key;
 }
 
 export default function InboxPage() {
@@ -295,6 +338,7 @@ export default function InboxPage() {
               last_message_at: lead.last_interaction_at ? new Date(lead.last_interaction_at).toISOString() : new Date().toISOString(),
               unread_count: 0,
               booking_status: null,
+              brand_name: null,
             }
           })
 
@@ -422,6 +466,16 @@ export default function InboxPage() {
           || ctx?.web?.booking_status
           || null;
 
+        // Extract brand name from unified_context or form data
+        const uc = lead?.unified_context || {};
+        const brandName =
+          uc?.web?.what_is_your_brand_name ||
+          uc?.whatsapp?.what_is_your_brand_name ||
+          uc?.bcon?.brand_name ||
+          uc?.web?.brand_name ||
+          uc?.whatsapp?.brand_name ||
+          null;
+
         const conversation: Conversation = {
           lead_id: leadId,
           lead_name: lead?.customer_name || 'Unknown',
@@ -432,6 +486,7 @@ export default function InboxPage() {
           last_message_at: convData.last_message_at,
           unread_count: 0,
           booking_status: bookingStatus,
+          brand_name: brandName,
         }
 
         console.log('Adding conversation:', {
@@ -819,48 +874,39 @@ export default function InboxPage() {
 
       {/* Left Panel - Conversations List */}
       <div
-        className="w-[350px] flex flex-col border-r"
+        className="w-[320px] flex flex-col border-r flex-shrink-0"
         style={{
           background: 'var(--bg-secondary)',
           borderColor: 'var(--border-primary)'
         }}
       >
-        {/* Header */}
-        <div className="p-4 border-b" style={{ borderColor: 'var(--border-primary)' }}>
-          <h1 className="text-2xl font-black tracking-tight mb-3" style={{ color: 'var(--accent-primary)' }}>
-            INBOX
-          </h1>
-
-          {/* Search */}
+        {/* Search + Filters - flush at top */}
+        <div className="px-3 pt-2 pb-2 border-b" style={{ borderColor: 'var(--border-primary)' }}>
           <div
-            className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-transparent transition-all focus-within:border-amber-500/50 mb-4"
+            className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg border border-transparent transition-all focus-within:border-amber-500/50 mb-2"
             style={{ background: 'var(--bg-tertiary)' }}
           >
             <span style={{ color: 'var(--text-secondary)' }}>
-              <MdSearch size={18} />
+              <MdSearch size={16} />
             </span>
             <input
               type="text"
               placeholder="Search conversations..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="bg-transparent border-none outline-none flex-1 text-sm font-medium"
+              className="bg-transparent border-none outline-none flex-1 text-xs"
               style={{ color: 'var(--text-primary)' }}
             />
           </div>
-
-          {/* Channel Filter */}
-          <div className="flex flex-wrap gap-2">
+          <div className="flex gap-1">
             {['all', 'web', 'whatsapp'].map((ch) => (
               <button
                 key={ch}
                 onClick={() => setChannelFilter(ch)}
-                className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all border`}
+                className="px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider transition-all"
                 style={{
                   background: channelFilter === ch ? 'var(--accent-primary)' : 'transparent',
-                  borderColor: channelFilter === ch ? 'var(--accent-primary)' : 'var(--border-primary)',
                   color: channelFilter === ch ? 'white' : 'var(--text-secondary)',
-                  boxShadow: channelFilter === ch ? '0 4px 14px 0 rgba(0,0,0,0.1)' : 'none'
                 }}
               >
                 {ch}
@@ -872,36 +918,23 @@ export default function InboxPage() {
         {/* Conversations List */}
         <div className="flex-1 overflow-y-auto">
           {loading ? (
-            <div className="p-4 text-center" style={{ color: 'var(--text-secondary)' }}>
+            <div className="p-3 text-center text-xs" style={{ color: 'var(--text-secondary)' }}>
               Loading...
             </div>
           ) : conversations.length === 0 ? (
-            <div className="p-4 text-center space-y-2">
-              <p style={{ color: 'var(--text-secondary)' }}>
-                No conversations found
-              </p>
-              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                Messages will appear here once conversations start
-              </p>
+            <div className="p-3 text-center space-y-1">
+              <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>No conversations found</p>
               <button
                 onClick={() => fetchConversations()}
-                className="mt-2 px-3 py-1.5 text-xs rounded-md"
-                style={{
-                  background: 'var(--accent-primary)',
-                  color: 'white'
-                }}
+                className="mt-1 px-3 py-1 text-[10px] rounded"
+                style={{ background: 'var(--accent-primary)', color: 'white' }}
               >
                 Refresh
               </button>
             </div>
           ) : filteredConversations.length === 0 ? (
-            <div className="p-4 text-center space-y-2">
-              <p style={{ color: 'var(--text-secondary)' }}>
-                No conversations match your search
-              </p>
-              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                Try adjusting your search query
-              </p>
+            <div className="p-3 text-center">
+              <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>No conversations match your search</p>
             </div>
           ) : (
             filteredConversations.map((conv) => {
@@ -919,8 +952,7 @@ export default function InboxPage() {
                       setSelectedChannel('');
                     }
                   }}
-                  className={`p-4 cursor-pointer transition-all duration-300 relative border-b ${isSelected ? '' : 'hover:bg-gray-50 dark:hover:bg-white/5'
-                    }`}
+                  className={`px-3 py-2.5 cursor-pointer transition-all relative border-b ${isSelected ? '' : 'hover:bg-gray-50 dark:hover:bg-white/5'}`}
                   style={{
                     borderColor: 'var(--border-primary)',
                     background: isSelected ? 'var(--accent-subtle)' : 'transparent'
@@ -930,11 +962,9 @@ export default function InboxPage() {
                     <div className="absolute left-0 top-0 bottom-0 w-1" style={{ background: 'var(--accent-primary)' }} />
                   )}
 
-                  <div className="flex items-center gap-3">
-                    {/* Avatar */}
+                  <div className="flex items-center gap-2.5">
                     <div
-                      className={`w-10 h-10 rounded-xl flex items-center justify-center text-xs font-bold transition-transform duration-300 ${isSelected ? 'scale-110' : 'scale-100'
-                        }`}
+                      className="w-8 h-8 rounded-lg flex items-center justify-center text-[10px] font-bold flex-shrink-0"
                       style={{
                         background: isSelected ? 'var(--accent-primary)' : 'var(--bg-tertiary)',
                         color: isSelected ? 'white' : 'var(--text-secondary)',
@@ -944,38 +974,42 @@ export default function InboxPage() {
                     </div>
 
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-0.5">
-                        <span className={`text-[13px] font-bold truncate ${isSelected ? '' : 'text-gray-900 dark:text-gray-100'}`} style={{ color: isSelected ? 'var(--accent-primary)' : 'var(--text-primary)' }}>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[12px] font-semibold truncate" style={{ color: isSelected ? 'var(--accent-primary)' : 'var(--text-primary)' }}>
                           {conv.lead_name || conv.lead_phone || 'Unknown'}
                         </span>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
                           <div className="flex items-center gap-0.5">
-                            {['web', 'whatsapp', 'voice', 'social'].map((ch) => (
-                              conv.channels.includes(ch) && (
-                                <div key={ch} className="opacity-80">
-                                  <ChannelIcon channel={ch} size={12} active={true} />
-                                </div>
-                              )
+                            {conv.channels.map((ch) => (
+                              <div key={ch} className="opacity-70">
+                                <ChannelIcon channel={ch} size={10} active={true} />
+                              </div>
                             ))}
                           </div>
-                          <span className="text-[10px] font-medium opacity-60 whitespace-nowrap">
+                          <span className="text-[9px] opacity-50 whitespace-nowrap">
                             {timeAgo(conv.last_message_at)}
                           </span>
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2">
-                        <p className="text-[12px] truncate opacity-60 flex-1">
+                      {conv.brand_name && (
+                        <p className="text-[10px] truncate mt-px" style={{ color: 'var(--text-secondary)' }}>
+                          {conv.brand_name}
+                        </p>
+                      )}
+
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <p className="text-[11px] truncate opacity-50 flex-1">
                           {conv.last_message}
                         </p>
                         {conv.booking_status && (
-                          <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-md whitespace-nowrap"
+                          <span className="text-[8px] font-bold uppercase px-1.5 py-0.5 rounded whitespace-nowrap flex-shrink-0"
                             style={{
                               background: 'rgba(34, 197, 94, 0.15)',
                               color: '#22c55e',
                               border: '1px solid rgba(34, 197, 94, 0.3)',
                             }}>
-                            <MdEventAvailable size={10} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 2 }} /> Event
+                            <MdEventAvailable size={8} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 1 }} /> EVENT
                           </span>
                         )}
                       </div>
@@ -989,125 +1023,99 @@ export default function InboxPage() {
       </div>
 
       {/* Right Panel - Messages */}
-      <div className="flex-1 flex flex-col" style={{ background: 'var(--bg-primary)' }}>
+      <div className="flex-1 flex flex-col min-w-0" style={{ background: 'var(--bg-primary)' }}>
         {!selectedLeadId ? (
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center">
-              <div className="mx-auto mb-4" style={{ color: 'var(--text-secondary)' }}>
-                <MdInbox size={64} />
-              </div>
-              <p style={{ color: 'var(--text-secondary)' }}>Select a conversation to view messages</p>
+              <MdInbox size={48} style={{ color: 'var(--text-secondary)', margin: '0 auto 8px' }} />
+              <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Select a conversation</p>
             </div>
           </div>
         ) : (
           <>
-            {/* Conversation Header with Channel Tabs */}
+            {/* Compact Header - single line */}
             <div
-              className="border-b"
+              className="flex items-center gap-3 px-4 py-2 border-b flex-shrink-0"
               style={{ borderColor: 'var(--border-primary)' }}
             >
-              {/* Lead Info - Clickable name */}
-              <div className="p-4 flex items-center justify-between">
-                <div>
-                  <h2
-                    className="font-semibold cursor-pointer hover:underline"
-                    style={{ color: 'var(--accent-primary)' }}
-                    onClick={() => openLeadModal(selectedLeadId!)}
-                    title="Click to view lead details"
-                  >
-                    {selectedConversation?.lead_name || 'Unknown'}
-                  </h2>
-                  <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-                    {selectedConversation?.lead_phone}
-                  </p>
-                </div>
+              <h2
+                className="text-sm font-semibold cursor-pointer hover:underline truncate"
+                style={{ color: 'var(--text-primary)' }}
+                onClick={() => openLeadModal(selectedLeadId!)}
+                title="Click to view lead details"
+              >
+                {selectedConversation?.lead_name || 'Unknown'}
+              </h2>
+              {selectedConversation?.lead_phone && (
+                <span className="text-[11px] flex-shrink-0" style={{ color: 'var(--text-secondary)' }}>
+                  {selectedConversation.lead_phone}
+                </span>
+              )}
 
-                <div className="flex items-center gap-2">
-                  {/* AI Summary Button */}
-                  <button
-                    onClick={summarizeConversation}
-                    disabled={summaryLoading || messages.length === 0}
-                    className="p-2 rounded-md transition-colors flex items-center gap-1"
-                    style={{
-                      background: showSummary ? 'var(--accent-primary)' : 'var(--bg-tertiary)',
-                      color: showSummary ? 'white' : 'var(--text-secondary)',
-                      opacity: messages.length === 0 ? 0.5 : 1
-                    }}
-                    title="Generate AI Summary"
-                  >
-                    <MdAutoAwesome size={18} className={summaryLoading ? 'animate-spin' : ''} />
-                  </button>
-
-                  {/* View Details Button */}
-                  <button
-                    onClick={() => openLeadModal(selectedLeadId!)}
-                    className="px-3 py-1.5 rounded-md text-xs font-medium transition-colors"
-                    style={{
-                      background: 'var(--bg-tertiary)',
-                      color: 'var(--text-secondary)'
-                    }}
-                  >
-                    View Details
-                  </button>
-                </div>
-              </div>
-
-              {/* Channel Tabs - Only show channels this customer has used */}
-              <div className="flex items-center gap-1 px-4 pb-3">
+              {/* Channel tabs inline */}
+              <div className="flex items-center gap-1 ml-1">
                 {selectedConversation?.channels.map((ch) => (
                   <button
                     key={ch}
                     onClick={() => setSelectedChannel(ch)}
-                    className="px-3 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-2"
+                    className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium transition-colors capitalize"
                     style={{
                       background: selectedChannel === ch ? 'var(--accent-primary)' : 'var(--bg-tertiary)',
                       color: selectedChannel === ch ? 'white' : 'var(--text-secondary)'
                     }}
                   >
-                    <ChannelIcon channel={ch} size={14} active={true} />
-                    <span className="capitalize">{ch}</span>
+                    <ChannelIcon channel={ch} size={10} active={true} />
+                    {ch}
                   </button>
                 ))}
               </div>
+
+              <div className="flex items-center gap-1.5 ml-auto flex-shrink-0">
+                <button
+                  onClick={summarizeConversation}
+                  disabled={summaryLoading || messages.length === 0}
+                  className="p-1.5 rounded transition-colors"
+                  style={{
+                    background: showSummary ? 'var(--accent-primary)' : 'var(--bg-tertiary)',
+                    color: showSummary ? 'white' : 'var(--text-secondary)',
+                    opacity: messages.length === 0 ? 0.5 : 1
+                  }}
+                  title="AI Summary"
+                >
+                  <MdAutoAwesome size={14} className={summaryLoading ? 'animate-spin' : ''} />
+                </button>
+                <button
+                  onClick={() => openLeadModal(selectedLeadId!)}
+                  className="px-2 py-1 rounded text-[10px] font-medium transition-colors"
+                  style={{ background: 'var(--bg-tertiary)', color: 'var(--text-secondary)' }}
+                >
+                  View Details
+                </button>
+              </div>
             </div>
 
-            {/* AI Summary Panel */}
+            {/* AI Summary Panel - compact */}
             {showSummary && (
               <div
-                className="mx-4 mb-4 p-4 rounded-lg border"
+                className="mx-3 mt-2 mb-1 p-3 rounded-lg border"
                 style={{
                   background: 'var(--bg-tertiary)',
                   borderColor: 'var(--accent-primary)',
-                  borderWidth: '1px'
                 }}
               >
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <MdAutoAwesome size={16} style={{ color: 'var(--accent-primary)' }} />
-                    <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
-                      AI Summary
-                    </span>
+                <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <MdAutoAwesome size={12} style={{ color: 'var(--accent-primary)' }} />
+                    <span className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>AI Summary</span>
                   </div>
-                  <button
-                    onClick={() => setShowSummary(false)}
-                    className="text-xs"
-                    style={{ color: 'var(--text-secondary)' }}
-                  >
-                    ✕ Close
-                  </button>
+                  <button onClick={() => setShowSummary(false)} className="text-[10px]" style={{ color: 'var(--text-secondary)' }}>✕</button>
                 </div>
-
                 {summaryLoading ? (
-                  <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-                    Generating summary...
-                  </p>
+                  <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Generating...</p>
                 ) : (
                   <div
-                    className="text-sm whitespace-pre-wrap"
-                    style={{
-                      color: 'var(--text-secondary)',
-                      lineHeight: '1.6'
-                    }}
+                    className="text-xs whitespace-pre-wrap leading-relaxed"
+                    style={{ color: 'var(--text-secondary)' }}
                     dangerouslySetInnerHTML={{
                       __html: conversationSummary
                         ?.replace(/\*\*(.*?)\*\*/g, '<strong style="color: var(--text-primary); font-weight: 600;">$1</strong>')
@@ -1120,85 +1128,128 @@ export default function InboxPage() {
 
             {/* Messages */}
             <div
-              className="flex-1 overflow-y-auto p-6 space-y-6 relative"
+              className="flex-1 overflow-y-auto px-4 py-3 space-y-3 relative"
               style={{
                 backgroundImage: 'radial-gradient(circle at 2px 2px, var(--bg-tertiary) 1px, transparent 0)',
                 backgroundSize: '24px 24px'
               }}
             >
               {messagesLoading ? (
-                <div className="text-center" style={{ color: 'var(--text-secondary)' }}>
-                  Loading messages...
-                </div>
+                <div className="text-center text-xs" style={{ color: 'var(--text-secondary)' }}>Loading messages...</div>
               ) : messages.length === 0 ? (
-                <div className="text-center" style={{ color: 'var(--text-secondary)' }}>
-                  No messages yet
-                </div>
+                <div className="text-center text-xs" style={{ color: 'var(--text-secondary)' }}>No messages yet</div>
               ) : (
-                messages.map((msg) => (
-                  <div
-                    key={msg.id}
-                    className={`flex ${msg.sender === 'customer' ? 'justify-start' : 'justify-end'}`}
-                  >
+                messages.map((msg, msgIdx) => {
+                  // Check if this is a form data message (first customer message with form fields)
+                  const isCustomer = msg.sender === 'customer';
+                  const formData = isCustomer ? parseFormFields(msg.content) : null;
+
+                  if (formData) {
+                    // Render as compact form data card
+                    const priorityFields = formData.fields.filter(f => {
+                      const k = f.key.toLowerCase();
+                      return k.includes('brand') || k.includes('full name') || k.includes('email') ||
+                             k.includes('phone') || k.includes('city') || k.includes('how fast') ||
+                             k.includes('business type');
+                    });
+                    const otherFields = formData.fields.filter(f => !priorityFields.includes(f));
+
+                    return (
+                      <div key={msg.id} className="flex justify-start">
+                        <div
+                          className="max-w-[90%] rounded-lg px-3 py-2 border"
+                          style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border-primary)' }}
+                        >
+                          {/* Header */}
+                          <div className="flex items-center justify-between mb-1.5">
+                            <div className="flex items-center gap-1.5">
+                              <ChannelIcon channel={msg.channel} size={10} active={true} />
+                              <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>
+                                {selectedConversation?.lead_name || 'Customer'}
+                              </span>
+                              <span className="text-[9px] px-1.5 py-0.5 rounded font-medium" style={{ background: 'var(--bg-tertiary)', color: 'var(--text-secondary)' }}>
+                                Form Submission
+                              </span>
+                            </div>
+                            <span className="text-[9px]" style={{ color: 'var(--text-muted)' }}>{formatTime(msg.created_at)}</span>
+                          </div>
+                          {/* Compact fields grid */}
+                          <div className="flex flex-wrap gap-x-4 gap-y-1">
+                            {priorityFields.map((f, i) => (
+                              <div key={i} className="flex items-baseline gap-1">
+                                <span className="text-[9px] font-semibold uppercase" style={{ color: 'var(--text-secondary)' }}>{getFormFieldLabel(f.key)}:</span>
+                                <span className="text-[11px] font-medium" style={{ color: 'var(--text-primary)' }}>{f.value}</span>
+                              </div>
+                            ))}
+                          </div>
+                          {otherFields.length > 0 && (
+                            <details className="mt-1">
+                              <summary className="text-[9px] cursor-pointer" style={{ color: 'var(--text-secondary)' }}>+{otherFields.length} more fields</summary>
+                              <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1">
+                                {otherFields.map((f, i) => (
+                                  <div key={i} className="flex items-baseline gap-1">
+                                    <span className="text-[9px] font-semibold uppercase" style={{ color: 'var(--text-secondary)' }}>{getFormFieldLabel(f.key)}:</span>
+                                    <span className="text-[11px]" style={{ color: 'var(--text-primary)' }}>{f.value}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </details>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  // Regular message bubble
+                  return (
                     <div
-                      className={`max-w-[85%] rounded-2xl px-4 py-3 shadow-sm border ${msg.sender === 'customer'
-                        ? 'bg-white dark:bg-[#1A1A2E] border-gray-200 dark:border-[#1E1E2E]'
-                        : ''
-                        }`}
-                      style={{
-                        position: 'relative',
-                        background: msg.sender === 'agent' || msg.sender === 'system' ? 'var(--accent-subtle)' : undefined,
-                        borderColor: msg.sender === 'agent' || msg.sender === 'system' ? 'var(--accent-primary)' : undefined,
-                        borderWidth: '1px'
-                      }}
+                      key={msg.id}
+                      className={`flex ${isCustomer ? 'justify-start' : 'justify-end'}`}
                     >
-                      {/* Message header - show sender name and channel */}
-                      <div className="flex items-center justify-between gap-4 mb-1.5">
-                        <div className="flex items-center gap-1.5">
-                          <ChannelIcon channel={msg.channel} size={10} active={true} />
-                          <span
-                            className="text-[10px] font-bold uppercase tracking-wider"
-                            style={{
-                              color: msg.sender === 'customer' ? 'var(--text-secondary)' : 'var(--accent-primary)'
-                            }}
-                          >
-                            {msg.sender === 'customer' ? selectedConversation?.lead_name || 'Customer' : 'PROXe AI'}
+                      <div
+                        className={`max-w-[80%] rounded-xl px-3 py-2 shadow-sm border ${isCustomer
+                          ? 'bg-white dark:bg-[#1A1A2E] border-gray-200 dark:border-[#1E1E2E]'
+                          : ''}`}
+                        style={{
+                          background: !isCustomer ? 'var(--accent-subtle)' : undefined,
+                          borderColor: !isCustomer ? 'var(--accent-primary)' : undefined,
+                          borderWidth: '1px'
+                        }}
+                      >
+                        <div className="flex items-center justify-between gap-3 mb-1">
+                          <div className="flex items-center gap-1">
+                            <ChannelIcon channel={msg.channel} size={9} active={true} />
+                            <span
+                              className="text-[9px] font-bold uppercase tracking-wider"
+                              style={{ color: isCustomer ? 'var(--text-secondary)' : 'var(--accent-primary)' }}
+                            >
+                              {isCustomer ? selectedConversation?.lead_name || 'Customer' : 'PROXe AI'}
+                            </span>
+                          </div>
+                          <span className="text-[8px]" style={{ color: 'var(--text-muted)' }}>
+                            {formatTime(msg.created_at)}
                           </span>
                         </div>
-                        <span
-                          className="text-[9px] font-medium"
-                          style={{ color: 'var(--text-muted)' }}
-                        >
-                          {formatTime(msg.created_at)}
-                        </span>
-                      </div>
-
-                      <div
-                        className="text-sm leading-relaxed"
-                        style={{ color: 'var(--text-primary)' }}
-                      >
-                        {renderMarkdown(msg.content)}
+                        <div className="text-[13px] leading-relaxed" style={{ color: 'var(--text-primary)' }}>
+                          {renderMarkdown(msg.content)}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
 
-            {/* Message Input */}
-            <div
-              className="p-4 border-t"
-              style={{ borderColor: 'var(--border-primary)' }}
-            >
+            {/* Message Input - compact */}
+            <div className="px-3 py-2 border-t" style={{ borderColor: 'var(--border-primary)' }}>
               <div
-                className="flex items-center gap-2 px-4 py-3 rounded-lg"
+                className="flex items-center gap-2 px-3 py-2 rounded-lg"
                 style={{ background: 'var(--bg-tertiary)' }}
               >
-                {/* Generate AI Response button */}
                 <button
                   onClick={generateAIResponse}
                   disabled={isGenerating || messages.length === 0}
-                  className="p-2 rounded-lg transition-colors flex-shrink-0"
+                  className="p-1.5 rounded-lg transition-colors flex-shrink-0"
                   style={{
                     background: isGenerating ? 'var(--accent-primary)' : 'transparent',
                     color: isGenerating ? 'white' : 'var(--text-secondary)',
@@ -1206,9 +1257,8 @@ export default function InboxPage() {
                   }}
                   title="Generate AI Response"
                 >
-                  <MdAutoAwesome size={20} className={isGenerating ? 'animate-spin' : ''} />
+                  <MdAutoAwesome size={18} className={isGenerating ? 'animate-spin' : ''} />
                 </button>
-
                 <input
                   type="text"
                   placeholder={
@@ -1225,20 +1275,20 @@ export default function InboxPage() {
                     }
                   }}
                   disabled={isSending || isGenerating}
-                  className="bg-transparent border-none outline-none flex-1 text-sm"
+                  className="bg-transparent border-none outline-none flex-1 text-xs"
                   style={{ color: 'var(--text-primary)' }}
                 />
                 <button
                   onClick={sendReply}
                   disabled={!replyText.trim() || isSending}
-                  className="p-2 rounded-lg transition-opacity flex-shrink-0"
+                  className="p-1.5 rounded-lg transition-opacity flex-shrink-0"
                   style={{
                     background: 'var(--accent-primary)',
                     opacity: !replyText.trim() || isSending ? 0.4 : 1,
                   }}
                   title="Send Message"
                 >
-                  <MdSend size={20} color="white" />
+                  <MdSend size={18} color="white" />
                 </button>
               </div>
             </div>
