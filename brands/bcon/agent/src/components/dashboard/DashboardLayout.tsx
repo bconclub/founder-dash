@@ -321,12 +321,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         >
           {!isCollapsed && (
             <>
-              <div className="dashboard-layout-sidebar-logo flex items-center gap-2">
+              <div className="dashboard-layout-sidebar-logo flex items-center gap-2.5">
                 <img src="/bcon-icon.png" alt="BCON" className="w-7 h-7 rounded-md object-contain flex-shrink-0" />
-                <div className="flex flex-col leading-tight">
-                  <span className="text-sm font-black tracking-tight" style={{ color: 'var(--accent-primary)' }}>BCON</span>
-                  <span className="text-[9px] font-medium" style={{ color: 'var(--text-secondary)', opacity: 0.6 }}>bconclub.com</span>
-                </div>
+                <span className="text-[10px] font-medium" style={{ color: 'var(--text-secondary)', opacity: 0.5 }}>bconclub.com</span>
               </div>
               {!isMobile && (
                 <button
