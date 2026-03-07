@@ -386,15 +386,15 @@ export function RadialProgress({
         {/* Value inside circle */}
         <div className="absolute inset-0 flex flex-col items-center justify-center">
           <span
-            className="text-lg font-bold"
-            style={{ color: defaultColor }}
+            className="font-bold"
+            style={{ color: defaultColor, fontSize: size <= 60 ? '11px' : '18px', lineHeight: 1 }}
           >
             {valueFormatter(value)}
           </span>
         </div>
       </div>
-      {/* Label below circle */}
-      <p className="text-xs text-gray-600 dark:text-gray-400 font-medium mt-2">{label}</p>
+      {/* Label below circle — hidden when empty */}
+      {label && <p className="text-xs font-medium mt-2" style={{ color: 'var(--text-secondary)' }}>{label}</p>}
     </div>
   )
 }
