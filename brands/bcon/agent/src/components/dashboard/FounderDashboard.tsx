@@ -386,86 +386,23 @@ export default function FounderDashboard() {
             borderColor: 'var(--accent-subtle)'
           }}
         >
-          <h2 className="text-base sm:text-lg font-semibold mb-3" style={{ color: 'var(--text-primary)' }}>At a Glance</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-            {/* Avg Score */}
-            <div className="flex flex-col">
-              {(() => {
-                const metricColor = getMetricColor('avgScore', metrics.radialMetrics.avgScore)
-                return (
-                  <>
-                    <div className="flex items-start justify-between mb-1">
-                      <p className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Avg Score</p>
-                      <RadialProgress value={metrics.radialMetrics.avgScore} label="" color={metricColor} size={52} />
-                    </div>
-                    {metrics.radialTrends?.avgScore && (
-                      <div className="w-full mt-auto" style={{ height: '48px' }}>
-                        <Sparkline data={metrics.radialTrends.avgScore} color={metricColor} height={48} />
-                      </div>
-                    )}
-                  </>
-                )
-              })()}
+          <h2 className="text-base sm:text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>At a Glance</h2>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="flex flex-col items-center">
+              <RadialProgress value={metrics.radialMetrics.avgScore} label="" color={getMetricColor('avgScore', metrics.radialMetrics.avgScore)} size={120} />
+              <p className="text-xs font-medium mt-3" style={{ color: 'var(--text-secondary)' }}>Avg Score</p>
             </div>
-
-            {/* Response Rate */}
-            <div className="flex flex-col">
-              {(() => {
-                const metricColor = getMetricColor('responseRate', metrics.radialMetrics.responseRate)
-                return (
-                  <>
-                    <div className="flex items-start justify-between mb-1">
-                      <p className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Response Rate</p>
-                      <RadialProgress value={metrics.radialMetrics.responseRate} label="" color={metricColor} size={52} />
-                    </div>
-                    {metrics.radialTrends?.responseRate && (
-                      <div className="w-full mt-auto" style={{ height: '48px' }}>
-                        <Sparkline data={metrics.radialTrends.responseRate} color={metricColor} height={48} />
-                      </div>
-                    )}
-                  </>
-                )
-              })()}
+            <div className="flex flex-col items-center">
+              <RadialProgress value={metrics.radialMetrics.responseRate} label="" color={getMetricColor('responseRate', metrics.radialMetrics.responseRate)} size={120} />
+              <p className="text-xs font-medium mt-3" style={{ color: 'var(--text-secondary)' }}>Response Rate</p>
             </div>
-
-            {/* Key Event Rate */}
-            <div className="flex flex-col">
-              {(() => {
-                const metricColor = getMetricColor('bookingRate', metrics.radialMetrics.bookingRate)
-                return (
-                  <>
-                    <div className="flex items-start justify-between mb-1">
-                      <p className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Key Event Rate</p>
-                      <RadialProgress value={metrics.radialMetrics.bookingRate} label="" color={metricColor} size={52} />
-                    </div>
-                    {metrics.radialTrends?.bookingRate && (
-                      <div className="w-full mt-auto" style={{ height: '48px' }}>
-                        <Sparkline data={metrics.radialTrends.bookingRate} color={metricColor} height={48} />
-                      </div>
-                    )}
-                  </>
-                )
-              })()}
+            <div className="flex flex-col items-center">
+              <RadialProgress value={metrics.radialMetrics.bookingRate} label="" color={getMetricColor('bookingRate', metrics.radialMetrics.bookingRate)} size={120} />
+              <p className="text-xs font-medium mt-3" style={{ color: 'var(--text-secondary)' }}>Key Event Rate</p>
             </div>
-
-            {/* Avg Response Time */}
-            <div className="flex flex-col">
-              {(() => {
-                const metricColor = getMetricColor('avgResponseTime', metrics.radialMetrics.avgResponseTime)
-                return (
-                  <>
-                    <div className="flex items-start justify-between mb-1">
-                      <p className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Avg Response</p>
-                      <RadialProgress value={metrics.radialMetrics.avgResponseTime} max={10000} label="" color={metricColor} size={52} valueFormatter={(v) => `${Math.round(v)}ms`} showPercentage={false} />
-                    </div>
-                    {metrics.radialTrends?.avgResponseTime && (
-                      <div className="w-full mt-auto" style={{ height: '48px' }}>
-                        <Sparkline data={metrics.radialTrends.avgResponseTime} color={metricColor} height={48} />
-                      </div>
-                    )}
-                  </>
-                )
-              })()}
+            <div className="flex flex-col items-center">
+              <RadialProgress value={metrics.radialMetrics.avgResponseTime} max={10000} label="" color={getMetricColor('avgResponseTime', metrics.radialMetrics.avgResponseTime)} size={120} valueFormatter={(v) => `${Math.round(v)}ms`} showPercentage={false} />
+              <p className="text-xs font-medium mt-3" style={{ color: 'var(--text-secondary)' }}>Avg Response</p>
             </div>
           </div>
         </div>

@@ -347,7 +347,8 @@ export function RadialProgress({
 }) {
   const defaultColor = color || getAccentColor()
   const percentage = Math.min((value / max) * 100, 100)
-  const radius = size / 2 - 2
+  const strokeW = size >= 100 ? 4 : 2
+  const radius = size / 2 - strokeW / 2
   const circumference = 2 * Math.PI * radius
   const offset = circumference * (1 - percentage / 100)
   
@@ -365,7 +366,7 @@ export function RadialProgress({
             cy={size / 2}
             r={radius}
             stroke={defaultColor}
-            strokeWidth="2"
+            strokeWidth={strokeW}
             fill="none"
             style={{ opacity: 0.2 }}
           />
@@ -375,7 +376,7 @@ export function RadialProgress({
             cy={size / 2}
             r={radius}
             stroke={defaultColor}
-            strokeWidth="2"
+            strokeWidth={strokeW}
             fill="none"
             strokeDasharray={circumference}
             strokeDashoffset={offset}
@@ -387,7 +388,7 @@ export function RadialProgress({
         <div className="absolute inset-0 flex flex-col items-center justify-center">
           <span
             className="font-bold"
-            style={{ color: defaultColor, fontSize: size <= 60 ? '11px' : '18px', lineHeight: 1 }}
+            style={{ color: defaultColor, fontSize: size <= 60 ? '11px' : size >= 100 ? '22px' : '18px', lineHeight: 1 }}
           >
             {valueFormatter(value)}
           </span>
