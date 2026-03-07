@@ -67,7 +67,7 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
   // Auto-scroll to 8 AM on mount
   useEffect(() => {
     if (scrollRef.current && viewMode === 'week') {
-      const hourHeight = 60
+      const hourHeight = 44
       scrollRef.current.scrollTop = 8 * hourHeight
     }
   }, [viewMode])
@@ -302,8 +302,8 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
             {/* Day header row — fixed */}
             <div className="flex border-b" style={{ borderColor: 'var(--border-primary)' }}>
               {/* Timezone label in corner */}
-              <div className="w-[60px] flex-shrink-0 flex items-end justify-center pb-1">
-                <span className="text-[10px]" style={{ color: 'var(--text-secondary)' }}>{tzLabel}</span>
+              <div className="w-[52px] flex-shrink-0 flex items-end justify-center pb-1">
+                <span className="text-[9px]" style={{ color: 'var(--text-secondary)' }}>{tzLabel}</span>
               </div>
               {/* Day columns */}
               {weekDays.map((day, i) => {
@@ -338,11 +338,15 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
             <div ref={scrollRef} className="flex-1 overflow-y-auto overflow-x-hidden">
               <div className="flex relative">
                 {/* Time labels */}
-                <div className="w-[60px] flex-shrink-0">
+                <div className="w-[52px] flex-shrink-0">
                   {HOURS.map((hour) => (
-                    <div key={hour} className="relative" style={{ height: '60px' }}>
+                    <div
+                      key={hour}
+                      className="relative border-b"
+                      style={{ height: '44px', borderColor: 'color-mix(in srgb, var(--border-primary) 40%, transparent)' }}
+                    >
                       {hour > 0 && (
-                        <span className="absolute -top-[7px] right-2 text-[10px]" style={{ color: 'var(--text-secondary)' }}>
+                        <span className="absolute -top-[6px] right-2 text-[10px] leading-none" style={{ color: 'var(--text-secondary)' }}>
                           {formatHour(hour)}
                         </span>
                       )}
@@ -357,15 +361,15 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
                       <div
                         key={hour}
                         className="border-b"
-                        style={{ height: '60px', borderColor: 'color-mix(in srgb, var(--border-primary) 50%, transparent)' }}
+                        style={{ height: '44px', borderColor: 'color-mix(in srgb, var(--border-primary) 40%, transparent)' }}
                       />
                     ))}
                     {/* Booking events overlaid */}
                     {getBookingsForDate(day).map((booking, bIdx) => {
                       if (!booking.booking_time) return null
                       const [h, m] = booking.booking_time.split(':').map(Number)
-                      const top = h * 60 + (m || 0)
-                      const height = 60 // 1-hour block
+                      const top = h * 44 + Math.round((m || 0) * 44 / 60)
+                      const height = 44 // 1-hour block
                       const dayBookingsAtHour = getBookingsForTimeSlot(day, h)
                       const total = dayBookingsAtHour.length
                       const idx = dayBookingsAtHour.indexOf(booking)
@@ -377,7 +381,7 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
                         <div
                           key={booking.id}
                           onClick={(e) => handleBookingClick(booking, e)}
-                          className="absolute rounded-md px-2 py-1 text-white cursor-pointer hover:brightness-110 hover:shadow-lg transition-all z-10 overflow-hidden"
+                          className="absolute rounded px-1.5 py-0.5 text-white cursor-pointer hover:brightness-110 hover:shadow-md transition-all z-10 overflow-hidden"
                           style={{
                             top: `${top}px`,
                             height: `${height - 2}px`,
@@ -385,7 +389,7 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
                             right: total > 1 ? undefined : '2px',
                             width: total > 1 ? `calc(${widthPct}% - 4px)` : undefined,
                             backgroundColor: 'var(--accent-primary)',
-                            fontSize: '11px',
+                            fontSize: '10px',
                             lineHeight: '1.3',
                           }}
                           title={`${booking.booking_time?.substring(0, 5)} - ${booking.name || 'Unnamed'}${topic ? ` - ${topic}` : ''}`}
