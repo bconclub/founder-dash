@@ -5,6 +5,7 @@ import { formatDateTime, formatDate } from '@/lib/utils'
 import { createClient } from '../../lib/supabase/client'
 import { format } from 'date-fns'
 import { MdLanguage, MdChat, MdPhone, MdShare, MdAutoAwesome, MdOpenInNew, MdHistory, MdCall, MdEvent, MdMessage, MdNote, MdEdit, MdTrendingUp, MdTrendingDown, MdRemove, MdCheckCircle, MdSchedule, MdPsychology, MdFlashOn, MdBarChart, MdEmail, MdChevronRight, MdSmartToy, MdPerson, MdRefresh, MdHelpOutline, MdInfo, MdCheck, MdClose, MdPayments, MdReportProblem, MdSchool, MdHistoryEdu, MdFlightTakeoff, MdAccountBalanceWallet, MdPersonOutline, MdOutlineInsights } from 'react-icons/md'
+import { FaWhatsapp } from 'react-icons/fa'
 import { useRouter } from 'next/navigation'
 import LeadStageSelector from './LeadStageSelector'
 import ActivityLoggerModal from './ActivityLoggerModal'
@@ -81,7 +82,7 @@ function renderMarkdown(text: string) {
 function renderSummary(text: string) {
   if (!text) return null;
   return (
-    <p className="text-xs leading-relaxed" style={{ color: 'var(--text-primary)' }}>
+    <p className="text-[13px] leading-relaxed font-normal" style={{ color: 'var(--text-primary)' }}>
       {text.trim()}
     </p>
   );
@@ -148,7 +149,7 @@ const CHANNEL_CONFIG = {
   },
   whatsapp: {
     name: 'WhatsApp',
-    icon: MdChat,
+    icon: FaWhatsapp,
     color: '#22C55E',
     emoji: '💬'
   },
@@ -1437,7 +1438,13 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                       )}
                     </article>
 
-                    {/* Compact Intelligence Insights - Inline to save scroll space */}
+                    {/* Compact Intelligence Insights - Only render when data exists */}
+                    {(() => {
+                      const hasKeyInfo = summaryData?.keyInfo && (summaryData.keyInfo.budget || summaryData.keyInfo.serviceInterest || summaryData.keyInfo.painPoints)
+                      const brandProfileCheck = currentLead.unified_context?.bcon || currentLead.unified_context?.windchasers || {}
+                      const hasProfile = Object.keys(brandProfileCheck).length > 0
+                      if (!hasKeyInfo && !hasProfile) return null
+                      return (
                     <article className="lead-intelligence-insights p-4 rounded-xl bg-gray-50/30 dark:bg-gray-800/20 border border-gray-100 dark:border-gray-800/50 shadow-sm">
                       <div className="flex flex-col gap-6">
                         {/* Buying Signals Group */}
@@ -1559,6 +1566,8 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                         })()}
                       </div>
                     </article>
+                      )
+                    })()}
                   </section>
                 )}
 

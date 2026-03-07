@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, addMonths, subMonths, addWeeks, subWeeks } from 'date-fns'
-import { MdChevronLeft, MdChevronRight, MdClose, MdCalendarToday, MdAccessTime } from 'react-icons/md'
+import { MdChevronLeft, MdChevronRight, MdClose, MdCalendarToday, MdAccessTime, MdAdd, MdSend, MdPhone, MdEvent, MdMessage, MdNote } from 'react-icons/md'
 import LeadDetailsModal from './LeadDetailsModal'
 import type { Lead } from '@/types'
 
@@ -49,6 +49,12 @@ export default function CalendarView({ bookings, onDateSelect, headerRight }: Ca
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
   const [isLeadModalOpen, setIsLeadModalOpen] = useState(false)
   const [loadingLead, setLoadingLead] = useState(false)
+  const [showNoteInput, setShowNoteInput] = useState(false)
+  const [noteText, setNoteText] = useState('')
+  const [noteType, setNoteType] = useState<'note' | 'call' | 'meeting' | 'message'>('note')
+  const [savingNote, setSavingNote] = useState(false)
+  const [recentNotes, setRecentNotes] = useState<Array<{ note: string; activity_type: string; created_at: string }>>([])
+  const [loadingNotes, setLoadingNotes] = useState(false)
 
   // Check for date query parameter on mount
   useEffect(() => {
@@ -112,12 +118,6 @@ export default function CalendarView({ bookings, onDateSelect, headerRight }: Ca
     onDateSelect?.(date)
   }
 
-  const handleBookingClick = (booking: Booking, e: React.MouseEvent) => {
-    e.stopPropagation()
-    setSelectedBooking(booking)
-    setIsModalOpen(true)
-  }
-
   const handleViewClientDetails = async () => {
     if (!selectedBooking) return
     setIsModalOpen(false)
@@ -178,6 +178,60 @@ export default function CalendarView({ bookings, onDateSelect, headerRight }: Ca
       throw err
     }
   }
+
+  // Fetch recent notes when modal opens
+  const fetchNotes = async (leadId: string) => {
+    setLoadingNotes(true)
+    try {
+      const res = await fetch(`/api/dashboard/leads/${leadId}/activities`)
+      if (!res.ok) return
+      const data = await res.json()
+      const notes = (data.activities || [])
+        .filter((a: any) => a.type === 'team')
+        .slice(0, 5)
+        .map((a: any) => ({ note: a.content, activity_type: a.icon, created_at: a.timestamp }))
+      setRecentNotes(notes)
+    } catch { /* ignore */ }
+    finally { setLoadingNotes(false) }
+  }
+
+  const handleSaveNote = async () => {
+    if (!selectedBooking || !noteText.trim()) return
+    setSavingNote(true)
+    try {
+      const res = await fetch(`/api/dashboard/leads/${selectedBooking.id}/activities`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ activity_type: noteType, note: noteText.trim() }),
+      })
+      if (!res.ok) throw new Error('Failed to save')
+      setNoteText('')
+      setShowNoteInput(false)
+      fetchNotes(selectedBooking.id)
+    } catch (err) {
+      console.error('Error saving note:', err)
+    } finally {
+      setSavingNote(false)
+    }
+  }
+
+  const handleBookingModalOpen = (booking: Booking, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setSelectedBooking(booking)
+    setIsModalOpen(true)
+    setShowNoteInput(false)
+    setNoteText('')
+    setNoteType('note')
+    setRecentNotes([])
+    fetchNotes(booking.id)
+  }
+
+  const NOTE_TYPES = [
+    { value: 'call' as const, label: 'Call', icon: MdPhone },
+    { value: 'meeting' as const, label: 'Meeting', icon: MdEvent },
+    { value: 'message' as const, label: 'Message', icon: MdMessage },
+    { value: 'note' as const, label: 'Note', icon: MdNote },
+  ]
 
   // Timezone label
   const tzOffset = new Date().getTimezoneOffset()
@@ -381,7 +435,7 @@ export default function CalendarView({ bookings, onDateSelect, headerRight }: Ca
                       return (
                         <div
                           key={booking.id}
-                          onClick={(e) => handleBookingClick(booking, e)}
+                          onClick={(e) => handleBookingModalOpen(booking, e)}
                           className="absolute rounded px-1.5 py-0.5 text-white cursor-pointer hover:brightness-110 hover:shadow-md transition-all z-10 overflow-hidden"
                           style={{
                             top: `${top}px`,
@@ -446,7 +500,7 @@ export default function CalendarView({ bookings, onDateSelect, headerRight }: Ca
                       {dayBookings.map((booking) => (
                         <div
                           key={booking.id}
-                          onClick={(e) => handleBookingClick(booking, e)}
+                          onClick={(e) => handleBookingModalOpen(booking, e)}
                           className="text-[10px] leading-tight px-1 py-px rounded text-white truncate cursor-pointer hover:brightness-110"
                           style={{ backgroundColor: 'var(--accent-primary)' }}
                         >
@@ -482,12 +536,22 @@ export default function CalendarView({ bookings, onDateSelect, headerRight }: Ca
                     {selectedBooking.phone && <span>{selectedBooking.phone}</span>}
                   </div>
                 </div>
-                <button onClick={() => setIsModalOpen(false)} className="p-1 rounded hover:bg-gray-200 dark:hover:bg-[#333]">
-                  <MdClose size={20} style={{ color: 'var(--text-secondary)' }} />
-                </button>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setShowNoteInput(!showNoteInput)}
+                    className="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-[#333] transition-colors"
+                    title="Add context note"
+                    style={{ color: showNoteInput ? 'var(--accent-primary)' : 'var(--text-secondary)' }}
+                  >
+                    <MdAdd size={20} />
+                  </button>
+                  <button onClick={() => setIsModalOpen(false)} className="p-1 rounded hover:bg-gray-200 dark:hover:bg-[#333]">
+                    <MdClose size={20} style={{ color: 'var(--text-secondary)' }} />
+                  </button>
+                </div>
               </div>
 
-              <div className="flex items-center gap-5 p-3 rounded-lg mb-4" style={{ backgroundColor: 'var(--bg-tertiary)' }}>
+              <div className="flex items-center gap-5 p-3 rounded-lg mb-3" style={{ backgroundColor: 'var(--bg-tertiary)' }}>
                 <div className="flex items-center gap-2">
                   <MdCalendarToday size={16} style={{ color: 'var(--accent-primary)' }} />
                   <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
@@ -510,11 +574,87 @@ export default function CalendarView({ bookings, onDateSelect, headerRight }: Ca
                   selectedBooking.unified_context?.whatsapp?.conversation_summary
                 if (!summary) return null
                 return (
-                  <div className="text-xs leading-relaxed p-3 rounded-lg mb-4" style={{ backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-secondary)' }}>
+                  <div className="text-[13px] leading-relaxed font-normal p-3 rounded-lg mb-3" style={{ color: 'var(--text-primary)' }}>
                     {summary}
                   </div>
                 )
               })()}
+
+              {/* Add Context Note Section */}
+              {showNoteInput && (
+                <div className="mb-3 p-3 rounded-lg border" style={{ borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-tertiary)' }}>
+                  <div className="flex items-center gap-1 mb-2">
+                    {NOTE_TYPES.map((type) => {
+                      const Icon = type.icon
+                      const isActive = noteType === type.value
+                      return (
+                        <button
+                          key={type.value}
+                          onClick={() => setNoteType(type.value)}
+                          className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium transition-colors"
+                          style={{
+                            backgroundColor: isActive ? 'var(--accent-primary)' : 'transparent',
+                            color: isActive ? '#fff' : 'var(--text-secondary)',
+                          }}
+                        >
+                          <Icon size={12} />
+                          {type.label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={noteText}
+                      onChange={(e) => setNoteText(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter' && noteText.trim()) handleSaveNote() }}
+                      placeholder="Quick note... e.g. Had a call, discussed pricing"
+                      className="flex-1 px-2.5 py-1.5 text-xs rounded border bg-transparent focus:outline-none focus:ring-1"
+                      style={{ borderColor: 'var(--border-primary)', color: 'var(--text-primary)', '--tw-ring-color': 'var(--accent-primary)' } as any}
+                      autoFocus
+                    />
+                    <button
+                      onClick={handleSaveNote}
+                      disabled={savingNote || !noteText.trim()}
+                      className="px-2.5 py-1.5 rounded text-white text-xs font-medium disabled:opacity-40 hover:brightness-110 transition-all"
+                      style={{ backgroundColor: 'var(--accent-primary)' }}
+                    >
+                      {savingNote ? '...' : <MdSend size={14} />}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Recent Notes */}
+              {recentNotes.length > 0 && (
+                <div className="mb-3 space-y-1">
+                  <div className="text-[10px] font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--text-secondary)' }}>Recent Notes</div>
+                  {recentNotes.map((n, idx) => (
+                    <div key={idx} className="flex items-start gap-2 text-xs px-2 py-1.5 rounded" style={{ backgroundColor: 'var(--bg-tertiary)' }}>
+                      <span className="flex-shrink-0 mt-0.5" style={{ color: 'var(--text-secondary)' }}>
+                        {n.activity_type === 'call' ? <MdPhone size={12} /> : n.activity_type === 'meeting' ? <MdEvent size={12} /> : n.activity_type === 'message' ? <MdMessage size={12} /> : <MdNote size={12} />}
+                      </span>
+                      <span className="flex-1 text-[12px]" style={{ color: 'var(--text-primary)' }}>{n.note}</span>
+                      <span className="text-[9px] flex-shrink-0" style={{ color: 'var(--text-secondary)' }}>
+                        {(() => {
+                          try {
+                            const d = new Date(n.created_at)
+                            const now = new Date()
+                            const diffMs = now.getTime() - d.getTime()
+                            const diffMins = Math.floor(diffMs / 60000)
+                            if (diffMins < 60) return `${diffMins}m ago`
+                            const diffHrs = Math.floor(diffMins / 60)
+                            if (diffHrs < 24) return `${diffHrs}h ago`
+                            const diffDays = Math.floor(diffHrs / 24)
+                            return `${diffDays}d ago`
+                          } catch { return '' }
+                        })()}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
 
               <button
                 onClick={handleViewClientDetails}
