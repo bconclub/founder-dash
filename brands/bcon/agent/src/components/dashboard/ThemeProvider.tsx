@@ -28,14 +28,16 @@ export default function ThemeProvider({
         document.documentElement.style.setProperty('--text-primary', '#ffffff');
         document.documentElement.style.setProperty('--text-secondary', '#999999');
         document.documentElement.style.setProperty('--bg-hover', '#1A1A1A');
+        document.documentElement.style.setProperty('--bg-tertiary', 'rgba(255, 255, 255, 0.02)');
       } else {
-        // Light mode — remove dark overrides so CSS :root values apply
-        document.documentElement.style.removeProperty('--bg-primary');
-        document.documentElement.style.removeProperty('--bg-secondary');
-        document.documentElement.style.removeProperty('--border-primary');
-        document.documentElement.style.removeProperty('--text-primary');
-        document.documentElement.style.removeProperty('--text-secondary');
-        document.documentElement.style.removeProperty('--bg-hover');
+        // Light mode — explicitly set light values
+        document.documentElement.style.setProperty('--bg-primary', '#f6f6f6');
+        document.documentElement.style.setProperty('--bg-secondary', '#ffffff');
+        document.documentElement.style.setProperty('--border-primary', '#d0d0d0');
+        document.documentElement.style.setProperty('--text-primary', '#1a1a1a');
+        document.documentElement.style.setProperty('--text-secondary', '#666666');
+        document.documentElement.style.setProperty('--bg-hover', '#ececec');
+        document.documentElement.style.setProperty('--bg-tertiary', 'rgba(0, 0, 0, 0.02)');
       }
     }
 
