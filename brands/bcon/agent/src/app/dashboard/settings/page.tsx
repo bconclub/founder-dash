@@ -119,10 +119,6 @@ export default function SettingsPage() {
   return (
     <DashboardLayout>
       <div className="p-6 max-w-4xl">
-        <h1 className="text-2xl font-bold mb-6" style={{ color: 'var(--text-primary)' }}>
-          Settings
-        </h1>
-
         {/* Theme Section */}
         <div className="mb-8">
           <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>

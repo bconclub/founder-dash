@@ -55,15 +55,7 @@ export default function SequencesPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold mb-2" style={{ color: 'var(--text-primary)' }}>
-            Sequences
-          </h1>
-          <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-            Automated follow-up sequences for leads — email, WhatsApp, and timed triggers
-          </p>
-        </div>
+      <div className="flex items-center justify-end">
         <button
           className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white transition-opacity hover:opacity-85"
           style={{ backgroundColor: 'var(--primary-color)' }}
