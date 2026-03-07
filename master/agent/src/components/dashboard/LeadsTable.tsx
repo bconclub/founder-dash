@@ -557,22 +557,24 @@ export default function LeadsTable({
       <div className="overflow-x-auto overflow-y-visible">
         <table className="w-full" style={{ tableLayout: 'fixed' }}>
           <colgroup>
-            <col style={{ width: '13%' }} />  {/* Name */}
-            <col style={{ width: '17%' }} />  {/* Email */}
-            <col style={{ width: '11%' }} />  {/* Phone */}
+            <col style={{ width: '11%' }} />  {/* Name */}
+            <col style={{ width: '11%' }} />  {/* Brand */}
+            <col style={{ width: '15%' }} />  {/* Email */}
+            <col style={{ width: '10%' }} />  {/* Phone */}
             <col style={{ width: '6%' }} />   {/* Source */}
             {showAviationColumns && <col style={{ width: '7%' }} />}
             {showAviationColumns && <col style={{ width: '8%' }} />}
             <col style={{ width: '5%' }} />   {/* Score */}
-            <col style={{ width: '9%' }} />   {/* Stage */}
-            <col style={{ width: '9%' }} />   {/* Status */}
-            <col style={{ width: '7%' }} />   {/* Activity */}
-            <col style={{ width: '10%' }} />  {/* Booking */}
+            <col style={{ width: '8%' }} />   {/* Stage */}
+            <col style={{ width: '8%' }} />   {/* Status */}
+            <col style={{ width: '6%' }} />   {/* Activity */}
+            <col style={{ width: '9%' }} />   {/* Booking */}
           </colgroup>
           <thead>
             <tr style={{ borderBottom: '1px solid var(--border-primary)' }}>
               {[
                 'Name',
+                'Brand',
                 'Email',
                 'Phone',
                 'Source',
@@ -597,7 +599,7 @@ export default function LeadsTable({
             {filteredLeads.length === 0 ? (
               <tr>
                 <td
-                  colSpan={showAviationColumns ? 12 : 10}
+                  colSpan={showAviationColumns ? 13 : 11}
                   className="px-3 py-8 text-center text-sm"
                   style={{ color: 'var(--text-secondary)' }}
                 >
@@ -657,6 +659,15 @@ export default function LeadsTable({
                       <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
                         {lead.name || '-'}
                       </span>
+                    </td>
+
+                    {/* Brand */}
+                    <td className="px-3 py-2 truncate text-sm" style={{ color: 'var(--text-secondary)' }} title={
+                      lead.unified_context?.whatsapp?.profile?.company ||
+                      lead.unified_context?.web?.profile?.company || ''
+                    }>
+                      {lead.unified_context?.whatsapp?.profile?.company ||
+                       lead.unified_context?.web?.profile?.company || '-'}
                     </td>
 
                     {/* Email */}
