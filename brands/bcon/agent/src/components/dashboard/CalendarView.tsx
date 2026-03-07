@@ -402,11 +402,11 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
           </div>
         ) : (
           /* ===== MONTH VIEW ===== */
-          <div className="flex-1 overflow-y-auto p-4">
-            <div className="grid grid-cols-7 gap-px rounded-lg overflow-hidden border" style={{ borderColor: 'var(--border-primary)' }}>
+          <div className="flex-1 flex flex-col overflow-hidden p-4">
+            <div className="flex-1 grid grid-cols-7 overflow-hidden rounded-lg border" style={{ borderColor: 'var(--border-primary)', gridTemplateRows: `auto repeat(${Math.ceil(calendarDays.length / 7)}, 1fr)` }}>
               {/* Day headers */}
               {DAY_LABELS.map((day) => (
-                <div key={day} className="text-center text-xs font-medium py-2" style={{ color: 'var(--text-secondary)', backgroundColor: 'var(--bg-tertiary)' }}>
+                <div key={day} className="text-center text-xs font-medium py-1.5" style={{ color: 'var(--text-secondary)', backgroundColor: 'var(--bg-tertiary)' }}>
                   {day}
                 </div>
               ))}
@@ -419,15 +419,17 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
                   <div
                     key={idx}
                     onClick={() => handleDateClick(day)}
-                    className="min-h-[100px] p-1.5 cursor-pointer hover:brightness-110 transition-all"
+                    className="p-1 cursor-pointer hover:brightness-110 transition-all overflow-y-auto flex flex-col"
                     style={{
                       backgroundColor: isCurrentMonth ? 'var(--bg-secondary)' : 'var(--bg-tertiary)',
                       borderTop: '1px solid var(--border-primary)',
+                      borderRight: (idx % 7 !== 6) ? '1px solid color-mix(in srgb, var(--border-primary) 40%, transparent)' : 'none',
                       opacity: isCurrentMonth ? 1 : 0.5,
+                      minHeight: 0,
                     }}
                   >
                     <div
-                      className="text-xs font-medium mb-1 w-6 h-6 flex items-center justify-center rounded-full mx-auto"
+                      className="text-[11px] font-medium mb-0.5 w-5 h-5 flex items-center justify-center rounded-full"
                       style={{
                         color: isToday ? '#fff' : 'var(--text-primary)',
                         backgroundColor: isToday ? 'var(--accent-primary)' : 'transparent',
@@ -435,22 +437,17 @@ export default function CalendarView({ bookings, onDateSelect }: CalendarViewPro
                     >
                       {format(day, 'd')}
                     </div>
-                    <div className="space-y-0.5">
-                      {dayBookings.slice(0, 3).map((booking) => (
+                    <div className="flex-1 space-y-px overflow-y-auto">
+                      {dayBookings.map((booking) => (
                         <div
                           key={booking.id}
                           onClick={(e) => handleBookingClick(booking, e)}
-                          className="text-[10px] px-1.5 py-0.5 rounded text-white truncate cursor-pointer hover:brightness-110"
+                          className="text-[10px] leading-tight px-1 py-px rounded text-white truncate cursor-pointer hover:brightness-110"
                           style={{ backgroundColor: 'var(--accent-primary)' }}
                         >
                           {booking.booking_time?.substring(0, 5)} {booking.name || 'Unnamed'}
                         </div>
                       ))}
-                      {dayBookings.length > 3 && (
-                        <div className="text-[10px] px-1.5" style={{ color: 'var(--text-secondary)' }}>
-                          +{dayBookings.length - 3} more
-                        </div>
-                      )}
                     </div>
                   </div>
                 )
