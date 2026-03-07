@@ -957,15 +957,15 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
           style={{
             width: '54vw',
             maxWidth: '720px',
-            height: '70vh',
-            maxHeight: '70vh'
+            height: '88vh',
+            maxHeight: '88vh'
           }}
           onClick={(e) => e.stopPropagation()}
           aria-labelledby="lead-modal-title"
           aria-modal="true"
         >
           {/* Single Row Header: Contact Card (Left) + Journey & Stats (Right) */}
-          <header className="lead-modal-header lead-details-modal-header flex flex-row items-stretch gap-6 p-4 border-b border-gray-200 dark:border-[#262626] flex-shrink-0 relative min-h-[160px]">
+          <header className="lead-modal-header lead-details-modal-header flex flex-row items-stretch gap-6 p-4 border-b border-gray-200 dark:border-[#262626] flex-shrink-0 relative min-h-[140px]">
             {/* LEFT HALF: Contact Card - Business Card Style */}
             <section className="lead-contact-card flex-1 flex flex-col justify-between h-full p-3 bg-gray-50/50 dark:bg-gray-800/30 rounded-xl border border-gray-200/50 dark:border-gray-700/30">
               {/* Top Section: Name, Score, Status */}
