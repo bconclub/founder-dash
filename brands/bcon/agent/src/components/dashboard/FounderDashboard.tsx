@@ -490,25 +490,22 @@ export default function FounderDashboard() {
             {conversationTimeFilter === '14D' && metrics.totalConversations.count14D}
             {conversationTimeFilter === '30D' && metrics.totalConversations.count30D}
           </p>
-          {/* 3. Metric Details - Trend */}
-          <div className="flex items-center gap-1 mb-2">
-            {metrics.totalConversations.trend7D > 0 ? (
-              <>
-                <MdTrendingUp className="text-green-600" size={16} />
-                <span className="text-sm text-green-600 font-medium">↑ {Math.abs(metrics.totalConversations.trend7D)}%</span>
-              </>
-            ) : metrics.totalConversations.trend7D < 0 ? (
-              <>
-                <MdTrendingDown className="text-red-600" size={16} />
-                <span className="text-sm text-red-600 font-medium">↓ {Math.abs(metrics.totalConversations.trend7D)}%</span>
-              </>
-            ) : (
-              <>
-                <MdRemove className="text-gray-400" size={16} />
-                <span className="text-sm text-gray-400 font-medium">0%</span>
-              </>
-            )}
-          </div>
+          {/* 3. Metric Details - Trend (hidden when 0%) */}
+          {metrics.totalConversations.trend7D !== 0 && (
+            <div className="flex items-center gap-1 mb-2">
+              {metrics.totalConversations.trend7D > 0 ? (
+                <>
+                  <MdTrendingUp className="text-green-600" size={16} />
+                  <span className="text-sm text-green-600 font-medium">↑ {Math.abs(metrics.totalConversations.trend7D)}%</span>
+                </>
+              ) : (
+                <>
+                  <MdTrendingDown className="text-red-600" size={16} />
+                  <span className="text-sm text-red-600 font-medium">↓ {Math.abs(metrics.totalConversations.trend7D)}%</span>
+                </>
+              )}
+            </div>
+          )}
           {/* 4. Sparkline Graph + Filter + Action */}
           <div className="mt-auto">
             {metrics.trends?.conversations && (
