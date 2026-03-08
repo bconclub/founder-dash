@@ -50,6 +50,14 @@ export async function process(
     ? `[EXISTING BOOKING INFO: ${existingBookingMessage} — If the customer provides a new date/time, they want to reschedule. Cancel old and book new immediately. Do NOT ask "should I cancel?" repeatedly — if they give a time, that IS the confirmation.]\n\nUser's message: ${input.message}`
     : input.message;
 
+  // Build admin notes context
+  let crossChannelContext = '';
+  if (input.adminNotes && input.adminNotes.length > 0) {
+    const recentNotes = input.adminNotes.slice(-10);
+    crossChannelContext += 'ADMIN NOTES (from team — use these to guide your approach):\n';
+    crossChannelContext += recentNotes.map(n => `- ${n.text}`).join('\n');
+  }
+
   const { systemPrompt, userPrompt } = buildPrompt({
     channel: input.channel,
     userName: input.userProfile.name,
@@ -60,6 +68,7 @@ export async function process(
     bookingAlreadyScheduled: !!existingBookingMessage,
     messageCount: input.messageCount,
     brand: brandId,
+    crossChannelContext: crossChannelContext || undefined,
   });
 
   // 5. Detect human handoff requests before AI generation
@@ -171,6 +180,14 @@ export async function* processStream(
       ? `${existingBookingMessage}\n\nUser's message: ${input.message}`
       : input.message;
 
+    // Build admin notes context
+    let crossChannelContext = '';
+    if (input.adminNotes && input.adminNotes.length > 0) {
+      const recentNotes = input.adminNotes.slice(-10);
+      crossChannelContext += 'ADMIN NOTES (from team — use these to guide your approach):\n';
+      crossChannelContext += recentNotes.map(n => `- ${n.text}`).join('\n');
+    }
+
     const { systemPrompt, userPrompt } = buildPrompt({
       channel: input.channel,
       userName: input.userProfile.name,
@@ -181,6 +198,7 @@ export async function* processStream(
       bookingAlreadyScheduled: !!existingBookingMessage,
       messageCount: input.messageCount,
       brand: brandId,
+      crossChannelContext: crossChannelContext || undefined,
     });
 
     // 5. Stream response

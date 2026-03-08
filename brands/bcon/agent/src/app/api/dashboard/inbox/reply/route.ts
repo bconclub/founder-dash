@@ -147,6 +147,7 @@ export async function POST(request: NextRequest) {
           phone: lead.phone || undefined,
         },
         summary: existingSummary,
+        adminNotes: customerContext?.unifiedContext?.admin_notes || undefined,
       };
 
       const aiStartTime = Date.now();

@@ -29,6 +29,7 @@ export interface CustomerContext {
   whatsappSummary: { summary: string; lastInteraction: string | null } | null;
   voiceSummary: { summary: string; lastInteraction: string | null } | null;
   socialSummary: { summary: string; lastInteraction: string | null } | null;
+  adminNotes: Array<{ text: string; created_by: string; created_at: string }> | null;
 }
 
 export interface BrandUserProfile {
@@ -148,6 +149,7 @@ export async function fetchCustomerContext(
     whatsappSummary: null,
     voiceSummary: null,
     socialSummary: null,
+    adminNotes: (lead.unified_context?.admin_notes as any[]) || null,
   };
 
   // Fetch web conversation summary

@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { formatDateTime, formatDate } from '@/lib/utils'
 import { createClient } from '../../lib/supabase/client'
 import { format } from 'date-fns'
-import { MdLanguage, MdChat, MdPhone, MdShare, MdAutoAwesome, MdOpenInNew, MdHistory, MdCall, MdEvent, MdMessage, MdNote, MdEdit, MdTrendingUp, MdTrendingDown, MdRemove, MdCheckCircle, MdSchedule, MdPsychology, MdFlashOn, MdBarChart, MdEmail, MdChevronRight, MdSmartToy, MdPerson, MdRefresh, MdHelpOutline, MdInfo, MdCheck, MdClose, MdPayments, MdReportProblem, MdSchool, MdHistoryEdu, MdFlightTakeoff, MdAccountBalanceWallet, MdPersonOutline, MdOutlineInsights } from 'react-icons/md'
+import { MdLanguage, MdChat, MdPhone, MdShare, MdAutoAwesome, MdOpenInNew, MdHistory, MdCall, MdEvent, MdMessage, MdNote, MdEdit, MdTrendingUp, MdTrendingDown, MdRemove, MdCheckCircle, MdSchedule, MdPsychology, MdFlashOn, MdBarChart, MdEmail, MdChevronRight, MdSmartToy, MdPerson, MdRefresh, MdHelpOutline, MdInfo, MdCheck, MdClose, MdPayments, MdReportProblem, MdSchool, MdHistoryEdu, MdFlightTakeoff, MdAccountBalanceWallet, MdPersonOutline, MdOutlineInsights, MdMic, MdAdd } from 'react-icons/md'
 import { FaWhatsapp } from 'react-icons/fa'
 import { useRouter } from 'next/navigation'
 import LeadStageSelector from './LeadStageSelector'
@@ -229,6 +229,13 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
   const [previousScore, setPreviousScore] = useState<number | null>(null)
   const [freshLeadData, setFreshLeadData] = useState<Lead | null>(null)
   const [calculatedScore, setCalculatedScore] = useState<CalculatedScore | null>(null)
+
+  // Admin notes state
+  const [showAdminNoteInput, setShowAdminNoteInput] = useState(false)
+  const [adminNoteText, setAdminNoteText] = useState('')
+  const [savingAdminNote, setSavingAdminNote] = useState(false)
+  const [isListening, setIsListening] = useState(false)
+  const recognitionRef = useRef<any>(null)
 
   // Calculate and set unified score (using shared utility)
   const calculateAndSetScore = async () => {
@@ -804,6 +811,63 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
     return stageColors[stage] || stageColors['New']
   }
 
+  // Admin note handlers
+  const handleSaveAdminNote = async () => {
+    if (!adminNoteText.trim() || !lead) return
+    setSavingAdminNote(true)
+    try {
+      const response = await fetch(`/api/dashboard/leads/${lead.id}/admin-notes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ note: adminNoteText.trim() }),
+      })
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Failed to save note')
+      }
+      setAdminNoteText('')
+      setShowAdminNoteInput(false)
+      loadActivities()
+      loadFreshLeadData()
+    } catch (err) {
+      console.error('Error saving admin note:', err)
+    } finally {
+      setSavingAdminNote(false)
+    }
+  }
+
+  const toggleVoiceDictation = () => {
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+      alert('Voice dictation is not supported in this browser.')
+      return
+    }
+
+    if (isListening) {
+      recognitionRef.current?.stop()
+      setIsListening(false)
+      return
+    }
+
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+    const recognition = new SpeechRecognition()
+    recognition.continuous = false
+    recognition.interimResults = false
+    recognition.lang = 'en-IN'
+
+    recognition.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript
+      setAdminNoteText((prev) => (prev ? prev + ' ' + transcript : transcript))
+      setIsListening(false)
+    }
+
+    recognition.onerror = () => setIsListening(false)
+    recognition.onend = () => setIsListening(false)
+
+    recognitionRef.current = recognition
+    recognition.start()
+    setIsListening(true)
+  }
+
   // Handle stage change
   const handleStageChange = (newStage: LeadStage) => {
     const oldStage: string | null = currentLead.lead_stage || null
@@ -1046,26 +1110,86 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
               {/* Customer Journey - TOP */}
               <section className="lead-journey-section">
                 <h3 className="lead-journey-title text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">Customer Journey</h3>
-                {activeChannels.length > 0 ? (
-                  <nav className="lead-journey-channels flex items-center gap-1.5 flex-wrap" aria-label="Customer journey channels">
-                    {activeChannels.map((channel, index) => (
-                      <div key={channel.key} className="lead-journey-channel-item flex items-center gap-1.5">
-                        <div
-                          className="lead-journey-channel-icon w-6 h-6 rounded-full flex items-center justify-center text-white shadow-sm flex-shrink-0 cursor-pointer"
-                          style={{ backgroundColor: channel.color }}
-                          title={`${channel.name} - ${channel.firstDate ? formatDateIST(channel.firstDate) : 'N/A'}, ${channel.count} msgs`}
-                          aria-label={`${channel.name} channel`}
-                        >
-                          <channel.icon size={14} />
+                <div className="lead-journey-row flex items-center gap-1.5">
+                  {activeChannels.length > 0 ? (
+                    <nav className="lead-journey-channels flex items-center gap-1.5 flex-wrap" aria-label="Customer journey channels">
+                      {activeChannels.map((channel, index) => (
+                        <div key={channel.key} className="lead-journey-channel-item flex items-center gap-1.5">
+                          <div
+                            className="lead-journey-channel-icon w-6 h-6 rounded-full flex items-center justify-center text-white shadow-sm flex-shrink-0 cursor-pointer"
+                            style={{ backgroundColor: channel.color }}
+                            title={`${channel.name} - ${channel.firstDate ? formatDateIST(channel.firstDate) : 'N/A'}, ${channel.count} msgs`}
+                            aria-label={`${channel.name} channel`}
+                          >
+                            <channel.icon size={14} />
+                          </div>
+                          {index < activeChannels.length - 1 && (
+                            <MdChevronRight className="lead-journey-separator text-gray-400 dark:text-gray-500 flex-shrink-0" size={16} aria-hidden="true" />
+                          )}
                         </div>
-                        {index < activeChannels.length - 1 && (
-                          <MdChevronRight className="lead-journey-separator text-gray-400 dark:text-gray-500 flex-shrink-0" size={16} aria-hidden="true" />
-                        )}
+                      ))}
+                    </nav>
+                  ) : (
+                    <p className="lead-journey-empty text-xs text-gray-500 dark:text-gray-400">No channels yet</p>
+                  )}
+                  <button
+                    onClick={() => setShowAdminNoteInput(!showAdminNoteInput)}
+                    className="lead-admin-note-toggle ml-auto w-6 h-6 flex items-center justify-center rounded-full text-gray-400 hover:text-white hover:bg-blue-500 transition-colors"
+                    title="Add admin note"
+                    aria-label="Add admin note"
+                  >
+                    {showAdminNoteInput ? <MdClose size={14} /> : <MdAdd size={14} />}
+                  </button>
+                </div>
+
+                {/* Inline admin note input */}
+                {showAdminNoteInput && (
+                  <div className="lead-admin-note-input flex items-center gap-2 mt-2 p-2 bg-white dark:bg-[#1A1A1A] rounded-lg border border-gray-200 dark:border-[#262626]">
+                    <input
+                      type="text"
+                      value={adminNoteText}
+                      onChange={(e) => setAdminNoteText(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && adminNoteText.trim()) handleSaveAdminNote()
+                      }}
+                      placeholder="Add context about this lead..."
+                      className="flex-1 text-xs bg-transparent border-none outline-none text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
+                      autoFocus
+                      disabled={savingAdminNote}
+                    />
+                    <button
+                      onClick={toggleVoiceDictation}
+                      className={`lead-admin-note-mic w-6 h-6 flex items-center justify-center rounded-full transition-colors ${
+                        isListening
+                          ? 'bg-red-500 text-white animate-pulse'
+                          : 'text-gray-400 hover:text-white hover:bg-gray-600'
+                      }`}
+                      title={isListening ? 'Stop dictation' : 'Voice dictation'}
+                      aria-label={isListening ? 'Stop voice dictation' : 'Start voice dictation'}
+                    >
+                      <MdMic size={14} />
+                    </button>
+                    <button
+                      onClick={handleSaveAdminNote}
+                      disabled={!adminNoteText.trim() || savingAdminNote}
+                      className="lead-admin-note-save w-6 h-6 flex items-center justify-center rounded-full bg-blue-500 text-white disabled:opacity-40 transition-colors"
+                      title="Save note"
+                    >
+                      <MdCheck size={12} />
+                    </button>
+                  </div>
+                )}
+
+                {/* Recent admin notes */}
+                {currentLead.unified_context?.admin_notes?.length > 0 && (
+                  <div className="lead-admin-notes mt-2 space-y-1">
+                    {(currentLead.unified_context.admin_notes as any[]).slice(-3).map((note: any, i: number) => (
+                      <div key={i} className="text-[11px] text-gray-500 dark:text-gray-400 flex items-start gap-1">
+                        <MdNote size={12} className="mt-0.5 flex-shrink-0 text-orange-400" />
+                        <span>{note.text} <span className="text-gray-400 dark:text-gray-500">({new Date(note.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })})</span></span>
                       </div>
                     ))}
-                  </nav>
-                ) : (
-                  <p className="lead-journey-empty text-xs text-gray-500 dark:text-gray-400">No channels yet</p>
+                  </div>
                 )}
               </section>
 
@@ -1082,30 +1206,11 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                     <p className="lead-stat-value text-2xl font-bold text-gray-900 dark:text-white mt-auto" aria-label={`${quickStats.responseRate}% response rate`}>{quickStats.responseRate}%</p>
                   </article>
                   <article className={`lead-stat-card lead-stat-key-event flex flex-col justify-between h-full p-3 min-h-[80px] rounded-lg border ${(() => {
-                    const bookingDate = currentLead.booking_date ||
-                      currentLead.unified_context?.web?.booking_date ||
-                      currentLead.unified_context?.web?.booking?.date ||
-                      currentLead.unified_context?.whatsapp?.booking_date ||
-                      currentLead.unified_context?.whatsapp?.booking?.date ||
-                      currentLead.unified_context?.voice?.booking_date ||
-                      currentLead.unified_context?.voice?.booking?.date ||
-                      currentLead.unified_context?.social?.booking_date ||
-                      currentLead.unified_context?.social?.booking?.date;
-                    const bookingTime = currentLead.booking_time ||
-                      currentLead.unified_context?.web?.booking_time ||
-                      currentLead.unified_context?.web?.booking?.time ||
-                      currentLead.unified_context?.whatsapp?.booking_time ||
-                      currentLead.unified_context?.whatsapp?.booking?.time ||
-                      currentLead.unified_context?.voice?.booking_time ||
-                      currentLead.unified_context?.voice?.booking?.time ||
-                      currentLead.unified_context?.social?.booking_time ||
-                      currentLead.unified_context?.social?.booking?.time;
-                    return bookingDate && bookingTime
-                      ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
-                      : 'bg-white dark:bg-[#1A1A1A] border-gray-200 dark:border-[#262626]';
-                  })()
-                    }`}>
-                    <p className="lead-stat-label text-xs text-gray-400 dark:text-gray-500">Key Event</p>
+                    const bd = currentLead.booking_date || currentLead.unified_context?.web?.booking_date || currentLead.unified_context?.web?.booking?.date || currentLead.unified_context?.whatsapp?.booking_date || currentLead.unified_context?.whatsapp?.booking?.date || currentLead.unified_context?.voice?.booking_date || currentLead.unified_context?.voice?.booking?.date || currentLead.unified_context?.social?.booking_date || currentLead.unified_context?.social?.booking?.date;
+                    const bt = currentLead.booking_time || currentLead.unified_context?.web?.booking_time || currentLead.unified_context?.web?.booking?.time || currentLead.unified_context?.whatsapp?.booking_time || currentLead.unified_context?.whatsapp?.booking?.time || currentLead.unified_context?.voice?.booking_time || currentLead.unified_context?.voice?.booking?.time || currentLead.unified_context?.social?.booking_time || currentLead.unified_context?.social?.booking?.time;
+                    return bd && bt ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800' : 'bg-white dark:bg-[#1A1A1A] border-gray-200 dark:border-[#262626]';
+                  })()}`}>
+                    <p className="lead-stat-label text-sm text-gray-400 dark:text-gray-500">Key Event</p>
                     <div className="lead-stat-content mt-auto">
                       {(() => {
                         const bookingDate = currentLead.booking_date ||
@@ -1136,13 +1241,12 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                               className="lead-booking-link flex flex-col cursor-pointer hover:opacity-80 transition-opacity"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                // Optionally navigate to calendar with date filter
                               }}
                               aria-label={`View booking on ${formattedDate} at ${formattedTime}`}
                             >
                               <div className="lead-booking-date flex items-center gap-1">
-                                <MdEvent className="text-blue-600 dark:text-blue-400 flex-shrink-0" size={16} aria-hidden="true" />
-                                <time className="text-lg font-bold text-blue-700 dark:text-blue-300" dateTime={bookingDate}>
+                                <MdEvent className="text-blue-600 dark:text-blue-400 flex-shrink-0" size={14} aria-hidden="true" />
+                                <time className="text-sm font-bold text-blue-700 dark:text-blue-300" dateTime={bookingDate}>
                                   {formattedDate}
                                 </time>
                               </div>

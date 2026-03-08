@@ -96,6 +96,7 @@ export async function POST(request: NextRequest) {
       })),
       summary: existingSummary,
       usedButtons: [],
+      adminNotes: customerContext?.unifiedContext?.admin_notes || undefined,
     };
 
     // Generate AI response (non-streaming for WhatsApp)
