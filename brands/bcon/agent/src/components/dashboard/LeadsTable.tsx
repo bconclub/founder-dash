@@ -627,14 +627,13 @@ export default function LeadsTable({
       <div className="overflow-x-auto overflow-y-auto" style={{ maxHeight: 'calc(100vh - 140px)' }}>
         <table className="w-full" style={{ tableLayout: 'fixed' }}>
           <colgroup>
-            <col style={{ width: '24%' }} />  {/* Lead */}
-            <col style={{ width: '18%' }} />  {/* Contact */}
+            <col style={{ width: '27%' }} />  {/* Lead */}
+            <col style={{ width: '20%' }} />  {/* Contact */}
             <col style={{ width: '6%' }} />   {/* Source */}
             <col style={{ width: '7%' }} />   {/* Score */}
-            <col style={{ width: '12%' }} />  {/* Stage */}
-            <col style={{ width: '9%' }} />   {/* Temp */}
-            <col style={{ width: '8%' }} />   {/* Active */}
-            <col style={{ width: '14%' }} />  {/* Booking */}
+            <col style={{ width: '13%' }} />  {/* Stage */}
+            <col style={{ width: '9%' }} />   {/* Active */}
+            <col style={{ width: '16%' }} />  {/* Booking */}
             {showAviationColumns && <col style={{ width: '7%' }} />}
             {showAviationColumns && <col style={{ width: '8%' }} />}
           </colgroup>
@@ -646,7 +645,6 @@ export default function LeadsTable({
                 'Source',
                 'Score',
                 'Stage',
-                'Temp',
                 'Active',
                 'Booking',
                 ...(showAviationColumns ? ['Type', 'Course'] : []),
@@ -665,7 +663,7 @@ export default function LeadsTable({
             {filteredLeads.length === 0 ? (
               <tr>
                 <td
-                  colSpan={showAviationColumns ? 10 : 8}
+                  colSpan={showAviationColumns ? 9 : 7}
                   className="px-3 py-8 text-center text-sm"
                   style={{ color: 'var(--text-secondary)' }}
                 >
@@ -719,11 +717,6 @@ export default function LeadsTable({
                   unknown: { label: '-', color: '#6B7280' },
                 }
                 const srcCfg = sourceConfig[source] || sourceConfig.unknown
-
-                // Temperature from score
-                const tempLabel = score != null ? (score >= 70 ? 'Hot' : score >= 40 ? 'Warm' : score >= 20 ? 'Cool' : 'Cold') : null
-                const tempColor = score != null ? (score >= 70 ? '#22c55e' : score >= 40 ? '#f59e0b' : score >= 20 ? '#3b82f6' : '#ef4444') : null
-                const tempBg = score != null ? (score >= 70 ? 'rgba(34,197,94,0.12)' : score >= 40 ? 'rgba(245,158,11,0.12)' : score >= 20 ? 'rgba(59,130,246,0.12)' : 'rgba(239,68,68,0.12)') : null
 
                 // Score pill colors
                 const scorePillBg = score != null ? (score >= 70 ? 'rgba(34,197,94,0.15)' : score >= 40 ? 'rgba(245,158,11,0.15)' : 'rgba(239,68,68,0.15)') : null
@@ -796,18 +789,6 @@ export default function LeadsTable({
                       >
                         {displayStage}
                       </span>
-                    </td>
-
-                    {/* TEMP — Hot/Warm/Cool/Cold */}
-                    <td className="px-3 py-2">
-                      {tempLabel ? (
-                        <span
-                          className="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold"
-                          style={{ backgroundColor: tempBg!, color: tempColor! }}
-                        >
-                          {tempLabel}
-                        </span>
-                      ) : null}
                     </td>
 
                     {/* ACTIVE */}
