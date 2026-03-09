@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server'
+import { APP_VERSION, BUILD_TIMESTAMP } from '@/lib/generated-version'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET() {
-  const version = process.env.NEXT_PUBLIC_APP_VERSION || '0.0.1'
-  const buildTimestamp = process.env.NEXT_PUBLIC_BUILD_TIME || new Date().toISOString()
+  const version = APP_VERSION
+  const buildTimestamp = BUILD_TIMESTAMP
 
   const buildDate = new Date(buildTimestamp).toLocaleString('en-US', {
     timeZone: 'Asia/Kolkata',

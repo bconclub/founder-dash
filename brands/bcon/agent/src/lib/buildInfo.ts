@@ -1,14 +1,15 @@
-// Build information - updated at build time
-// This file can be updated by CI/CD during deployment
+// Build information - uses generated version file from prebuild script
+import { APP_VERSION, BUILD_TIMESTAMP } from './generated-version'
 
-export const BUILD_TIME = process.env.NEXT_PUBLIC_BUILD_TIME || new Date().toISOString()
+export const BUILD_TIME = BUILD_TIMESTAMP
+export const VERSION = APP_VERSION
 
 // Format date in a deterministic way that doesn't change between server and client
 // Converts UTC to IST (GMT+5:30)
 function formatDateDeterministic(date: Date): string {
   // Format in IST timezone
   const istDate = new Date(date.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }))
-  
+
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
   const month = months[istDate.getMonth()]
   const day = istDate.getDate()
@@ -18,7 +19,7 @@ function formatDateDeterministic(date: Date): string {
   const ampm = hours >= 12 ? 'PM' : 'AM'
   const displayHours = hours % 12 || 12
   const displayMinutes = minutes.toString().padStart(2, '0')
-  
+
   return `${month} ${day}, ${year}, ${displayHours}:${displayMinutes} ${ampm} IST`
 }
 
@@ -31,4 +32,3 @@ export function getBuildDate(): string {
     return formatDateDeterministic(new Date())
   }
 }
-
