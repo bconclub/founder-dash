@@ -8,7 +8,8 @@ import {
   MdSend,
   MdSearch,
   MdAutoAwesome,
-  MdEventAvailable
+  MdEventAvailable,
+  MdOpenInNew,
 } from 'react-icons/md'
 import LoadingOverlay from '@/components/dashboard/LoadingOverlay'
 import LeadDetailsModal from '@/components/dashboard/LeadDetailsModal'
@@ -48,6 +49,12 @@ interface Conversation {
   unread_count: number
   booking_status: string | null
   brand_name: string | null
+  lead_score: number | null
+  lead_stage: string | null
+  city: string | null
+  booking_date: string | null
+  booking_time: string | null
+  next_touchpoint: string | null
 }
 
 interface Message {
@@ -404,7 +411,7 @@ export default function InboxPage() {
 
       const { data: leadsData, error: leadsError } = await supabase
         .from('all_leads')
-        .select('id, customer_name, email, phone, unified_context, booking_date, lead_stage')
+        .select('id, customer_name, email, phone, unified_context, booking_date, booking_time, lead_stage, lead_score')
         .in('id', leadIds)
 
       if (leadsError) {
@@ -442,7 +449,9 @@ export default function InboxPage() {
         phone?: string | null
         unified_context?: any
         booking_date?: string | null
+        booking_time?: string | null
         lead_stage?: string | null
+        lead_score?: number | null
       }>
 
       for (const [leadId, convData] of conversationMap) {
@@ -476,6 +485,19 @@ export default function InboxPage() {
           uc?.whatsapp?.brand_name ||
           null;
 
+        // Extract city from unified_context profile
+        const cityValue =
+          uc?.whatsapp?.profile?.city ||
+          uc?.web?.profile?.city ||
+          uc?.bcon?.city ||
+          null;
+
+        // Extract next touchpoint / next action
+        const nextTouchpoint =
+          uc?.next_touchpoint ||
+          uc?.sequence?.next_step ||
+          null;
+
         const conversation: Conversation = {
           lead_id: leadId,
           lead_name: lead?.customer_name || 'Unknown',
@@ -487,6 +509,12 @@ export default function InboxPage() {
           unread_count: 0,
           booking_status: bookingStatus,
           brand_name: brandName,
+          lead_score: lead?.lead_score ?? null,
+          lead_stage: lead?.lead_stage ?? null,
+          city: cityValue,
+          booking_date: lead?.booking_date ?? null,
+          booking_time: lead?.booking_time ?? null,
+          next_touchpoint: nextTouchpoint,
         }
 
         console.log('Adding conversation:', {
@@ -1033,65 +1061,213 @@ export default function InboxPage() {
           </div>
         ) : (
           <>
-            {/* Compact Header - single line */}
+            {/* Expanded Info Bar Header */}
             <div
-              className="flex items-center gap-3 px-4 py-2 border-b flex-shrink-0"
-              style={{ borderColor: 'var(--border-primary)' }}
+              className="flex-shrink-0 border-b"
+              style={{ borderColor: 'var(--border-primary)', background: 'var(--bg-secondary)' }}
             >
-              <h2
-                className="text-sm font-semibold cursor-pointer hover:underline truncate"
-                style={{ color: 'var(--text-primary)' }}
-                onClick={() => openLeadModal(selectedLeadId!)}
-                title="Click to view lead details"
-              >
-                {selectedConversation?.lead_name || 'Unknown'}
-              </h2>
-              {selectedConversation?.lead_phone && (
-                <span className="text-[11px] flex-shrink-0" style={{ color: 'var(--text-secondary)' }}>
-                  {selectedConversation.lead_phone}
-                </span>
-              )}
-
-              {/* Channel tabs inline */}
-              <div className="flex items-center gap-1 ml-1">
-                {selectedConversation?.channels.map((ch) => (
-                  <button
-                    key={ch}
-                    onClick={() => setSelectedChannel(ch)}
-                    className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium transition-colors capitalize"
-                    style={{
-                      background: selectedChannel === ch ? 'var(--accent-primary)' : 'var(--bg-tertiary)',
-                      color: selectedChannel === ch ? 'white' : 'var(--text-secondary)'
-                    }}
-                  >
-                    <ChannelIcon channel={ch} size={10} active={true} />
-                    {ch}
-                  </button>
-                ))}
-              </div>
-
-              <div className="flex items-center gap-1.5 ml-auto flex-shrink-0">
-                <button
-                  onClick={summarizeConversation}
-                  disabled={summaryLoading || messages.length === 0}
-                  className="p-1.5 rounded transition-colors"
-                  style={{
-                    background: showSummary ? 'var(--accent-primary)' : 'var(--bg-tertiary)',
-                    color: showSummary ? 'white' : 'var(--text-secondary)',
-                    opacity: messages.length === 0 ? 0.5 : 1
-                  }}
-                  title="AI Summary"
-                >
-                  <MdAutoAwesome size={14} className={summaryLoading ? 'animate-spin' : ''} />
-                </button>
-                <button
+              {/* Row 1 — Identity + Channel tabs + Actions */}
+              <div className="flex items-center gap-2 px-4 pt-2.5 pb-1">
+                <h2
+                  className="text-sm font-bold cursor-pointer hover:underline truncate"
+                  style={{ color: 'var(--text-primary)' }}
                   onClick={() => openLeadModal(selectedLeadId!)}
-                  className="px-2 py-1 rounded text-[10px] font-medium transition-colors"
-                  style={{ background: 'var(--bg-tertiary)', color: 'var(--text-secondary)' }}
+                  title="Click to view lead details"
                 >
-                  View Details
-                </button>
+                  {selectedConversation?.lead_name || 'Unknown'}
+                </h2>
+                {selectedConversation?.brand_name && (
+                  <>
+                    <span className="text-[10px]" style={{ color: 'var(--text-secondary)' }}>|</span>
+                    <span className="text-xs truncate" style={{ color: 'var(--text-secondary)' }}>
+                      {selectedConversation.brand_name}
+                    </span>
+                  </>
+                )}
+                {selectedConversation?.city && (
+                  <>
+                    <span className="text-[10px]" style={{ color: 'var(--text-secondary)' }}>|</span>
+                    <span className="text-xs truncate" style={{ color: 'var(--text-secondary)' }}>
+                      {selectedConversation.city}
+                    </span>
+                  </>
+                )}
+
+                {/* Channel tabs */}
+                <div className="flex items-center gap-1 ml-3">
+                  {selectedConversation?.channels.map((ch) => (
+                    <button
+                      key={ch}
+                      onClick={() => setSelectedChannel(ch)}
+                      className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium transition-colors capitalize"
+                      style={{
+                        background: selectedChannel === ch ? 'var(--accent-primary)' : 'var(--bg-tertiary)',
+                        color: selectedChannel === ch ? 'white' : 'var(--text-secondary)'
+                      }}
+                    >
+                      <ChannelIcon channel={ch} size={10} active={true} />
+                      {ch}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Right actions */}
+                <div className="flex items-center gap-1.5 ml-auto flex-shrink-0">
+                  <button
+                    onClick={summarizeConversation}
+                    disabled={summaryLoading || messages.length === 0}
+                    className="p-1.5 rounded transition-colors"
+                    style={{
+                      background: showSummary ? 'var(--accent-primary)' : 'var(--bg-tertiary)',
+                      color: showSummary ? 'white' : 'var(--text-secondary)',
+                      opacity: messages.length === 0 ? 0.5 : 1
+                    }}
+                    title="AI Summary"
+                  >
+                    <MdAutoAwesome size={14} className={summaryLoading ? 'animate-spin' : ''} />
+                  </button>
+                  <button
+                    onClick={() => openLeadModal(selectedLeadId!)}
+                    className="p-1.5 rounded transition-colors"
+                    style={{ background: 'var(--bg-tertiary)', color: 'var(--text-secondary)' }}
+                    title="Open full lead details"
+                  >
+                    <MdOpenInNew size={14} />
+                  </button>
+                </div>
               </div>
+
+              {/* Row 2 — Contact */}
+              <div className="flex items-center gap-3 px-4 pb-1">
+                {selectedConversation?.lead_phone && (
+                  <a
+                    href={`tel:${selectedConversation.lead_phone}`}
+                    className="text-[11px] hover:underline"
+                    style={{ color: 'var(--text-secondary)' }}
+                  >
+                    {selectedConversation.lead_phone}
+                  </a>
+                )}
+                {selectedConversation?.lead_email && (
+                  <>
+                    {selectedConversation?.lead_phone && (
+                      <span className="text-[10px]" style={{ color: 'var(--border-primary)' }}>|</span>
+                    )}
+                    <a
+                      href={`mailto:${selectedConversation.lead_email}`}
+                      className="text-[11px] hover:underline truncate"
+                      style={{ color: 'var(--text-secondary)' }}
+                    >
+                      {selectedConversation.lead_email}
+                    </a>
+                  </>
+                )}
+              </div>
+
+              {/* Row 3 — Status bar */}
+              <div className="flex items-center gap-3 px-4 pb-1 flex-wrap">
+                {/* Score + warmth badge */}
+                {selectedConversation?.lead_score != null && (
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[11px] font-medium" style={{ color: 'var(--text-secondary)' }}>Score:</span>
+                    <span
+                      className="text-[11px] font-bold"
+                      style={{
+                        color: selectedConversation.lead_score >= 90
+                          ? '#22C55E'
+                          : selectedConversation.lead_score >= 70
+                            ? '#F97316'
+                            : selectedConversation.lead_score >= 40
+                              ? '#3B82F6'
+                              : 'var(--text-secondary)'
+                      }}
+                    >
+                      {selectedConversation.lead_score}
+                    </span>
+                    <span
+                      className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full"
+                      style={{
+                        background: selectedConversation.lead_score >= 90
+                          ? 'rgba(34, 197, 94, 0.15)'
+                          : selectedConversation.lead_score >= 70
+                            ? 'rgba(249, 115, 22, 0.15)'
+                            : selectedConversation.lead_score >= 40
+                              ? 'rgba(59, 130, 246, 0.15)'
+                              : 'rgba(107, 114, 128, 0.15)',
+                        color: selectedConversation.lead_score >= 90
+                          ? '#22C55E'
+                          : selectedConversation.lead_score >= 70
+                            ? '#F97316'
+                            : selectedConversation.lead_score >= 40
+                              ? '#3B82F6'
+                              : 'var(--text-secondary)'
+                      }}
+                    >
+                      {selectedConversation.lead_score >= 90 ? 'Hot' : selectedConversation.lead_score >= 70 ? 'Warm' : selectedConversation.lead_score >= 40 ? 'Cool' : 'Cold'}
+                    </span>
+                  </div>
+                )}
+
+                {/* Stage */}
+                {selectedConversation?.lead_stage && (
+                  <>
+                    <span className="text-[10px]" style={{ color: 'var(--border-primary)' }}>|</span>
+                    <div className="flex items-center gap-1">
+                      <span className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>Stage:</span>
+                      <span
+                        className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
+                        style={{
+                          background:
+                            selectedConversation.lead_stage === 'Booking Made' || selectedConversation.lead_stage === 'Converted'
+                              ? 'rgba(34, 197, 94, 0.15)'
+                              : selectedConversation.lead_stage === 'High Intent' || selectedConversation.lead_stage === 'Qualified'
+                                ? 'rgba(249, 115, 22, 0.15)'
+                                : selectedConversation.lead_stage === 'Closed Lost' || selectedConversation.lead_stage === 'Cold'
+                                  ? 'rgba(239, 68, 68, 0.15)'
+                                  : 'rgba(59, 130, 246, 0.15)',
+                          color:
+                            selectedConversation.lead_stage === 'Booking Made' || selectedConversation.lead_stage === 'Converted'
+                              ? '#22C55E'
+                              : selectedConversation.lead_stage === 'High Intent' || selectedConversation.lead_stage === 'Qualified'
+                                ? '#F97316'
+                                : selectedConversation.lead_stage === 'Closed Lost' || selectedConversation.lead_stage === 'Cold'
+                                  ? '#EF4444'
+                                  : '#3B82F6'
+                        }}
+                      >
+                        {selectedConversation.lead_stage}
+                      </span>
+                    </div>
+                  </>
+                )}
+
+                {/* Booking */}
+                <span className="text-[10px]" style={{ color: 'var(--border-primary)' }}>|</span>
+                <div className="flex items-center gap-1">
+                  {selectedConversation?.booking_date ? (
+                    <>
+                      <MdEventAvailable size={12} style={{ color: '#22C55E' }} />
+                      <span className="text-[11px] font-medium" style={{ color: '#22C55E' }}>
+                        {new Date(selectedConversation.booking_date).toLocaleDateString('en-IN', {
+                          weekday: 'short', month: 'short', day: 'numeric'
+                        })}
+                        {selectedConversation.booking_time && `, ${selectedConversation.booking_time}`}
+                      </span>
+                    </>
+                  ) : (
+                    <span className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>No booking</span>
+                  )}
+                </div>
+              </div>
+
+              {/* Row 4 — Next action (only if available) */}
+              {selectedConversation?.next_touchpoint && (
+                <div className="px-4 pb-2">
+                  <span className="text-[10px] italic" style={{ color: 'var(--text-secondary)' }}>
+                    {selectedConversation.next_touchpoint}
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* AI Summary Panel - compact */}
