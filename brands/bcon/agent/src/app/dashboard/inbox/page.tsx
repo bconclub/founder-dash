@@ -1119,11 +1119,10 @@ export default function InboxPage() {
                         {conv.last_message || '\u00A0'}
                       </p>
                       {conv.booking_status && (
-                        <span className="text-[8px] font-bold uppercase px-1.5 py-0.5 rounded whitespace-nowrap flex-shrink-0"
+                        <span className="text-[8px] font-bold uppercase px-1.5 py-0.5 rounded-full whitespace-nowrap flex-shrink-0"
                           style={{
-                            background: 'rgba(34, 197, 94, 0.15)',
-                            color: '#22c55e',
-                            border: '1px solid rgba(34, 197, 94, 0.3)',
+                            background: 'rgba(96, 165, 250, 0.15)',
+                            color: '#60a5fa',
                           }}>
                           EVENT
                         </span>
