@@ -955,7 +955,7 @@ export default function InboxPage() {
 
       {/* Left Panel - Conversations List */}
       <div
-        className="w-[320px] flex flex-col border-r flex-shrink-0"
+        className="w-[320px] flex flex-col border-r flex-shrink-0 overflow-hidden"
         style={{
           background: 'var(--bg-secondary)',
           borderColor: 'var(--border-primary)'
@@ -1148,7 +1148,7 @@ export default function InboxPage() {
       </div>
 
       {/* Right Panel - Messages */}
-      <div className="flex-1 flex flex-col min-w-0" style={{ background: 'var(--bg-primary)' }}>
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden" style={{ background: 'var(--bg-primary)' }}>
         {!selectedLeadId ? (
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center">
