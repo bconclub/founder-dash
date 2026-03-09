@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { formatDateTime, formatDate } from '@/lib/utils'
 import { createClient } from '../../lib/supabase/client'
 import { format } from 'date-fns'
-import { MdLanguage, MdChat, MdPhone, MdShare, MdAutoAwesome, MdOpenInNew, MdHistory, MdCall, MdEvent, MdMessage, MdNote, MdEdit, MdTrendingUp, MdTrendingDown, MdRemove, MdCheckCircle, MdSchedule, MdPsychology, MdFlashOn, MdBarChart, MdEmail, MdChevronRight, MdSmartToy, MdPerson, MdRefresh, MdHelpOutline, MdInfo, MdCheck, MdClose, MdPayments, MdReportProblem, MdSchool, MdHistoryEdu, MdFlightTakeoff, MdAccountBalanceWallet, MdPersonOutline, MdOutlineInsights, MdMic, MdAdd } from 'react-icons/md'
+import { MdLanguage, MdChat, MdPhone, MdShare, MdAutoAwesome, MdOpenInNew, MdHistory, MdCall, MdEvent, MdMessage, MdNote, MdEdit, MdTrendingUp, MdTrendingDown, MdRemove, MdCheckCircle, MdSchedule, MdPsychology, MdFlashOn, MdBarChart, MdEmail, MdChevronRight, MdSmartToy, MdPerson, MdRefresh, MdHelpOutline, MdInfo, MdCheck, MdClose, MdPayments, MdReportProblem, MdSchool, MdHistoryEdu, MdFlightTakeoff, MdAccountBalanceWallet, MdPersonOutline, MdOutlineInsights, MdMic, MdAdd, MdMoreHoriz } from 'react-icons/md'
 import { FaWhatsapp } from 'react-icons/fa'
 import { useRouter } from 'next/navigation'
 import LeadStageSelector from './LeadStageSelector'
@@ -235,6 +235,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
   const [adminNoteText, setAdminNoteText] = useState('')
   const [savingAdminNote, setSavingAdminNote] = useState(false)
   const [isListening, setIsListening] = useState(false)
+  const [showAdminNotes, setShowAdminNotes] = useState(false)
   const recognitionRef = useRef<any>(null)
 
   // Calculate and set unified score (using shared utility)
@@ -1184,15 +1185,26 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                   </div>
                 )}
 
-                {/* Recent admin notes */}
+                {/* Admin notes — 3-dot menu */}
                 {currentLead.unified_context?.admin_notes?.length > 0 && (
-                  <div className="lead-admin-notes mt-2 space-y-1">
-                    {(currentLead.unified_context.admin_notes as any[]).slice(-3).map((note: any, i: number) => (
-                      <div key={i} className="text-[11px] text-gray-500 dark:text-gray-400 flex items-start gap-1">
-                        <MdNote size={12} className="mt-0.5 flex-shrink-0 text-orange-400" />
-                        <span>{note.text} <span className="text-gray-400 dark:text-gray-500">({new Date(note.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })})</span></span>
+                  <div className="relative inline-block mt-1">
+                    <button
+                      onClick={() => setShowAdminNotes(!showAdminNotes)}
+                      className="text-gray-400 hover:text-gray-200 transition-colors"
+                      title={`${(currentLead.unified_context.admin_notes as any[]).length} admin notes`}
+                    >
+                      <MdMoreHoriz size={18} />
+                    </button>
+                    {showAdminNotes && (
+                      <div className="absolute left-0 top-6 z-50 w-64 max-h-48 overflow-y-auto bg-white dark:bg-[#1A1A1A] rounded-lg border border-gray-200 dark:border-[#262626] shadow-lg p-2 space-y-1.5">
+                        {(currentLead.unified_context.admin_notes as any[]).slice().reverse().map((note: any, i: number) => (
+                          <div key={i} className="text-[11px] text-gray-500 dark:text-gray-400 flex items-start gap-1.5">
+                            <MdNote size={11} className="mt-0.5 flex-shrink-0 text-orange-400" />
+                            <span>{note.text} <span className="text-gray-400 dark:text-gray-600">({new Date(note.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })})</span></span>
+                          </div>
+                        ))}
                       </div>
-                    ))}
+                    )}
                   </div>
                 )}
               </section>
