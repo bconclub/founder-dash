@@ -368,6 +368,8 @@ export default function InboxPage() {
               fbUc?.web?.what_is_your_brand_name ||
               fbUc?.whatsapp?.what_is_your_brand_name ||
               fbUc?.bcon?.brand_name ||
+              fbUc?.whatsapp?.profile?.company ||
+              fbUc?.web?.profile?.company ||
               null;
 
             return {
@@ -524,6 +526,8 @@ export default function InboxPage() {
           uc?.bcon?.brand_name ||
           uc?.web?.brand_name ||
           uc?.whatsapp?.brand_name ||
+          uc?.whatsapp?.profile?.company ||
+          uc?.web?.profile?.company ||
           null;
 
         // Extract city from unified_context profile
