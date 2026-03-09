@@ -1075,18 +1075,21 @@ export default function InboxPage() {
                         </div>
                       )}
 
-                      {/* Line 3: Booking (only if exists) */}
+                      {/* Line 3: Booking pill (only if exists) */}
                       {conv.booking_date && (
-                        <div className="text-xs truncate flex items-center gap-0.5 mt-0.5" style={{ color: '#22c55e', paddingLeft: '38px' }}>
-                          <MdEvent size={11} />
-                          {new Date(conv.booking_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                          {conv.booking_time && (() => {
-                            const tp = conv.booking_time.toString().split(':');
-                            if (tp.length < 2) return `, ${conv.booking_time}`;
-                            const h = parseInt(tp[0], 10), m = parseInt(tp[1], 10);
-                            if (isNaN(h) || isNaN(m)) return `, ${conv.booking_time}`;
-                            return `, ${h % 12 || 12}:${m.toString().padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
-                          })()}
+                        <div className="mt-1" style={{ paddingLeft: '38px' }}>
+                          <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full"
+                            style={{ background: 'rgba(96, 165, 250, 0.15)', color: '#60a5fa' }}>
+                            <MdEvent size={10} />
+                            {new Date(conv.booking_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                            {conv.booking_time && (() => {
+                              const tp = conv.booking_time.toString().split(':');
+                              if (tp.length < 2) return `, ${conv.booking_time}`;
+                              const h = parseInt(tp[0], 10), m = parseInt(tp[1], 10);
+                              if (isNaN(h) || isNaN(m)) return `, ${conv.booking_time}`;
+                              return `, ${h % 12 || 12}:${m.toString().padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
+                            })()}
+                          </span>
                         </div>
                       )}
                     </div>
