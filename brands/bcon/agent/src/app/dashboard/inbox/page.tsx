@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { createClient } from '../../../lib/supabase/client'
 import { useSearchParams } from 'next/navigation'
 import {
@@ -320,7 +320,7 @@ export default function InboxPage() {
         console.log('Attempting fallback: fetching leads with recent activity...')
         const { data: activeLeads, error: leadsError } = await supabase
           .from('all_leads')
-          .select('id, customer_name, email, phone, last_interaction_at, first_touchpoint, last_touchpoint')
+          .select('id, customer_name, email, phone, last_interaction_at, first_touchpoint, last_touchpoint, unified_context, lead_score, lead_stage, booking_date, booking_time')
           .not('last_interaction_at', 'is', null)
           .order('last_interaction_at', { ascending: false })
           .limit(50)
@@ -334,10 +334,21 @@ export default function InboxPage() {
             if (lead.last_touchpoint && !channels.includes(lead.last_touchpoint)) {
               channels.push(lead.last_touchpoint)
             }
+            const fbUc = lead.unified_context || {};
+            const fbName =
+              fbUc?.whatsapp?.profile?.full_name ||
+              fbUc?.web?.profile?.full_name ||
+              lead.customer_name ||
+              'Unknown';
+            const fbBrand =
+              fbUc?.web?.what_is_your_brand_name ||
+              fbUc?.whatsapp?.what_is_your_brand_name ||
+              fbUc?.bcon?.brand_name ||
+              null;
 
             return {
               lead_id: lead.id,
-              lead_name: lead.customer_name || 'Unknown',
+              lead_name: fbName,
               lead_email: lead.email || '',
               lead_phone: lead.phone || '',
               channels: channels.length > 0 ? channels : ['web'],
@@ -345,7 +356,13 @@ export default function InboxPage() {
               last_message_at: lead.last_interaction_at ? new Date(lead.last_interaction_at).toISOString() : new Date().toISOString(),
               unread_count: 0,
               booking_status: null,
-              brand_name: null,
+              brand_name: fbBrand,
+              lead_score: lead.lead_score ?? null,
+              lead_stage: lead.lead_stage ?? null,
+              city: fbUc?.whatsapp?.profile?.city || fbUc?.web?.profile?.city || null,
+              booking_date: lead.booking_date ?? null,
+              booking_time: lead.booking_time ?? null,
+              next_touchpoint: fbUc?.next_touchpoint || fbUc?.sequence?.next_step || null,
             }
           })
 
@@ -498,9 +515,17 @@ export default function InboxPage() {
           uc?.sequence?.next_step ||
           null;
 
+        // Prefer profile full_name (set by save_lead_profile tool) over customer_name
+        // customer_name sometimes has the brand name instead of the person's name
+        const resolvedName =
+          uc?.whatsapp?.profile?.full_name ||
+          uc?.web?.profile?.full_name ||
+          lead?.customer_name ||
+          'Unknown';
+
         const conversation: Conversation = {
           lead_id: leadId,
-          lead_name: lead?.customer_name || 'Unknown',
+          lead_name: resolvedName,
           lead_email: lead?.email || '',
           lead_phone: lead?.phone || '',
           channels: Array.from(convData.channels),
@@ -1137,122 +1162,74 @@ export default function InboxPage() {
                 </div>
               </div>
 
-              {/* Row 2 — Visual status chips */}
-              <div className="flex items-center gap-1.5 px-4 pb-2 flex-wrap">
-                {/* Score chip — colored circle + label */}
-                {selectedConversation?.lead_score != null && (() => {
-                  const s = selectedConversation.lead_score;
-                  const color = s >= 70 ? '#22c55e' : s >= 40 ? '#f59e0b' : s >= 20 ? '#3b82f6' : '#ef4444';
-                  const bg = s >= 70 ? 'rgba(34,197,94,0.12)' : s >= 40 ? 'rgba(245,158,11,0.12)' : s >= 20 ? 'rgba(59,130,246,0.12)' : 'rgba(239,68,68,0.12)';
-                  const label = s >= 70 ? 'Hot' : s >= 40 ? 'Warm' : s >= 20 ? 'Cool' : 'Cold';
-                  return (
-                    <div
-                      className="flex items-center gap-1.5 px-2 py-0.5 rounded-full"
-                      style={{ background: bg, border: `1px solid ${color}25` }}
-                    >
-                      <span
-                        className="flex items-center justify-center rounded-full text-[9px] font-bold leading-none"
-                        style={{
-                          width: 20, height: 20,
-                          background: color,
-                          color: '#fff',
-                        }}
-                      >
-                        {s}
+              {/* Row 2 — Plain inline status text separated by dots */}
+              <div className="flex items-center gap-0 px-4 pb-2 flex-wrap text-[11px]">
+                {(() => {
+                  const items: JSX.Element[] = [];
+                  const dot = <span className="mx-1.5" style={{ color: 'var(--text-secondary)', opacity: 0.4 }}>·</span>;
+                  const sc = selectedConversation;
+                  if (!sc) return null;
+
+                  // Score number (colored)
+                  if (sc.lead_score != null) {
+                    const color = sc.lead_score >= 70 ? '#22c55e' : sc.lead_score >= 40 ? '#f59e0b' : sc.lead_score >= 20 ? '#3b82f6' : '#ef4444';
+                    const label = sc.lead_score >= 70 ? 'Hot' : sc.lead_score >= 40 ? 'Warm' : sc.lead_score >= 20 ? 'Cool' : 'Cold';
+                    items.push(<span key="score" className="font-bold" style={{ color }}>{sc.lead_score}</span>);
+                    items.push(<React.Fragment key="d1">{dot}</React.Fragment>);
+                    items.push(<span key="label" className="font-medium" style={{ color }}>{label}</span>);
+                  }
+
+                  // Stage (muted)
+                  if (sc.lead_stage) {
+                    if (items.length > 0) items.push(<React.Fragment key="d2">{dot}</React.Fragment>);
+                    items.push(<span key="stage" style={{ color: 'var(--text-secondary)' }}>{sc.lead_stage}</span>);
+                  }
+
+                  // Booking date (green) — only if exists, skip entirely if no booking
+                  if (sc.booking_date) {
+                    if (items.length > 0) items.push(<React.Fragment key="d3">{dot}</React.Fragment>);
+                    const dateStr = new Date(sc.booking_date).toLocaleDateString('en-IN', {
+                      weekday: 'short', day: 'numeric', month: 'short'
+                    });
+                    items.push(
+                      <span key="booking" style={{ color: '#22c55e' }}>
+                        {dateStr}{sc.booking_time ? `, ${sc.booking_time}` : ''}
                       </span>
-                      <span className="text-[10px] font-semibold" style={{ color }}>{label}</span>
-                    </div>
-                  );
+                    );
+                  }
+
+                  // Phone (muted, clickable)
+                  if (sc.lead_phone) {
+                    if (items.length > 0) items.push(<React.Fragment key="d4">{dot}</React.Fragment>);
+                    items.push(
+                      <a key="phone" href={`tel:${sc.lead_phone}`} className="hover:underline" style={{ color: 'var(--text-secondary)' }}>
+                        {sc.lead_phone}
+                      </a>
+                    );
+                  }
+
+                  // Email (muted, clickable)
+                  if (sc.lead_email) {
+                    if (items.length > 0) items.push(<React.Fragment key="d5">{dot}</React.Fragment>);
+                    items.push(
+                      <a key="email" href={`mailto:${sc.lead_email}`} className="hover:underline truncate max-w-[200px] inline-block align-bottom" style={{ color: 'var(--text-secondary)' }}>
+                        {sc.lead_email}
+                      </a>
+                    );
+                  }
+
+                  // Next action (italic, at end)
+                  if (sc.next_touchpoint) {
+                    if (items.length > 0) items.push(<React.Fragment key="d6">{dot}</React.Fragment>);
+                    items.push(
+                      <span key="next" className="italic" style={{ color: 'var(--text-secondary)', opacity: 0.7 }}>
+                        {sc.next_touchpoint}
+                      </span>
+                    );
+                  }
+
+                  return items;
                 })()}
-
-                {/* Stage chip */}
-                {selectedConversation?.lead_stage && (() => {
-                  const stage = selectedConversation.lead_stage;
-                  const stageColor =
-                    stage === 'Booking Made' || stage === 'Converted' ? '#22c55e'
-                    : stage === 'High Intent' ? '#f59e0b'
-                    : stage === 'Qualified' ? '#f59e0b'
-                    : stage === 'Engaged' ? '#06b6d4'
-                    : stage === 'Closed Lost' || stage === 'Cold' ? '#ef4444'
-                    : stage === 'R&R' ? '#f59e0b'
-                    : '#3b82f6';
-                  return (
-                    <span
-                      className="text-[10px] font-semibold px-2.5 py-1 rounded-full"
-                      style={{
-                        background: `${stageColor}18`,
-                        color: stageColor,
-                        border: `1px solid ${stageColor}25`,
-                      }}
-                    >
-                      {stage}
-                    </span>
-                  );
-                })()}
-
-                {/* Booking chip */}
-                {selectedConversation?.booking_date ? (
-                  <span
-                    className="flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-full"
-                    style={{
-                      background: 'rgba(34,197,94,0.12)',
-                      color: '#22c55e',
-                      border: '1px solid rgba(34,197,94,0.15)',
-                    }}
-                  >
-                    <MdEventAvailable size={11} />
-                    {new Date(selectedConversation.booking_date).toLocaleDateString('en-IN', {
-                      weekday: 'short', month: 'short', day: 'numeric'
-                    })}
-                    {selectedConversation.booking_time && `, ${selectedConversation.booking_time}`}
-                  </span>
-                ) : (
-                  <span
-                    className="text-[10px] px-2.5 py-1 rounded-full"
-                    style={{
-                      background: 'var(--bg-tertiary)',
-                      color: 'var(--text-secondary)',
-                      border: '1px solid var(--border-primary)',
-                    }}
-                  >
-                    No booking
-                  </span>
-                )}
-
-                {/* Contact chips — phone + email */}
-                {selectedConversation?.lead_phone && (
-                  <a
-                    href={`tel:${selectedConversation.lead_phone}`}
-                    className="text-[10px] px-2 py-1 rounded-full hover:brightness-125 transition-all"
-                    style={{
-                      background: 'var(--bg-tertiary)',
-                      color: 'var(--text-secondary)',
-                      border: '1px solid var(--border-primary)',
-                    }}
-                  >
-                    📞 {selectedConversation.lead_phone}
-                  </a>
-                )}
-                {selectedConversation?.lead_email && (
-                  <a
-                    href={`mailto:${selectedConversation.lead_email}`}
-                    className="text-[10px] px-2 py-1 rounded-full hover:brightness-125 transition-all truncate max-w-[200px]"
-                    style={{
-                      background: 'var(--bg-tertiary)',
-                      color: 'var(--text-secondary)',
-                      border: '1px solid var(--border-primary)',
-                    }}
-                  >
-                    ✉ {selectedConversation.lead_email}
-                  </a>
-                )}
-
-                {/* Next action — inline italic at end of chips */}
-                {selectedConversation?.next_touchpoint && (
-                  <span className="text-[10px] italic ml-1" style={{ color: 'var(--text-secondary)' }}>
-                    → {selectedConversation.next_touchpoint}
-                  </span>
-                )}
               </div>
             </div>
 
