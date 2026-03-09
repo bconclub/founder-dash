@@ -9,7 +9,7 @@ function LeadsPageContent() {
 
 export default function LeadsPage() {
   return (
-    <Suspense fallback={<div className="text-center py-12 text-sm" style={{ color: 'var(--text-secondary)' }}>Loading...</div>}>
+    <Suspense fallback={<div className="text-center py-12 text-sm flex-1" style={{ color: 'var(--text-secondary)' }}>Loading...</div>}>
       <LeadsPageContent />
     </Suspense>
   )

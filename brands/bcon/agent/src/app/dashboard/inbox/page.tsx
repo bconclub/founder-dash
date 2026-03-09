@@ -942,7 +942,7 @@ export default function InboxPage() {
 
   // Render the inbox UI
   return (
-    <div className="h-[calc(100vh-32px)] flex relative" style={{ background: 'var(--bg-primary)' }}>
+    <div className="flex-1 flex relative overflow-hidden" style={{ background: 'var(--bg-primary)' }}>
       {/* Loading Overlay */}
       <LoadingOverlay
         isLoading={loading || messagesLoading}

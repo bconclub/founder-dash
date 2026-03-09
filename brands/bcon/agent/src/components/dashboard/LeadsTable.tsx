@@ -480,9 +480,9 @@ export default function LeadsTable({
   }
 
   return (
-    <div className="leads-table">
+    <div className="leads-table flex flex-col flex-1 overflow-hidden">
       {/* Header row: Title left, filters + actions right */}
-      <div className="flex items-center justify-between gap-3 px-4 py-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
+      <div className="flex items-center justify-between gap-3 px-4 py-3 border-b flex-shrink-0" style={{ borderColor: 'var(--border-primary)' }}>
         <div className="flex items-center gap-2">
           <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
             {presetFilter === 'engaged' ? 'Engaged Leads' : presetFilter === 'warm' ? 'Warm Leads' : 'Leads'}
@@ -624,7 +624,7 @@ export default function LeadsTable({
       </div>
 
       {/* Table */}
-      <div className="overflow-x-auto overflow-y-auto" style={{ maxHeight: 'calc(100vh - 140px)' }}>
+      <div className="overflow-x-auto overflow-y-auto flex-1">
         <table className="w-full" style={{ tableLayout: 'fixed' }}>
           <colgroup>
             <col style={{ width: '27%' }} />  {/* Lead */}
