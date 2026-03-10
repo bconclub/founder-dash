@@ -76,11 +76,13 @@ export default function WebAgentSettingsClient() {
     <DashboardLayout>
       <div style={{
         width: 'calc(100% + 64px)',
-        height: 'calc(100vh - 72px)',
-        margin: '0 -32px -24px',
+        height: '100%',
+        margin: '0 -32px',
         padding: 0,
         display: 'flex',
         overflow: 'hidden',
+        flex: 1,
+        minHeight: 0,
       }}>
         {/* LEFT — Configuration */}
         <div style={{
@@ -209,6 +211,8 @@ export default function WebAgentSettingsClient() {
             style={{
               width: widgetOpen ? '450px' : '125px',
               height: widgetOpen ? '700px' : '125px',
+              maxWidth: '100%',
+              maxHeight: '100%',
               border: 'none',
               background: 'transparent',
               borderRadius: widgetOpen ? '20px' : '50%',
