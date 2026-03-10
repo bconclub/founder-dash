@@ -14,12 +14,23 @@ import {
 export default function WebAgentSettingsClient() {
   const [isResetting, setIsResetting] = useState(false)
   const [copySuccess, setCopySuccess] = useState(false)
+  const [widgetOpen, setWidgetOpen] = useState(false)
   const iframeRef = useRef<HTMLIFrameElement>(null)
 
   useEffect(() => {
     if (iframeRef.current) {
       iframeRef.current.src = '/widget'
     }
+  }, [])
+
+  // Listen for widget open/close postMessages (same protocol as embed.js)
+  useEffect(() => {
+    const handleMessage = (e: MessageEvent) => {
+      if (e.data === 'wc-chat-open') setWidgetOpen(true)
+      if (e.data === 'wc-chat-close') setWidgetOpen(false)
+    }
+    window.addEventListener('message', handleMessage)
+    return () => window.removeEventListener('message', handleMessage)
   }, [])
 
   const handleResetWidget = () => {
@@ -41,6 +52,7 @@ export default function WebAgentSettingsClient() {
         }
       }
       keysToRemove.forEach(key => localStorage.removeItem(key))
+      setWidgetOpen(false)
       if (iframeRef.current) {
         iframeRef.current.src = '/widget'
       }
@@ -182,24 +194,26 @@ export default function WebAgentSettingsClient() {
           </div>
         </div>
 
-        {/* RIGHT — Widget preview */}
+        {/* RIGHT — Widget preview, centered, actual size */}
         <div style={{
           flex: '1 1 60%',
           minWidth: 0,
-          position: 'relative',
           backgroundColor: '#141420',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
         }}>
           <iframe
             ref={iframeRef}
             src="/widget"
             style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              width: '100%',
-              height: '100%',
+              width: widgetOpen ? '450px' : '125px',
+              height: widgetOpen ? '700px' : '125px',
               border: 'none',
               background: 'transparent',
+              borderRadius: widgetOpen ? '20px' : '50%',
+              transition: 'width 0.25s ease, height 0.25s ease, border-radius 0.25s ease',
+              overflow: 'hidden',
             }}
             title="Widget Preview"
             sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
