@@ -182,45 +182,13 @@ export default function WebAgentSettingsClient() {
           </div>
         </div>
 
-        {/* RIGHT — Simulated webpage with live widget */}
+        {/* RIGHT — Widget preview */}
         <div style={{
           flex: '1 1 60%',
           minWidth: 0,
           position: 'relative',
-          backgroundColor: '#1a1a2e',
-          backgroundImage:
-            'linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px)',
-          backgroundSize: '40px 40px',
+          backgroundColor: '#141420',
         }}>
-          {/* Faint simulated page header */}
-          <div style={{
-            height: '48px',
-            borderBottom: '1px solid rgba(255,255,255,0.06)',
-            display: 'flex',
-            alignItems: 'center',
-            padding: '0 20px',
-            gap: '12px',
-          }}>
-            <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: 'rgba(255,255,255,0.08)' }} />
-            <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: 'rgba(255,255,255,0.08)' }} />
-            <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: 'rgba(255,255,255,0.08)' }} />
-            <div style={{
-              flex: 1,
-              maxWidth: '280px',
-              height: '24px',
-              borderRadius: '6px',
-              backgroundColor: 'rgba(255,255,255,0.04)',
-              marginLeft: '8px',
-            }} />
-          </div>
-          {/* Faint simulated page content blocks */}
-          <div style={{ padding: '32px 28px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div style={{ width: '60%', height: '14px', borderRadius: '4px', backgroundColor: 'rgba(255,255,255,0.05)' }} />
-            <div style={{ width: '85%', height: '10px', borderRadius: '4px', backgroundColor: 'rgba(255,255,255,0.03)' }} />
-            <div style={{ width: '75%', height: '10px', borderRadius: '4px', backgroundColor: 'rgba(255,255,255,0.03)' }} />
-            <div style={{ width: '40%', height: '10px', borderRadius: '4px', backgroundColor: 'rgba(255,255,255,0.03)' }} />
-          </div>
-          {/* Widget iframe — fills the whole panel, widget positions itself bottom-right */}
           <iframe
             ref={iframeRef}
             src="/widget"
