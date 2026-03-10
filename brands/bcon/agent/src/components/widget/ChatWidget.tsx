@@ -1202,16 +1202,14 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', autoOpen = false
       el.style.setProperty('height', '100vh', 'important');
       el.style.setProperty('max-height', '100vh', 'important');
     } else {
-      // In preview mode (/widget page), fill the viewport; on real sites, use fixed size
-      const isPreview = window.location.pathname === '/widget';
       el.style.setProperty('right', '24px', 'important');
-      el.style.setProperty('bottom', isPreview ? '24px' : '104px', 'important');
+      el.style.setProperty('bottom', '104px', 'important');
       el.style.setProperty('left', 'auto', 'important');
-      el.style.setProperty('top', isPreview ? '24px' : 'auto', 'important');
+      el.style.setProperty('top', 'auto', 'important');
       el.style.setProperty('width', '400px', 'important');
       el.style.setProperty('max-width', 'calc(100vw - 48px)', 'important');
-      el.style.setProperty('height', isPreview ? 'calc(100vh - 48px)' : '580px', 'important');
-      el.style.setProperty('max-height', isPreview ? 'calc(100vh - 48px)' : 'calc(100vh - 130px)', 'important');
+      el.style.setProperty('height', '580px', 'important');
+      el.style.setProperty('max-height', 'calc(100vh - 130px)', 'important');
     }
   }, [isOpen, isDesktop, widgetStyle, isParentMobile]);
 
