@@ -200,8 +200,8 @@ export default function WebAgentSettingsClient() {
           minWidth: 0,
           backgroundColor: '#141420',
           display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
+          alignItems: 'flex-end',
+          justifyContent: 'flex-end',
         }}>
           <iframe
             ref={iframeRef}
