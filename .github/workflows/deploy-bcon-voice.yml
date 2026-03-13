@@ -1,0 +1,35 @@
+name: Deploy BCON Voice
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'brands/bcon/voice/**'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Copy files to VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_DEPLOY_KEY }}
+          source: "brands/bcon/voice/*"
+          target: "/var/www/bcon-voiceproxe"
+          strip_components: 3
+
+      - name: Start/Restart on VPS
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_DEPLOY_KEY }}
+          script: |
+            cd /var/www/bcon-voiceproxe
+            npm install --production
+            pm2 restart bcon-voice || pm2 start ecosystem.config.js
+            pm2 save
