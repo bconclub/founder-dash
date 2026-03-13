@@ -14,7 +14,7 @@ wss.on('connection', (ws, req) => {
   let audioBuffer = [];
   let isProcessing = false;
   let silenceTimer = null;
-  let detectedLanguage = 'en-IN';
+  let detectedLanguage = 'hi-IN';
   ws.on('message', async (data) => {
     try {
       console.log('RAW MSG:', data.toString().substring(0, 300));
@@ -83,14 +83,14 @@ async function sarvamSTT(audioBuffer) {
     );
     return {
       transcript: response.data?.transcript || '',
-      language: response.data?.language_code || 'en-IN',
+      language: response.data?.language_code || 'hi-IN',
     };
   } catch (err) {
     console.error('STT error:', err.response?.data || err.message);
-    return { transcript: '', language: 'en-IN' };
+    return { transcript: '', language: 'hi-IN' };
   }
 }
-async function sarvamTTS(text, language = 'en-IN') {
+async function sarvamTTS(text, language = 'hi-IN') {
   const speakerMap = {
     'hi-IN': 'anushka',
     'en-IN': 'anushka',
@@ -99,14 +99,15 @@ async function sarvamTTS(text, language = 'en-IN') {
     'kn-IN': 'anushka',
     'ml-IN': 'anushka',
   };
+  const speaker = speakerMap[language] || 'anushka';
+  console.log('TTS request:', { text, language, speaker });
   try {
-    console.log('TTS request:', { text, language, speaker: speakerMap[language] || 'anushka' })
     const response = await axios.post(
       'https://api.sarvam.ai/text-to-speech',
       {
         inputs: [text],
         target_language_code: language,
-        speaker: speakerMap[language] || 'anushka',
+        speaker: speaker,
         model: 'bulbul:v2',
         encoding: 'mulaw',
         sample_rate: 8000,
@@ -118,19 +119,24 @@ async function sarvamTTS(text, language = 'en-IN') {
         },
       }
     );
-    return response.data?.audios?.[0] || null;
+    const audio = response.data?.audios?.[0] || null;
+    console.log('TTS success, audio length:', audio?.length || 0);
+    return audio;
   } catch (err) {
     console.error('TTS error:', err.response?.data || err.message);
     return null;
   }
 }
-async function speakToVobiz(ws, text, language = 'en-IN') {
+async function speakToVobiz(ws, text, language = 'hi-IN') {
   const audio = await sarvamTTS(text, language);
   if (audio && ws.readyState === 1) {
     ws.send(JSON.stringify({
       event: 'playAudio',
       media: { payload: audio }
     }));
+    console.log('Audio sent to Vobiz');
+  } else {
+    console.log('Audio not sent - audio null or ws closed');
   }
 }
 async function getAIResponse(transcript) {
