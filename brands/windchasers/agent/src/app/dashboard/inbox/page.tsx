@@ -7,7 +7,15 @@ import {
   MdInbox,
   MdSend,
   MdSearch,
-  MdAutoAwesome
+  MdAutoAwesome,
+  MdPerson,
+  MdPhone,
+  MdEmail,
+  MdLocationOn,
+  MdBusiness,
+  MdEvent,
+  MdNotes,
+  MdOpenInNew
 } from 'react-icons/md'
 import LoadingOverlay from '@/components/dashboard/LoadingOverlay'
 import LeadDetailsModal from '@/components/dashboard/LeadDetailsModal'
@@ -102,6 +110,7 @@ export default function InboxPage() {
   const [summaryLoading, setSummaryLoading] = useState(false)
   const [conversationSummary, setConversationSummary] = useState<string | null>(null)
   const [showSummary, setShowSummary] = useState(false)
+  const [leadDetails, setLeadDetails] = useState<any>(null)
 
   // Handle URL parameters to open specific conversation
   useEffect(() => {
@@ -124,17 +133,16 @@ export default function InboxPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channelFilter])
 
-  // Debug: Log when conversations state changes
+  // Auto-select first conversation when loaded (if none selected via URL)
   useEffect(() => {
-    console.log('Conversations state changed:', {
-      count: conversations.length,
-      conversations: conversations.map(c => ({
-        id: c.lead_id,
-        name: c.lead_name,
-        message: c.last_message?.substring(0, 30)
-      }))
-    })
-  }, [conversations])
+    if (conversations.length > 0 && !selectedLeadId && !searchParams.get('lead')) {
+      const first = conversations[0]
+      setSelectedLeadId(first.lead_id)
+      if (first.channels && first.channels.length > 0) {
+        setSelectedChannel(first.channels[0])
+      }
+    }
+  }, [conversations, selectedLeadId, searchParams])
 
   // Set default channel when conversation is selected
   useEffect(() => {
@@ -157,6 +165,34 @@ export default function InboxPage() {
   useEffect(() => {
     setConversationSummary(null)
     setShowSummary(false)
+  }, [selectedLeadId])
+
+  // Fetch lead details for right panel when conversation selected
+  useEffect(() => {
+    if (!selectedLeadId) {
+      setLeadDetails(null)
+      return
+    }
+    async function fetchLeadDetails() {
+      try {
+        const { data, error } = await supabase
+          .from('all_leads')
+          .select('id, customer_name, email, phone, lead_score, lead_stage, sub_stage, booking_date, booking_time, unified_context, status, first_touchpoint, last_touchpoint, created_at, admin_notes')
+          .eq('id', selectedLeadId)
+          .single()
+        if (error) {
+          console.error('Error fetching lead details for panel:', error)
+          setLeadDetails(null)
+          return
+        }
+        setLeadDetails(data)
+      } catch (err) {
+        console.error('Error fetching lead details:', err)
+        setLeadDetails(null)
+      }
+    }
+    fetchLeadDetails()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedLeadId])
 
   // Fetch messages when conversation selected or channel changes
@@ -1110,6 +1146,190 @@ export default function InboxPage() {
           </>
         )}
       </div>
+
+      {/* Right Panel - Lead Details Sidebar */}
+      {selectedLeadId && leadDetails && (
+        <div
+          className="hidden lg:flex w-[280px] flex-col border-l overflow-y-auto"
+          style={{
+            background: 'var(--bg-secondary)',
+            borderColor: 'var(--border-primary)'
+          }}
+        >
+          {/* Lead Card */}
+          <div className="p-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
+            <div className="flex items-center gap-2 mb-2">
+              <div
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-[10px] font-bold"
+                style={{ background: 'var(--accent-primary)', color: 'white' }}
+              >
+                {(leadDetails.customer_name || 'U').split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
+                  {leadDetails.customer_name || 'Unknown'}
+                </p>
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              {leadDetails.phone && (
+                <div className="flex items-center gap-2">
+                  <MdPhone size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                  <span className="text-[11px] truncate" style={{ color: 'var(--text-secondary)' }}>{leadDetails.phone}</span>
+                </div>
+              )}
+              {leadDetails.email && (
+                <div className="flex items-center gap-2">
+                  <MdEmail size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                  <span className="text-[11px] truncate" style={{ color: 'var(--text-secondary)' }}>{leadDetails.email}</span>
+                </div>
+              )}
+              {(() => {
+                const ctx = leadDetails.unified_context?.bcon || leadDetails.unified_context?.windchasers || {}
+                const city = ctx.city || ctx.location
+                const brand = ctx.brand || ctx.brand_name || ctx.company
+                const businessType = ctx.type || ctx.business_type
+                return (
+                  <>
+                    {city && (
+                      <div className="flex items-center gap-2">
+                        <MdLocationOn size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                        <span className="text-[11px] truncate" style={{ color: 'var(--text-secondary)' }}>{city}</span>
+                      </div>
+                    )}
+                    {brand && (
+                      <div className="flex items-center gap-2">
+                        <MdBusiness size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                        <span className="text-[11px] truncate" style={{ color: 'var(--text-secondary)' }}>{brand}</span>
+                      </div>
+                    )}
+                    {businessType && (
+                      <div className="flex items-center gap-2">
+                        <MdPerson size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                        <span className="text-[11px] truncate" style={{ color: 'var(--text-secondary)' }}>{businessType}</span>
+                      </div>
+                    )}
+                  </>
+                )
+              })()}
+            </div>
+          </div>
+
+          {/* Score + Stage */}
+          <div className="p-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[10px] font-medium uppercase tracking-wider mb-0.5" style={{ color: 'var(--text-muted)' }}>Score</p>
+                <span
+                  className="text-lg font-bold"
+                  style={{
+                    color: (leadDetails.lead_score ?? 0) >= 60 ? '#22C55E'
+                      : (leadDetails.lead_score ?? 0) >= 30 ? '#F59E0B'
+                      : '#EF4444'
+                  }}
+                >
+                  {leadDetails.lead_score ?? '—'}
+                </span>
+              </div>
+              <div className="text-right">
+                <p className="text-[10px] font-medium uppercase tracking-wider mb-0.5" style={{ color: 'var(--text-muted)' }}>Stage</p>
+                <span
+                  className="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold"
+                  style={{
+                    background: leadDetails.lead_stage === 'Converted' ? 'rgba(34,197,94,0.15)' :
+                      leadDetails.lead_stage === 'Booking Made' ? 'rgba(59,130,246,0.15)' :
+                      leadDetails.lead_stage === 'High Intent' ? 'rgba(168,85,247,0.15)' :
+                      leadDetails.lead_stage === 'Qualified' ? 'rgba(245,158,11,0.15)' :
+                      leadDetails.lead_stage === 'Engaged' ? 'rgba(34,197,94,0.15)' :
+                      'rgba(156,163,175,0.15)',
+                    color: leadDetails.lead_stage === 'Converted' ? '#22C55E' :
+                      leadDetails.lead_stage === 'Booking Made' ? '#3B82F6' :
+                      leadDetails.lead_stage === 'High Intent' ? '#A855F7' :
+                      leadDetails.lead_stage === 'Qualified' ? '#F59E0B' :
+                      leadDetails.lead_stage === 'Engaged' ? '#22C55E' :
+                      'var(--text-secondary)'
+                  }}
+                >
+                  {leadDetails.lead_stage || 'New'}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Upcoming Booking */}
+          {(() => {
+            const uc = leadDetails.unified_context || {}
+            const bookingDate = leadDetails.booking_date ||
+              uc.web?.booking_date || uc.web?.booking?.date ||
+              uc.whatsapp?.booking_date || uc.whatsapp?.booking?.date ||
+              uc.voice?.booking_date || uc.voice?.booking?.date
+            const bookingTime = leadDetails.booking_time ||
+              uc.web?.booking_time || uc.web?.booking?.time ||
+              uc.whatsapp?.booking_time || uc.whatsapp?.booking?.time ||
+              uc.voice?.booking_time || uc.voice?.booking?.time
+            const meetLink = uc.web?.meeting_link || uc.whatsapp?.meeting_link || uc.bcon?.meeting_link || uc.windchasers?.meeting_link
+
+            if (!bookingDate) return null
+            return (
+              <div className="p-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
+                <p className="text-[10px] font-medium uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-muted)' }}>
+                  Upcoming Event
+                </p>
+                <div className="flex items-start gap-2">
+                  <MdEvent size={14} style={{ color: '#3B82F6', marginTop: 1, flexShrink: 0 }} />
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>
+                      {bookingDate}
+                    </p>
+                    {bookingTime && (
+                      <p className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>
+                        {typeof bookingTime === 'string' ? bookingTime : String(bookingTime)}
+                      </p>
+                    )}
+                    {meetLink && (
+                      <a
+                        href={meetLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[11px] flex items-center gap-1 mt-0.5 hover:underline"
+                        style={{ color: '#3B82F6' }}
+                      >
+                        Join meeting <MdOpenInNew size={10} />
+                      </a>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )
+          })()}
+
+          {/* Admin Notes */}
+          {leadDetails.admin_notes && (
+            <div className="p-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
+              <p className="text-[10px] font-medium uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-muted)' }}>
+                Notes
+              </p>
+              <div className="flex items-start gap-2">
+                <MdNotes size={14} style={{ color: 'var(--text-muted)', marginTop: 1, flexShrink: 0 }} />
+                <p className="text-[11px] leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                  {leadDetails.admin_notes}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* View Full Details link */}
+          <div className="p-3">
+            <button
+              onClick={() => openLeadModal(selectedLeadId!)}
+              className="w-full text-center text-[11px] font-medium py-1.5 rounded-md transition-colors hover:opacity-80"
+              style={{ background: 'var(--bg-tertiary)', color: 'var(--text-secondary)' }}
+            >
+              View Full Details
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Lead Details Modal */}
       {selectedLead && (
