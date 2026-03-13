@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import axios from 'axios';
 
 export async function POST(req: NextRequest) {
   const { phone } = await req.json();
@@ -11,19 +10,21 @@ export async function POST(req: NextRequest) {
     const fromNumber = process.env.VOBIZ_PHONE_NUMBER;
     const answerUrl = `${process.env.NEXT_PUBLIC_APP_URL}/api/agent/voice/answer`;
 
-    const res = await axios.post(
+    const res = await fetch(
       `https://api.vobiz.ai/api/v1/Account/${authId}/Call/`,
-      { from: fromNumber, to: phone, answer_url: answerUrl, answer_method: 'POST' },
       {
+        method: 'POST',
         headers: {
-          'X-Auth-ID': authId,
-          'X-Auth-Token': authToken,
+          'X-Auth-ID': authId || '',
+          'X-Auth-Token': authToken || '',
           'Content-Type': 'application/json',
         },
+        body: JSON.stringify({ from: fromNumber, to: phone, answer_url: answerUrl, answer_method: 'POST' }),
       }
     );
 
-    return NextResponse.json({ success: true, callId: res.data?.CallUUID });
+    const data = await res.json();
+    return NextResponse.json({ success: true, callId: data?.CallUUID });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
