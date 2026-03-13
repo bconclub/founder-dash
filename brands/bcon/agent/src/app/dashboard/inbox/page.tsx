@@ -251,7 +251,7 @@ export default function InboxPage() {
         const { data, error } = await supabase
           .from('all_leads')
           .select('id, lead_id, customer_name, email, phone, lead_score, lead_stage, sub_stage, booking_date, booking_time, unified_context, status, first_touchpoint, last_touchpoint, created_at, admin_notes')
-          .eq('lead_id', selectedLeadId)
+          .eq('id', selectedLeadId)
           .single()
         if (error) { console.error('Error fetching lead details:', error); setLeadDetails(null); return }
         setLeadDetails(data)
