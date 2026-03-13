@@ -1,3 +1,4 @@
+// BCON Voice Server v1.0.0
 require('dotenv').config();
 const express = require('express');
 const { WebSocketServer } = require('ws');
