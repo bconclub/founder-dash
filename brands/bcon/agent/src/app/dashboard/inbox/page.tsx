@@ -1392,7 +1392,7 @@ export default function InboxPage() {
       {/* Right Panel - Lead Details Sidebar */}
       {selectedLeadId && (
         <div
-          className="hidden md:flex w-[280px] flex-col border-l overflow-y-auto flex-shrink-0"
+          className="flex w-[280px] flex-col border-l overflow-y-auto flex-shrink-0"
           style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border-primary)' }}
         >
           {!leadDetails ? (
