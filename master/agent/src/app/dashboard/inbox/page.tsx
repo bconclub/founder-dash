@@ -1390,11 +1390,17 @@ export default function InboxPage() {
       </div>
 
       {/* Right Panel - Lead Details Sidebar */}
-      {selectedLeadId && leadDetails && (
+      {selectedLeadId && (
         <div
-          className="hidden lg:flex w-[280px] flex-col border-l overflow-y-auto flex-shrink-0"
+          className="hidden md:flex w-[280px] flex-col border-l overflow-y-auto flex-shrink-0"
           style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border-primary)' }}
         >
+          {!leadDetails ? (
+            <div className="p-4 text-center">
+              <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>Loading details...</p>
+            </div>
+          ) : (
+          <>
           {/* Lead Card */}
           <div className="p-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
             <div className="flex items-center gap-2 mb-2">
@@ -1547,6 +1553,8 @@ export default function InboxPage() {
               <MdOpenInNew size={12} /> View Full Details
             </button>
           </div>
+          </>
+          )}
         </div>
       )}
 
