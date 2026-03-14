@@ -479,7 +479,7 @@ export async function GET(request: NextRequest) {
           title,
           date: bookingDate,
           time: bookingTime,
-          datetime: (() => { try { const d = new Date(`${bookingDate}T${bookingTime || '12:00:00'}`); return isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString(); } catch { return new Date().toISOString(); } })(),
+          datetime: (() => { try { const d = new Date(`${bookingDate}T${bookingTime || '12:00:00'}+05:30`); return isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString(); } catch { return new Date().toISOString(); } })(),
         }
       })
 
