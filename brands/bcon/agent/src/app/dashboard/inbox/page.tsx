@@ -16,7 +16,9 @@ import {
   MdLocationOn,
   MdBusiness,
   MdNotes,
+  MdLanguage,
 } from 'react-icons/md'
+import { FaWhatsapp } from 'react-icons/fa'
 import LoadingOverlay from '@/components/dashboard/LoadingOverlay'
 import LeadDetailsModal from '@/components/dashboard/LeadDetailsModal'
 
@@ -1405,8 +1407,8 @@ export default function InboxPage() {
       {/* Right Panel - Lead Details Sidebar */}
       {selectedLeadId && (
         <div
-          className="flex w-[280px] flex-col border-l overflow-y-auto flex-shrink-0"
-          style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border-primary)' }}
+          className="flex w-[300px] flex-col border-l overflow-y-auto flex-shrink-0"
+          style={{ background: 'var(--bg-primary)', borderColor: 'var(--border-primary)' }}
         >
           {!leadDetails ? (
             <div className="p-4 text-center">
@@ -1414,99 +1416,166 @@ export default function InboxPage() {
             </div>
           ) : (
           <>
-          {/* Lead Card */}
-          <div className="p-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
-            <div className="flex items-center gap-2 mb-2">
-              <div
-                className="w-8 h-8 rounded-lg flex items-center justify-center text-[10px] font-bold"
-                style={{ background: 'var(--accent-primary)', color: 'white' }}
-              >
-                {(leadDetails.customer_name || 'U').split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
+          {/* 1. Header — Avatar, Name, Company, City + Channel */}
+          {(() => {
+            const ctx = leadDetails.unified_context?.bcon || leadDetails.unified_context?.windchasers || {}
+            const city = ctx.city || ctx.location || ''
+            const brand = ctx.brand || ctx.brand_name || ctx.company || ''
+            const initials = (leadDetails.customer_name || 'U').split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()
+            const stageAvatarColors: Record<string, string> = {
+              'Converted': '#22c55e',
+              'Booking Made': '#60a5fa',
+              'High Intent': '#f59e0b',
+              'Qualified': '#a855f7',
+              'Engaged': '#6b7280',
+            }
+            const avatarBg = stageAvatarColors[leadDetails.lead_stage] || 'var(--accent-primary)'
+            const channelLabel = selectedChannel === 'whatsapp' ? 'WhatsApp' : selectedChannel === 'web' ? 'Web' : selectedChannel === 'voice' ? 'Voice' : selectedChannel || ''
+            return (
+              <div className="p-4 pt-5 border-b flex flex-col items-center text-center" style={{ borderColor: 'var(--border-primary)' }}>
+                <div
+                  className="w-16 h-16 rounded-full flex items-center justify-center text-xl font-bold mb-3"
+                  style={{ background: avatarBg, color: 'white' }}
+                >
+                  {initials}
+                </div>
+                <p className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>
                   {leadDetails.customer_name || 'Unknown'}
                 </p>
+                {brand && (
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{brand}</p>
+                )}
+                {(city || channelLabel) && (
+                  <div className="flex items-center gap-1.5 mt-1.5">
+                    {city && <span className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>{city}</span>}
+                    {city && channelLabel && <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>·</span>}
+                    {channelLabel && (
+                      <span className="flex items-center gap-1 text-[11px]" style={{ color: 'var(--text-secondary)' }}>
+                        {selectedChannel === 'whatsapp' ? <FaWhatsapp size={10} style={{ color: '#25D366' }} /> :
+                         selectedChannel === 'web' ? <MdLanguage size={11} style={{ color: 'var(--text-muted)' }} /> :
+                         selectedChannel === 'voice' ? <MdPhone size={11} style={{ color: 'var(--text-muted)' }} /> : null}
+                        {channelLabel}
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
-            </div>
-            <div className="space-y-1.5">
-              {leadDetails.phone && (
-                <div className="flex items-center gap-2">
-                  <MdPhone size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-                  <span className="text-[11px] truncate" style={{ color: 'var(--text-secondary)' }}>{leadDetails.phone}</span>
-                </div>
+            )
+          })()}
+
+          {/* 2. Score + Stage + Last Active */}
+          {(leadDetails.lead_score != null || leadDetails.lead_stage) && (
+            <div className="px-4 py-3 border-b flex items-center gap-2" style={{ borderColor: 'var(--border-primary)' }}>
+              {leadDetails.lead_score != null && (
+                <span className="text-sm font-bold px-2 py-0.5 rounded-md" style={{
+                  background: leadDetails.lead_score >= 60 ? 'rgba(34,197,94,0.15)' : leadDetails.lead_score >= 30 ? 'rgba(245,158,11,0.15)' : 'rgba(239,68,68,0.15)',
+                  color: leadDetails.lead_score >= 60 ? '#22C55E' : leadDetails.lead_score >= 30 ? '#F59E0B' : '#EF4444',
+                }}>
+                  {leadDetails.lead_score}
+                </span>
               )}
-              {leadDetails.email && (
-                <div className="flex items-center gap-2">
-                  <MdEmail size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-                  <span className="text-[11px] truncate" style={{ color: 'var(--text-secondary)' }}>{leadDetails.email}</span>
-                </div>
-              )}
-              {(() => {
-                const ctx = leadDetails.unified_context?.bcon || leadDetails.unified_context?.windchasers || {}
-                const city = ctx.city || ctx.location
-                const brand = ctx.brand || ctx.brand_name || ctx.company
-                const businessType = ctx.type || ctx.business_type
+              {leadDetails.lead_stage && (() => {
+                const stageColors: Record<string, { bg: string; text: string }> = {
+                  'Converted': { bg: 'rgba(34,197,94,0.15)', text: '#22c55e' },
+                  'Booking Made': { bg: 'rgba(96,165,250,0.15)', text: '#60a5fa' },
+                  'High Intent': { bg: 'rgba(245,158,11,0.15)', text: '#f59e0b' },
+                  'Qualified': { bg: 'rgba(168,85,247,0.15)', text: '#a855f7' },
+                  'Engaged': { bg: 'rgba(107,114,128,0.15)', text: '#9ca3af' },
+                }
+                const sc = stageColors[leadDetails.lead_stage] || { bg: 'var(--bg-tertiary)', text: 'var(--text-secondary)' }
                 return (
-                  <>
-                    {city && (
-                      <div className="flex items-center gap-2">
-                        <MdLocationOn size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-                        <span className="text-[11px] truncate" style={{ color: 'var(--text-secondary)' }}>{city}</span>
-                      </div>
-                    )}
-                    {brand && (
-                      <div className="flex items-center gap-2">
-                        <MdBusiness size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-                        <span className="text-[11px] truncate" style={{ color: 'var(--text-secondary)' }}>{brand}</span>
-                      </div>
-                    )}
-                    {businessType && (
-                      <div className="flex items-center gap-2">
-                        <span className="text-[11px] pl-5 truncate" style={{ color: 'var(--text-muted)' }}>{businessType}</span>
-                      </div>
-                    )}
-                  </>
+                  <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full"
+                    style={{ background: sc.bg, color: sc.text }}>
+                    {leadDetails.lead_stage}
+                  </span>
                 )
               })()}
-            </div>
-          </div>
-
-          {/* Score + Stage */}
-          {(leadDetails.lead_score != null || leadDetails.lead_stage) && (
-            <div className="p-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
-              <div className="flex items-center gap-2">
-                {leadDetails.lead_score != null && (
-                  <span className="text-lg font-bold" style={{
-                    color: leadDetails.lead_score >= 60 ? '#22C55E' : leadDetails.lead_score >= 30 ? '#F59E0B' : '#EF4444'
-                  }}>
-                    {leadDetails.lead_score}
-                  </span>
-                )}
-                {leadDetails.lead_stage && (() => {
-                  const stageColors: Record<string, { bg: string; text: string }> = {
-                    'Converted': { bg: 'rgba(34,197,94,0.15)', text: '#22c55e' },
-                    'Booking Made': { bg: 'rgba(96,165,250,0.15)', text: '#60a5fa' },
-                    'High Intent': { bg: 'rgba(245,158,11,0.15)', text: '#f59e0b' },
-                    'Qualified': { bg: 'rgba(168,85,247,0.15)', text: '#a855f7' },
-                    'Engaged': { bg: 'rgba(107,114,128,0.15)', text: '#9ca3af' },
-                  }
-                  const sc = stageColors[leadDetails.lead_stage] || { bg: 'var(--bg-tertiary)', text: 'var(--text-secondary)' }
-                  return (
-                    <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full"
-                      style={{ background: sc.bg, color: sc.text }}>
-                      {leadDetails.lead_stage}
-                    </span>
-                  )
-                })()}
-              </div>
-              {leadDetails.sub_stage && (
-                <p className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>{leadDetails.sub_stage}</p>
+              {leadDetails.last_message_at && (
+                <span className="text-[10px] ml-auto" style={{ color: 'var(--text-muted)' }}>
+                  {(() => {
+                    const diff = Date.now() - new Date(leadDetails.last_message_at || leadDetails.updated_at || '').getTime()
+                    const mins = Math.floor(diff / 60000)
+                    if (mins < 1) return 'Just now'
+                    if (mins < 60) return `${mins}m ago`
+                    const hrs = Math.floor(mins / 60)
+                    if (hrs < 24) return `${hrs}h ago`
+                    const days = Math.floor(hrs / 24)
+                    return `${days}d ago`
+                  })()}
+                </span>
               )}
             </div>
           )}
 
-          {/* Upcoming Booking */}
+          {/* 3. Quick Action Buttons — Call, WhatsApp, Email */}
+          <div className="px-4 py-3 border-b flex gap-2" style={{ borderColor: 'var(--border-primary)' }}>
+            <a
+              href={leadDetails.phone ? `tel:${leadDetails.phone}` : undefined}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[11px] font-medium transition-opacity"
+              style={{
+                background: leadDetails.phone ? 'rgba(34,197,94,0.12)' : 'var(--bg-tertiary)',
+                color: leadDetails.phone ? '#22c55e' : 'var(--text-muted)',
+                opacity: leadDetails.phone ? 1 : 0.4,
+                pointerEvents: leadDetails.phone ? 'auto' : 'none',
+              }}
+            >
+              <MdPhone size={14} /> Call
+            </a>
+            <a
+              href={leadDetails.phone ? `https://wa.me/${leadDetails.phone.replace(/[^0-9]/g, '')}` : undefined}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[11px] font-medium transition-opacity"
+              style={{
+                background: leadDetails.phone ? 'rgba(37,211,102,0.12)' : 'var(--bg-tertiary)',
+                color: leadDetails.phone ? '#25D366' : 'var(--text-muted)',
+                opacity: leadDetails.phone ? 1 : 0.4,
+                pointerEvents: leadDetails.phone ? 'auto' : 'none',
+              }}
+            >
+              <FaWhatsapp size={14} /> WhatsApp
+            </a>
+            <a
+              href={leadDetails.email ? `mailto:${leadDetails.email}` : undefined}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[11px] font-medium transition-opacity"
+              style={{
+                background: leadDetails.email ? 'rgba(168,85,247,0.12)' : 'var(--bg-tertiary)',
+                color: leadDetails.email ? '#a855f7' : 'var(--text-muted)',
+                opacity: leadDetails.email ? 1 : 0.4,
+                pointerEvents: leadDetails.email ? 'auto' : 'none',
+              }}
+            >
+              <MdEmail size={14} /> Email
+            </a>
+          </div>
+
+          {/* 4. Business Info — label: value pairs */}
+          {(() => {
+            const ctx = leadDetails.unified_context?.bcon || leadDetails.unified_context?.windchasers || {}
+            const fields: { label: string; value: string | undefined }[] = [
+              { label: 'Business Type', value: ctx.type || ctx.business_type },
+              { label: 'Urgency', value: ctx.urgency || ctx.timeline },
+              { label: 'Volume', value: ctx.volume || ctx.team_size || ctx.scale },
+              { label: 'Website', value: ctx.website || ctx.url },
+              { label: 'AI Systems', value: ctx.ai_systems || ctx.current_tools || ctx.existing_ai },
+            ].filter(f => f.value)
+            if (fields.length === 0) return null
+            return (
+              <div className="px-4 py-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
+                <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>Business Info</p>
+                <div className="space-y-1.5">
+                  {fields.map(f => (
+                    <div key={f.label} className="flex justify-between items-baseline gap-2">
+                      <span className="text-[10px] flex-shrink-0" style={{ color: 'var(--text-muted)' }}>{f.label}</span>
+                      <span className="text-[11px] text-right truncate" style={{ color: 'var(--text-secondary)' }}>{f.value}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )
+          })()}
+
+          {/* 5. Upcoming Events */}
           {(() => {
             const bd = leadDetails.booking_date
               || leadDetails.unified_context?.web?.booking_date
@@ -1516,54 +1585,50 @@ export default function InboxPage() {
               || leadDetails.unified_context?.whatsapp?.booking_time
             const ml = leadDetails.unified_context?.web?.booking_meet_link
               || leadDetails.unified_context?.whatsapp?.booking_meet_link
-            if (!bd) return null
             return (
-              <div className="p-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
-                <p className="text-[10px] font-bold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-muted)' }}>Upcoming Booking</p>
-                <div className="flex items-center gap-1.5">
-                  <MdEvent size={14} style={{ color: '#22c55e' }} />
-                  <span className="text-xs font-medium" style={{ color: '#22c55e' }}>
-                    {new Date(bd).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}
-                    {bt && (() => {
-                      const tp = bt.toString().split(':')
-                      if (tp.length < 2) return `, ${bt}`
-                      const h = parseInt(tp[0], 10), m = parseInt(tp[1], 10)
-                      if (isNaN(h) || isNaN(m)) return `, ${bt}`
-                      return `, ${h % 12 || 12}:${m.toString().padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`
-                    })()}
-                  </span>
-                </div>
-                {ml && (
-                  <a href={ml} target="_blank" rel="noopener noreferrer"
-                    className="text-[10px] mt-1 inline-block hover:underline" style={{ color: '#60a5fa' }}>
-                    Join Meet →
-                  </a>
+              <div className="px-4 py-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
+                <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>Upcoming Events</p>
+                {bd ? (
+                  <div className="rounded-lg p-2.5" style={{ background: 'var(--bg-secondary)', borderLeft: '3px solid #22c55e' }}>
+                    <div className="flex items-center gap-1.5">
+                      <MdEvent size={14} style={{ color: '#22c55e' }} />
+                      <span className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>
+                        {new Date(bd).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}
+                      </span>
+                    </div>
+                    {bt && (
+                      <p className="text-[11px] mt-1 pl-5" style={{ color: 'var(--text-secondary)' }}>
+                        {(() => {
+                          const tp = bt.toString().split(':')
+                          if (tp.length < 2) return bt
+                          const h = parseInt(tp[0], 10), m = parseInt(tp[1], 10)
+                          if (isNaN(h) || isNaN(m)) return bt
+                          return `${h % 12 || 12}:${m.toString().padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`
+                        })()}
+                      </p>
+                    )}
+                    {ml && (
+                      <a href={ml} target="_blank" rel="noopener noreferrer"
+                        className="text-[10px] mt-1.5 pl-5 inline-block hover:underline" style={{ color: '#60a5fa' }}>
+                        Join Meeting →
+                      </a>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>No upcoming events</p>
                 )}
               </div>
             )
           })()}
 
-          {/* Admin Notes */}
-          {leadDetails.admin_notes && (
-            <div className="p-3 border-b" style={{ borderColor: 'var(--border-primary)' }}>
-              <p className="text-[10px] font-bold uppercase tracking-wider mb-1.5" style={{ color: 'var(--text-muted)' }}>
-                <MdNotes size={10} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 4 }} />
-                Notes
-              </p>
-              <p className="text-[11px] leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-                {leadDetails.admin_notes}
-              </p>
-            </div>
-          )}
-
-          {/* View Full Details */}
-          <div className="p-3">
+          {/* 6. View Full Details — prominent button */}
+          <div className="px-4 py-3 mt-auto">
             <button
               onClick={() => openLeadModal(selectedLeadId)}
-              className="w-full text-[11px] font-medium py-1.5 rounded-lg transition-colors flex items-center justify-center gap-1"
-              style={{ background: 'var(--bg-tertiary)', color: 'var(--text-secondary)' }}
+              className="w-full text-xs font-semibold py-2.5 rounded-lg transition-opacity flex items-center justify-center gap-1.5 hover:opacity-90"
+              style={{ background: 'var(--accent-primary)', color: 'white' }}
             >
-              <MdOpenInNew size={12} /> View Full Details
+              <MdOpenInNew size={14} /> View Full Details
             </button>
           </div>
           </>

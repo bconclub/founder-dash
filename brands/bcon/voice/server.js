@@ -42,7 +42,7 @@ wss.on('connection', (ws, req) => {
         // Send cached greeting instantly
         if (greetingAudio && ws.readyState === 1) {
           ws.send(JSON.stringify({
-            event: 'playAudio',
+            event: 'media',
             media: { payload: greetingAudio }
           }));
           console.log('Greeting sent instantly from cache');
@@ -168,7 +168,7 @@ async function speakToVobiz(ws, text, language = 'hi-IN') {
   const audio = await sarvamTTS(text, language);
   if (audio && ws.readyState === 1) {
     ws.send(JSON.stringify({
-      event: 'playAudio',
+      event: 'media',
       media: { payload: audio }
     }));
     console.log('Audio sent to Vobiz');
