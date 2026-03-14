@@ -390,7 +390,7 @@ export default function FounderDashboard() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
         {/* Card 1: Total Conversations */}
         <div
-          className="rounded-xl p-5 sm:p-6 border transition-all hover:shadow-lg aspect-square flex flex-col justify-between"
+          className="rounded-xl p-5 sm:p-6 border transition-all hover:shadow-lg aspect-[4/3] flex flex-col justify-between"
           style={{
             backgroundColor: 'rgba(59, 130, 246, 0.05)',
             borderColor: 'rgba(59, 130, 246, 0.2)',
@@ -432,7 +432,7 @@ export default function FounderDashboard() {
 
         {/* Card 2: Engaged Leads */}
         <div
-          className="rounded-xl p-5 sm:p-6 border transition-all hover:shadow-lg aspect-square flex flex-col justify-between"
+          className="rounded-xl p-5 sm:p-6 border transition-all hover:shadow-lg aspect-[4/3] flex flex-col justify-between"
           style={{
             backgroundColor: 'rgba(34, 197, 94, 0.05)',
             borderColor: 'rgba(34, 197, 94, 0.2)',
@@ -462,7 +462,7 @@ export default function FounderDashboard() {
 
         {/* Card 3: Warm Leads */}
         <div
-          className="rounded-xl p-5 sm:p-6 border transition-all hover:shadow-lg aspect-square flex flex-col justify-between"
+          className="rounded-xl p-5 sm:p-6 border transition-all hover:shadow-lg aspect-[4/3] flex flex-col justify-between"
           style={{
             backgroundColor: 'rgba(249, 115, 22, 0.05)',
             borderColor: 'rgba(249, 115, 22, 0.2)',
@@ -504,7 +504,7 @@ export default function FounderDashboard() {
 
         {/* Card 4: Total Leads */}
         <div
-          className="rounded-xl p-5 sm:p-6 border transition-all hover:shadow-lg aspect-square flex flex-col justify-between"
+          className="rounded-xl p-5 sm:p-6 border transition-all hover:shadow-lg aspect-[4/3] flex flex-col justify-between"
           style={{
             backgroundColor: 'var(--accent-subtle)',
             borderColor: 'var(--accent-primary)',
