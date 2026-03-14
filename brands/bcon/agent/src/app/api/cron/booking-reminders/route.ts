@@ -220,10 +220,44 @@ export async function GET(req: NextRequest) {
 
   console.log('[reminders] Done:', results);
 
+  // Debug: include query diagnostics when ?debug=1
+  const debug = req.nextUrl.searchParams.get('debug') === '1';
+  const debugInfo: any = {};
+  if (debug) {
+    // Check what the 24h query returns
+    const { data: dbg24h, error: dbgErr24h } = await supabase
+      .from('whatsapp_sessions')
+      .select('id, customer_name, customer_phone, booking_date, booking_time, booking_status, reminder_24h_sent, reminder_1h_sent')
+      .not('booking_date', 'is', null)
+      .not('booking_time', 'is', null)
+      .limit(5);
+    debugInfo.sessionsWithBookings = dbg24h?.length || 0;
+    debugInfo.queryError = dbgErr24h?.message || null;
+    debugInfo.sampleSessions = dbg24h?.map(s => ({
+      name: s.customer_name,
+      phone: s.customer_phone,
+      date: s.booking_date,
+      time: s.booking_time,
+      status: s.booking_status,
+      r24h: s.reminder_24h_sent,
+      r1h: s.reminder_1h_sent,
+    }));
+    debugInfo.windows = {
+      now: now.toISOString(),
+      from24h: from24h.toISOString(),
+      to24h: to24h.toISOString(),
+      from1h: from1h.toISOString(),
+      to1h: to1h.toISOString(),
+      from30m: from30m.toISOString(),
+      to30m: to30m.toISOString(),
+    };
+  }
+
   return NextResponse.json({
     success: true,
     ...results,
     timestamp: now.toISOString(),
+    ...(debug ? { debug: debugInfo } : {}),
   });
 }
 
