@@ -731,8 +731,8 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
     null
   const daysInactive = lastInteraction ? Math.floor((new Date().getTime() - new Date(lastInteraction).getTime()) / (1000 * 60 * 60 * 24)) : 0
 
-  // Get health score from calculated score (live calculation)
-  const score = calculatedScore?.score ?? 0
+  // Use stored DB score to match the leads table (no live recalculation)
+  const score = currentLead.lead_score ?? lead.lead_score ?? 0
   const getHealthColor = (score: number) => {
     if (score >= 90) return { bg: '#22C55E', text: '#15803D', label: 'Hot 🔥' } // Green for Hot (90-100)
     if (score >= 70) return { bg: '#F97316', text: '#C2410C', label: 'Warm ⚡' } // Orange for Warm (70-89)
