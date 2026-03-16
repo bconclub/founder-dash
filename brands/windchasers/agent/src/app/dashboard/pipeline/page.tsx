@@ -474,25 +474,23 @@ export default function PipelinePage() {
         </div>
       </div>
 
-      {/* Kanban Board — scrollbar flipped to top */}
-      <div className="pipeline-scroll-wrapper" style={{ flex: 1, overflowX: 'auto', overflowY: 'hidden', transform: 'rotateX(180deg)' }}>
-        <div style={{ transform: 'rotateX(180deg)', height: '100%' }}>
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCorners}
-            onDragStart={handleDragStart}
-            onDragEnd={handleDragEnd}
-          >
-            <div style={{ display: 'flex', gap: 12, height: '100%', minWidth: 'fit-content', paddingBottom: 8 }}>
-              {STAGES.map((stage) => (
-                <StageColumn key={stage.id} stage={stage} leads={grouped[stage.id]} />
-              ))}
-            </div>
-            <DragOverlay>
-              {activeLead ? <LeadCard lead={activeLead} /> : null}
-            </DragOverlay>
-          </DndContext>
-        </div>
+      {/* Kanban Board — hidden scrollbar, swipe to scroll */}
+      <div className="pipeline-scroll-wrapper" style={{ flex: 1, overflowX: 'auto', overflowY: 'hidden' }}>
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCorners}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+        >
+          <div style={{ display: 'flex', gap: 12, height: '100%', minWidth: 'fit-content', paddingBottom: 8 }}>
+            {STAGES.map((stage) => (
+              <StageColumn key={stage.id} stage={stage} leads={grouped[stage.id]} />
+            ))}
+          </div>
+          <DragOverlay>
+            {activeLead ? <LeadCard lead={activeLead} /> : null}
+          </DragOverlay>
+        </DndContext>
       </div>
 
       <style>{`
@@ -500,19 +498,13 @@ export default function PipelinePage() {
           box-shadow: 0 2px 8px rgba(0,0,0,0.3);
           transform: translateY(-1px);
         }
+        .pipeline-scroll-wrapper {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+          -webkit-overflow-scrolling: touch;
+        }
         .pipeline-scroll-wrapper::-webkit-scrollbar {
-          height: 6px;
-        }
-        .pipeline-scroll-wrapper::-webkit-scrollbar-track {
-          background: rgba(255,255,255,0.03);
-          border-radius: 3px;
-        }
-        .pipeline-scroll-wrapper::-webkit-scrollbar-thumb {
-          background: rgba(255,255,255,0.15);
-          border-radius: 3px;
-        }
-        .pipeline-scroll-wrapper::-webkit-scrollbar-thumb:hover {
-          background: rgba(255,255,255,0.25);
+          display: none;
         }
       `}</style>
     </div>
