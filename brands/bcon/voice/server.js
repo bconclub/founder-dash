@@ -21,7 +21,7 @@ async function preloadGreeting() {
   }
 }
 
-// Strip WAV header if present, return raw base64
+// Strip WAV header if present, return raw PCM buffer and sample rate
 function stripWavHeader(base64Audio) {
   if (base64Audio && base64Audio.startsWith('UklGR')) {
     const buf = Buffer.from(base64Audio, 'base64');
@@ -29,14 +29,35 @@ function stripWavHeader(base64Audio) {
     const bitsPerSample = buf.readUInt16LE(34);
     const numChannels = buf.readUInt16LE(22);
     console.log('WAV actual sample rate:', actualSampleRate, 'bits:', bitsPerSample, 'channels:', numChannels);
-    return buf.slice(44);
+    return { pcm: buf.slice(44), sampleRate: actualSampleRate };
   }
-  return Buffer.from(base64Audio, 'base64');
+  return { pcm: Buffer.from(base64Audio, 'base64'), sampleRate: 8000 };
 }
 
-// Break raw audio buffer into 320-byte chunks (20ms at 8kHz 16-bit mono)
+// Resample 16-bit PCM from srcRate to dstRate using linear interpolation
+function resamplePCM(pcmBuffer, srcRate, dstRate) {
+  if (srcRate === dstRate) return pcmBuffer;
+  const srcSamples = pcmBuffer.length / 2;
+  const dstSamples = Math.floor(srcSamples * dstRate / srcRate);
+  const output = Buffer.alloc(dstSamples * 2);
+  const ratio = srcRate / dstRate;
+  for (let i = 0; i < dstSamples; i++) {
+    const srcPos = i * ratio;
+    const srcIndex = Math.floor(srcPos);
+    const frac = srcPos - srcIndex;
+    const s0 = pcmBuffer.readInt16LE(srcIndex * 2);
+    const s1 = srcIndex + 1 < srcSamples ? pcmBuffer.readInt16LE((srcIndex + 1) * 2) : s0;
+    const sample = Math.round(s0 + frac * (s1 - s0));
+    output.writeInt16LE(Math.max(-32768, Math.min(32767, sample)), i * 2);
+  }
+  console.log('Resampled:', srcRate, '->', dstRate, 'samples:', srcSamples, '->', dstSamples);
+  return output;
+}
+
+// Break raw audio buffer into chunks (300ms at 8kHz 16-bit mono)
 function prepareAudioChunks(base64Audio) {
-  const rawBuffer = stripWavHeader(base64Audio);
+  const { pcm, sampleRate } = stripWavHeader(base64Audio);
+  const rawBuffer = resamplePCM(pcm, sampleRate, 8000);
   const CHUNK_SIZE = 4800; // 300ms at 8kHz, 16-bit mono
   const chunks = [];
   for (let i = 0; i < rawBuffer.length; i += CHUNK_SIZE) {
@@ -57,7 +78,7 @@ async function sendChunkedAudio(ws, chunks) {
       event: 'playAudio',
       media: {
         contentType: 'audio/x-l16',
-        sampleRate: 22050,
+        sampleRate: 8000,
         payload: chunks[i]
       }
     }));
