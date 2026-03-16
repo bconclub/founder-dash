@@ -45,9 +45,9 @@ wss.on('connection', (ws, req) => {
         if (greetingAudio && ws.readyState === 1) {
           ws.send(JSON.stringify({
             event: 'playAudio',
-            streamId: ws.streamId,
             media: {
-              track: 'outbound',
+              contentType: 'audio/x-mulaw',
+              sampleRate: 8000,
               payload: greetingAudio
             }
           }));
@@ -89,7 +89,7 @@ wss.on('connection', (ws, req) => {
                 if (transcript?.trim()) {
                   const response = await getAIResponse(transcript);
                   console.log(`AI Response: "${response}"`);
-                  await speakToVobiz(ws, response, detectedLanguage);
+                  await speakToVobiz(ws, response, 'en-IN');
                 }
               } catch (err) {
                 console.error('Processing error:', err.message);
@@ -221,8 +221,11 @@ async function speakToVobiz(ws, text, language = 'hi-IN') {
   if (audio && ws.readyState === 1) {
     const msg = {
       event: 'playAudio',
-      streamId: ws.streamId,
-      media: { track: 'outbound', payload: audio }
+      media: {
+        contentType: 'audio/x-mulaw',
+        sampleRate: 8000,
+        payload: audio
+      }
     };
     console.log('Sending to Vobiz:', JSON.stringify(msg).substring(0, 100));
     ws.send(JSON.stringify(msg));
@@ -239,7 +242,7 @@ async function getAIResponse(transcript) {
       {
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 150,
-        system: `You are a voice assistant for BCON Club, a Human x AI business solutions agency. Keep responses to 1-2 sentences. No markdown. No bullet points. Speak naturally for voice calls. Services: AI agents, lead management, business automation. For booking: say "I'll have our team reach out to schedule a call with you." Reply in the same language the user speaks.`,
+        system: `You are a voice assistant for BCON Club, a Human x AI business solutions agency. Keep responses to 1-2 sentences. No markdown. No bullet points. Speak naturally for voice calls. Services: AI agents, lead management, business automation. For booking: say "I'll have our team reach out to schedule a call with you." IMPORTANT: Always respond in English only, regardless of what language the user speaks in. Keep responses under 2 sentences.`,
         messages: [{ role: 'user', content: transcript }],
       },
       {
