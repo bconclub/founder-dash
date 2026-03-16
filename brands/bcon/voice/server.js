@@ -14,7 +14,7 @@ let greetingAudioChunks = null;
 
 async function preloadGreeting() {
   console.log('Pre-loading greeting audio...');
-  const raw = await sarvamTTS("Hello! Welcome to BCON Club. How can I help you today?", 'en-IN');
+  const raw = await sarvamTTS("Hello! Welcome to Bee-Con Club. How can I help you today?", 'en-IN');
   if (raw) {
     greetingAudioChunks = prepareAudioChunks(raw);
     console.log('Greeting audio ready, chunks:', greetingAudioChunks.length);
@@ -117,7 +117,7 @@ wss.on('connection', (ws, req) => {
           console.log('Greeting sent from cache');
         } else {
           console.log('No cached greeting, generating...');
-          await speakToVobiz(ws, "Hello! Welcome to BCON Club. How can I help you today?", 'en-IN');
+          await speakToVobiz(ws, "Hello! Welcome to Bee-Con Club. How can I help you today?", 'en-IN');
         }
       }
 
@@ -292,7 +292,7 @@ async function getAIResponse(transcript) {
       {
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 150,
-        system: `You are a voice assistant for BCON Club, a Human x AI business solutions agency. Keep responses to 1-2 sentences. No markdown. No bullet points. Speak naturally for voice calls. Services: AI agents, lead management, business automation. For booking: say "I'll have our team reach out to schedule a call with you." IMPORTANT: Always respond in English only, regardless of what language the user speaks in. Keep responses under 2 sentences.`,
+        system: `You are a voice assistant for BCON Club, a Human x AI business solutions agency. Keep responses to 1-2 sentences. No markdown. No bullet points. Speak naturally for voice calls. Services: AI agents, lead management, business automation. For booking: say "I'll have our team reach out to schedule a call with you." IMPORTANT: Always respond in English only, regardless of what language the user speaks in. Keep responses under 2 sentences. PRONUNCIATION RULES: Always spell out abbreviations for voice. Write "Bee-Con" instead of "BCON". Write "A.I." instead of "AI". Never use abbreviations that a text-to-speech system would mispronounce.`,
         messages: [{ role: 'user', content: transcript }],
       },
       {
