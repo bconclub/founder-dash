@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '../../lib/supabase/client'
+import { OverviewSkeleton } from './Skeleton'
 import Image from 'next/image'
 import { MdTrendingUp, MdTrendingDown, MdRemove, MdCheckCircle, MdSchedule, MdMessage, MdWarning, MdArrowForward, MdLocalFireDepartment, MdSpeed, MdPeople, MdEvent, MdRefresh, MdCancel, MdTrendingUp as MdScoreUp, MdSwapHoriz, MdPhoneDisabled, MdArrowUpward, MdShowChart, MdFlashOn, MdChatBubble, MdCalendarToday, MdArrowDropDown, MdWhatsapp, MdLanguage, MdEventBusy, MdNotifications } from 'react-icons/md'
 import LeadDetailsModal from './LeadDetailsModal'
@@ -298,34 +299,7 @@ export default function FounderDashboard() {
   }
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen" style={{ backgroundColor: 'var(--bg-primary)' }}>
-        <div className="flex flex-col items-center gap-4">
-          <div className="relative">
-            <div
-              className="absolute inset-0 rounded-full animate-ping opacity-30"
-              style={{
-                backgroundColor: 'var(--accent-primary)',
-                width: '100px',
-                height: '100px',
-                margin: '-10px',
-              }}
-            />
-            <div className="relative animate-pulse">
-              <Image
-                src="/bcon-icon.png"
-                alt="BCON"
-                width={80}
-                height={80}
-                className="drop-shadow-lg"
-                priority
-              />
-            </div>
-          </div>
-          <div className="animate-pulse text-sm" style={{ color: 'var(--text-secondary)' }}>Loading dashboard...</div>
-        </div>
-      </div>
-    )
+    return <OverviewSkeleton />
   }
 
   if (!metrics) {

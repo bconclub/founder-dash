@@ -26,6 +26,7 @@ import {
 } from 'react-icons/md'
 import LoadingOverlay from '@/components/dashboard/LoadingOverlay'
 import LeadDetailsModal from '@/components/dashboard/LeadDetailsModal'
+import { ConversationsSkeleton } from '@/components/dashboard/Skeleton'
 
 // Channel Icons using custom SVGs
 const ChannelIcon = ({ channel, size = 16, active = false }: { channel: string; size?: number; active?: boolean }) => {
@@ -986,6 +987,11 @@ export default function InboxPage() {
   })
 
   const selectedConversation = conversations.find((c) => c.lead_id === selectedLeadId)
+
+  // Show skeleton on initial load
+  if (loading && conversations.length === 0) {
+    return <ConversationsSkeleton />
+  }
 
   // Render the inbox UI
   return (

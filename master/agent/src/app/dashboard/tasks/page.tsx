@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useCallback } from 'react'
+import { TasksSkeleton } from '@/components/dashboard/Skeleton'
 import {
   MdNotifications,
   MdMessage,
@@ -183,11 +184,7 @@ export default function TasksPage() {
   const hourlyData = buildHourlyChart(tasks)
 
   if (loading) {
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>
-        <span style={{ color: 'var(--text-secondary)', fontSize: 14 }}>Loading tasks…</span>
-      </div>
-    )
+    return <TasksSkeleton />
   }
 
   return (

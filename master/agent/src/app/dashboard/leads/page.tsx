@@ -2,6 +2,7 @@
 
 import { Suspense } from 'react'
 import LeadsTable from '@/components/dashboard/LeadsTable'
+import { LeadsSkeleton } from '@/components/dashboard/Skeleton'
 
 function LeadsPageContent() {
   return <LeadsTable showLimitSelector />
@@ -9,7 +10,7 @@ function LeadsPageContent() {
 
 export default function LeadsPage() {
   return (
-    <Suspense fallback={<div className="text-center py-12 text-sm" style={{ color: 'var(--text-secondary)' }}>Loading...</div>}>
+    <Suspense fallback={<LeadsSkeleton />}>
       <LeadsPageContent />
     </Suspense>
   )
