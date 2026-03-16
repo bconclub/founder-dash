@@ -995,7 +995,7 @@ export default function InboxPage() {
 
   // Render the inbox UI
   return (
-    <div className="flex relative overflow-hidden" style={{ background: 'var(--bg-primary)', height: 'calc(100vh - 64px)', display: 'flex', flexDirection: 'row' }}>
+    <div className="inbox-layout-root" style={{ display: 'flex', flexDirection: 'row', overflow: 'hidden', background: 'var(--bg-primary)', position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
       {/* Loading Overlay */}
       <LoadingOverlay
         isLoading={loading || messagesLoading}
@@ -1004,11 +1004,14 @@ export default function InboxPage() {
 
       {/* Left Panel - Conversations List */}
       <div
-        className="w-[320px] flex flex-col border-r flex-shrink-0 overflow-hidden"
+        className="flex flex-col"
         style={{
-          background: 'var(--bg-secondary)',
-          borderColor: 'var(--border-primary)',
+          width: 380,
+          flexShrink: 0,
           height: '100%',
+          overflow: 'hidden',
+          background: 'var(--bg-secondary)',
+          borderRight: '1px solid rgba(255,255,255,0.1)',
         }}
       >
         {/* Search + Filters - flush at top */}
@@ -1204,7 +1207,7 @@ export default function InboxPage() {
       </div>
 
       {/* Right Panel - Messages */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden" style={{ background: 'var(--bg-primary)', height: '100%' }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', minWidth: 0, background: 'var(--bg-primary)' }}>
         {!selectedLeadId ? (
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center">
@@ -1419,8 +1422,8 @@ export default function InboxPage() {
       {/* Right Panel - Lead Details Sidebar */}
       {selectedLeadId && (
         <div
-          className="hidden lg:flex w-[300px] flex-col border-l overflow-y-auto flex-shrink-0"
-          style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border-primary)', height: '100%' }}
+          className="hidden lg:flex flex-col"
+          style={{ width: 320, flexShrink: 0, overflowY: 'auto', height: '100%', borderLeft: '1px solid rgba(255,255,255,0.1)', background: 'var(--bg-secondary)' }}
         >
           {!leadDetails ? (
             <div className="p-4 text-center">
