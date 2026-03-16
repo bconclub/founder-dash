@@ -395,7 +395,7 @@ export default function PipelinePage() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: 16 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 80px)', gap: 16 }}>
       {/* Top Bar */}
       <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12, padding: '0 2px' }}>
         <h1 style={{ color: 'var(--text-primary)', fontSize: 18, fontWeight: 700, margin: 0 }}>Pipeline</h1>
@@ -474,29 +474,45 @@ export default function PipelinePage() {
         </div>
       </div>
 
-      {/* Kanban Board */}
-      <div style={{ flex: 1, overflow: 'auto' }}>
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCorners}
-          onDragStart={handleDragStart}
-          onDragEnd={handleDragEnd}
-        >
-          <div style={{ display: 'flex', gap: 12, height: '100%', minWidth: 'fit-content', paddingBottom: 8 }}>
-            {STAGES.map((stage) => (
-              <StageColumn key={stage.id} stage={stage} leads={grouped[stage.id]} />
-            ))}
-          </div>
-          <DragOverlay>
-            {activeLead ? <LeadCard lead={activeLead} /> : null}
-          </DragOverlay>
-        </DndContext>
+      {/* Kanban Board — scrollbar flipped to top */}
+      <div className="pipeline-scroll-wrapper" style={{ flex: 1, overflowX: 'auto', overflowY: 'hidden', transform: 'rotateX(180deg)' }}>
+        <div style={{ transform: 'rotateX(180deg)', height: '100%' }}>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCorners}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+          >
+            <div style={{ display: 'flex', gap: 12, height: '100%', minWidth: 'fit-content', paddingBottom: 8 }}>
+              {STAGES.map((stage) => (
+                <StageColumn key={stage.id} stage={stage} leads={grouped[stage.id]} />
+              ))}
+            </div>
+            <DragOverlay>
+              {activeLead ? <LeadCard lead={activeLead} /> : null}
+            </DragOverlay>
+          </DndContext>
+        </div>
       </div>
 
       <style>{`
         .lead-card:hover {
           box-shadow: 0 2px 8px rgba(0,0,0,0.3);
           transform: translateY(-1px);
+        }
+        .pipeline-scroll-wrapper::-webkit-scrollbar {
+          height: 6px;
+        }
+        .pipeline-scroll-wrapper::-webkit-scrollbar-track {
+          background: rgba(255,255,255,0.03);
+          border-radius: 3px;
+        }
+        .pipeline-scroll-wrapper::-webkit-scrollbar-thumb {
+          background: rgba(255,255,255,0.15);
+          border-radius: 3px;
+        }
+        .pipeline-scroll-wrapper::-webkit-scrollbar-thumb:hover {
+          background: rgba(255,255,255,0.25);
         }
       `}</style>
     </div>
