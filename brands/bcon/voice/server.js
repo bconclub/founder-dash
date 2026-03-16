@@ -53,7 +53,7 @@ async function sendChunkedAudio(ws, chunks) {
       event: 'playAudio',
       media: {
         contentType: 'audio/x-l16',
-        sampleRate: 16000,
+        sampleRate: 8000,
         payload: chunks[i]
       }
     }));
@@ -229,7 +229,7 @@ async function sarvamTTS(text, language = 'en-IN') {
         model: 'bulbul:v2',
         enable_preprocessing: true,
         encoding: 'pcm',
-        sample_rate: 16000,
+        sample_rate: 8000,
       },
       {
         headers: {
@@ -240,6 +240,7 @@ async function sarvamTTS(text, language = 'en-IN') {
     );
     const audio = response.data?.audios?.[0] || null;
     console.log('TTS audio length:', audio?.length || 0);
+    console.log('TTS audio prefix:', audio?.substring(0, 30));
     return audio;
   } catch (err) {
     console.error('TTS error:', err.response?.data || err.message);
