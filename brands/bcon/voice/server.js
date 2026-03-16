@@ -46,7 +46,7 @@ wss.on('connection', (ws, req) => {
           ws.send(JSON.stringify({
             event: 'playAudio',
             media: {
-              contentType: 'audio/x-mulaw',
+              contentType: 'audio/x-l16',
               sampleRate: 8000,
               payload: greetingAudio
             }
@@ -196,7 +196,7 @@ async function sarvamTTS(text, language = 'hi-IN') {
         speaker: speaker,
         model: 'bulbul:v2',
         enable_preprocessing: true,
-        encoding: 'mulaw',
+        encoding: 'pcm',
         sample_rate: 8000,
       },
       {
@@ -222,7 +222,7 @@ async function speakToVobiz(ws, text, language = 'hi-IN') {
     const msg = {
       event: 'playAudio',
       media: {
-        contentType: 'audio/x-mulaw',
+        contentType: 'audio/x-l16',
         sampleRate: 8000,
         payload: audio
       }
