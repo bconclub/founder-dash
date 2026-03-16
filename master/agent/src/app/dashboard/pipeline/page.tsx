@@ -18,6 +18,8 @@ interface Lead {
   city: string | null
   lead_stage: string | null
   phone?: string
+  stage_override?: boolean
+  unified_context?: Record<string, any>
 }
 
 interface Stage {
@@ -30,18 +32,27 @@ interface Stage {
 }
 
 const STAGES: Stage[] = [
-  { id: 'new',           dbValues: ['New', ''],          label: 'New',           bg: '#3266ad', text: '#E6F1FB', sub: '#9ec5e8' },
-  { id: 'engaged',       dbValues: ['Engaged'],          label: 'Engaged',       bg: '#3d5fa0', text: '#E6F1FB', sub: '#8fb0d6' },
-  { id: 'qualified',     dbValues: ['Qualified'],        label: 'Qualified',     bg: '#485693', text: '#EEEDFE', sub: '#9e9bd0' },
-  { id: 'key_events',    dbValues: ['Booking Made'],     label: 'Key Events',    bg: '#534AB7', text: '#EEEDFE', sub: '#b0ace0' },
-  { id: 'call_done',     dbValues: ['High Intent'],      label: 'Call Done',     bg: '#1D9E75', text: '#E1F5EE', sub: '#8ed4ba' },
-  { id: 'proposal_sent', dbValues: ['Proposal Sent'],    label: 'Proposal Sent', bg: '#BA7517', text: '#FAEEDA', sub: '#d4b477' },
-  { id: 'won',           dbValues: ['Converted'],        label: 'Won',           bg: '#639922', text: '#EAF3DE', sub: '#a8c97a' },
-  { id: 'lost',          dbValues: ['Cold', 'Closed Lost'], label: 'Lost',       bg: '#993C1D', text: '#FAECE7', sub: '#c98d78' },
+  { id: 'new',            dbValues: ['New', ''],                        label: 'New',           bg: '#3266ad', text: '#E6F1FB', sub: '#B5D4F4' },
+  { id: 'engaged',        dbValues: ['Engaged'],                       label: 'Engaged',       bg: '#3d5fa0', text: '#E6F1FB', sub: '#B5D4F4' },
+  { id: 'qualified',      dbValues: ['Qualified'],                     label: 'Qualified',     bg: '#485693', text: '#F1EFE8', sub: '#B4B2A9' },
+  { id: 'high_intent',    dbValues: ['High Intent'],                   label: 'High Intent',   bg: '#534AB7', text: '#EEEDFE', sub: '#CECBF6' },
+  { id: 'booking_made',   dbValues: ['Booking Made'],                  label: 'Booking Made',  bg: '#1D9E75', text: '#E1F5EE', sub: '#9FE1CB' },
+  { id: 'call_done',      dbValues: ['Call Done', 'Call/Demo Done'],   label: 'Call Done',     bg: '#0F6E56', text: '#E1F5EE', sub: '#5DCAA5' },
+  { id: 'won',            dbValues: ['Converted', 'Closed Won'],      label: 'Won',           bg: '#639922', text: '#EAF3DE', sub: '#C0DD97' },
+  { id: 'lost',           dbValues: ['Closed Lost', 'Cold'],          label: 'Lost',          bg: '#993C1D', text: '#FAECE7', sub: '#F5C4B3' },
 ]
+
+function mapScoreToStageId(score: number): string {
+  if (score >= 81) return 'booking_made'
+  if (score >= 61) return 'high_intent'
+  if (score >= 41) return 'qualified'
+  if (score >= 21) return 'engaged'
+  return 'new'
+}
 
 function mapLeadToStageId(lead: Lead): string {
   const s = lead.lead_stage || ''
+  if (s === 'In Sequence') return mapScoreToStageId(lead.lead_score || 0)
   for (const stage of STAGES) {
     if (stage.dbValues.includes(s)) return stage.id
   }
@@ -64,6 +75,44 @@ function relativeTime(dateStr: string | null): string {
 function daysBetween(a: string | null, b: string | null): number {
   if (!a || !b) return 0
   return Math.max(0, Math.round((new Date(b).getTime() - new Date(a).getTime()) / 86400000))
+}
+
+// --- Next action suggestion ---
+function getNextAction(stageId: string, lead: Lead): string {
+  if (lead.lead_stage === 'In Sequence') return 'In sequence — auto follow-up pending'
+  switch (stageId) {
+    case 'new': return 'Send intro message or add to sequence'
+    case 'engaged': return 'Continue conversation, qualify interest'
+    case 'qualified': return 'Schedule a call or send pricing info'
+    case 'high_intent': return 'Book a meeting or send proposal'
+    case 'booking_made': return 'Confirm meeting or send reminder'
+    case 'call_done': return 'Send follow-up or share proposal'
+    case 'won': return 'Onboard and nurture relationship'
+    case 'lost': return 'Re-engage or archive'
+    default: return 'Review lead'
+  }
+}
+
+function getLastMessage(lead: Lead): string {
+  const ctx = lead.unified_context
+  if (!ctx) return 'No recent messages'
+  const summary = ctx.unified_summary || ctx.web?.conversation_summary || ctx.whatsapp?.conversation_summary
+  if (summary && typeof summary === 'string') {
+    return summary.length > 80 ? summary.slice(0, 80) + '...' : summary
+  }
+  return 'No recent messages'
+}
+
+// Map pipeline stage IDs to DB values the API accepts
+const STAGE_TO_DB: Record<string, string> = {
+  new: 'New',
+  engaged: 'Engaged',
+  qualified: 'Qualified',
+  high_intent: 'High Intent',
+  booking_made: 'Booking Made',
+  call_done: 'Converted',  // API doesn't have Call Done, use closest
+  won: 'Converted',
+  lost: 'Closed Lost',
 }
 
 // --- Chevron clip-paths ---
@@ -148,6 +197,7 @@ export default function PipelinePage() {
   const [search, setSearch] = useState('')
   const [sortBy, setSortBy] = useState<'score' | 'activity' | 'days'>('score')
   const [page, setPage] = useState(1)
+  const [expandedId, setExpandedId] = useState<string | null>('__first__')
   const perPage = 20
 
   const fetchLeads = useCallback(async () => {
@@ -166,6 +216,19 @@ export default function PipelinePage() {
     fetchLeads()
     const interval = setInterval(fetchLeads, 60000)
     return () => clearInterval(interval)
+  }, [fetchLeads])
+
+  const handleStageChange = useCallback(async (leadId: string, newDbStage: string) => {
+    try {
+      await fetch(`/api/dashboard/leads/${leadId}/stage`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stage: newDbStage, stage_override: true }),
+      })
+      fetchLeads()
+    } catch (err) {
+      console.error('Failed to update stage:', err)
+    }
   }, [fetchLeads])
 
   // --- Computed ---
@@ -362,31 +425,124 @@ export default function PipelinePage() {
         {pagedLeads.length === 0 ? (
           <div style={{ padding: '36px 14px', textAlign: 'center', color: '#525252', fontSize: 12 }}>No leads found</div>
         ) : (
-          pagedLeads.map((lead) => {
-            const stageObj = STAGES.find((s) => s.id === mapLeadToStageId(lead))
+          pagedLeads.map((lead, idx) => {
+            const stageId = mapLeadToStageId(lead)
+            const stageObj = STAGES.find((s) => s.id === stageId)
             const days = daysBetween(lead.created_at || null, lead.last_interaction_at || new Date().toISOString())
+            const isExpanded = expandedId === '__first__' ? idx === 0 : expandedId === lead.id
+            const phone = lead.phone?.replace(/\D/g, '')
+
             return (
-              <div
-                key={lead.id}
-                className="table-grid pipeline-row"
-                style={{ padding: '9px 14px', borderBottom: '1px solid rgba(255,255,255,0.03)', alignItems: 'center', cursor: 'pointer', transition: 'background 0.1s' }}
-              >
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ color: 'var(--text-primary)', fontWeight: 600, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', letterSpacing: '-0.1px' }}>
-                    {lead.name || 'Unknown'}
+              <div key={lead.id}>
+                <div
+                  className="table-grid pipeline-row"
+                  onClick={() => setExpandedId(isExpanded ? null : lead.id)}
+                  style={{ padding: '9px 14px', borderBottom: '1px solid rgba(255,255,255,0.03)', alignItems: 'center', cursor: 'pointer', transition: 'background 0.1s' }}
+                >
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ color: 'var(--text-primary)', fontWeight: 600, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', letterSpacing: '-0.1px' }}>
+                      {lead.name || 'Unknown'}
+                    </div>
+                    {lead.phone && <div style={{ color: '#525252', fontSize: 11, marginTop: 1 }}>{lead.phone}</div>}
                   </div>
-                  {lead.phone && <div style={{ color: '#525252', fontSize: 11, marginTop: 1 }}>{lead.phone}</div>}
-                </div>
-                <span>
-                  <span style={{ background: `${stageObj?.bg}25`, color: stageObj?.text, padding: '1px 6px', borderRadius: 3, fontSize: 10, fontWeight: 600 }}>
-                    {stageObj?.label}
+                  <span>
+                    <span style={{ background: `${stageObj?.bg}25`, color: stageObj?.text, padding: '1px 6px', borderRadius: 3, fontSize: 10, fontWeight: 600 }}>
+                      {stageObj?.label}
+                    </span>
+                    {lead.lead_stage === 'In Sequence' && (
+                      <span style={{ marginLeft: 3, color: '#525252', fontSize: 9, fontWeight: 500, fontStyle: 'italic' }}>(seq)</span>
+                    )}
                   </span>
-                </span>
-                <span><ScoreDot score={lead.lead_score} /></span>
-                <span><ChannelIcon lead={lead} /></span>
-                <span style={{ color: '#525252', fontSize: 12 }}>{relativeTime(lead.last_interaction_at)}</span>
-                <span style={{ color: '#525252', fontSize: 12 }}>{days > 0 ? `${days}d` : '<1d'}</span>
-                <span style={{ color: '#525252', fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lead.city || ''}</span>
+                  <span><ScoreDot score={lead.lead_score} /></span>
+                  <span><ChannelIcon lead={lead} /></span>
+                  <span style={{ color: '#525252', fontSize: 12 }}>{relativeTime(lead.last_interaction_at)}</span>
+                  <span style={{ color: '#525252', fontSize: 12 }}>{days > 0 ? `${days}d` : '<1d'}</span>
+                  <span style={{ color: '#525252', fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lead.city || ''}</span>
+                </div>
+
+                {/* Expanded section */}
+                {isExpanded && (
+                  <div style={{ background: 'rgba(0,0,0,0.15)', borderLeft: `3px solid ${stageObj?.bg || '#525252'}`, padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '40% 25% 35%', gap: 16 }}>
+                      {/* Column 1: Next action */}
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ color: '#525252', fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 8 }}>Next Action</div>
+                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6, marginBottom: 8 }}>
+                          <span style={{ fontSize: 13, lineHeight: 1, flexShrink: 0 }}>💡</span>
+                          <span style={{ color: 'var(--text-primary)', fontSize: 12, fontWeight: 500, lineHeight: 1.4 }}>
+                            {getNextAction(stageId, lead)}
+                          </span>
+                        </div>
+                        <div style={{ color: '#525252', fontSize: 11, lineHeight: 1.4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {getLastMessage(lead)}
+                        </div>
+                      </div>
+
+                      {/* Column 2: Stage info */}
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ color: '#525252', fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 8 }}>Stage Info</div>
+                        <div style={{ color: '#8a8a8a', fontSize: 12, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <span style={{ fontSize: 11 }}>{lead.stage_override ? '✋' : '⚙️'}</span>
+                          <span>How: {lead.stage_override ? 'Manual override' : 'Auto (score-based)'}</span>
+                        </div>
+                        <div style={{ color: '#8a8a8a', fontSize: 12, marginBottom: 4 }}>
+                          Since: {relativeTime(lead.last_interaction_at) || 'Unknown'}
+                        </div>
+                        <div style={{ color: '#8a8a8a', fontSize: 12, display: 'flex', alignItems: 'center', gap: 4 }}>
+                          Score trend:{' '}
+                          {(lead.lead_score || 0) > 50
+                            ? <span style={{ color: '#34d399', fontWeight: 600 }}>↑</span>
+                            : (lead.lead_score || 0) < 30
+                              ? <span style={{ color: '#f87171', fontWeight: 600 }}>↓</span>
+                              : <span style={{ color: '#525252', fontWeight: 600 }}>—</span>
+                          }
+                        </div>
+                      </div>
+
+                      {/* Column 3: Quick actions */}
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ color: '#525252', fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 8 }}>Quick Actions</div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+                          {phone && (
+                            <a
+                              href={`https://wa.me/${phone}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              style={{ padding: '6px 12px', fontSize: 12, borderRadius: 6, background: 'rgba(52,211,153,0.15)', color: '#34d399', border: '1px solid rgba(52,211,153,0.25)', cursor: 'pointer', textDecoration: 'none', fontWeight: 500, display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                            >
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="#34d399"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 2C6.477 2 2 6.477 2 12c0 1.89.525 3.66 1.438 5.168L2 22l4.832-1.438A9.955 9.955 0 0012 22c5.523 0 10-4.477 10-10S17.523 2 12 2zm0 18a8 8 0 01-4.243-1.214l-.293-.175-2.828.84.84-2.828-.175-.293A8 8 0 1112 20z"/></svg>
+                              WhatsApp
+                            </a>
+                          )}
+                          {phone && (
+                            <a
+                              href={`tel:${phone}`}
+                              onClick={(e) => e.stopPropagation()}
+                              style={{ padding: '6px 12px', fontSize: 12, borderRadius: 6, background: 'rgba(96,165,250,0.15)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.25)', cursor: 'pointer', textDecoration: 'none', fontWeight: 500, display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                            >
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="#60a5fa"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/></svg>
+                              Call
+                            </a>
+                          )}
+                          <select
+                            value={stageId}
+                            onClick={(e) => e.stopPropagation()}
+                            onChange={(e) => {
+                              const dbStage = STAGE_TO_DB[e.target.value]
+                              if (dbStage) handleStageChange(lead.id, dbStage)
+                            }}
+                            style={{ padding: '6px 8px', fontSize: 12, borderRadius: 6, background: 'rgba(255,255,255,0.06)', color: 'var(--text-primary)', border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer', outline: 'none' }}
+                          >
+                            {STAGES.map((s) => (
+                              <option key={s.id} value={s.id} style={{ background: '#1a1a1a', color: '#fafafa' }}>{s.label}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )
           })
