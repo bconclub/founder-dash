@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nFix: Add dedicated layout for bubble widget to prevent black box\n\nCreated layout.tsx for /widget/bubble route that sets transparent\nbackgrounds on html/body at render time, eliminating the flash of\ndark background that occurred when global CSS loaded before useEffect.\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git push:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nFix: Make bubble widget clickable and remove dark background\n\n- Remove pointer-events:none from iframe \\(was blocking clicks\\)\n- Increase iframe size to 400x700px \\(room for expanded chat\\)\n- Add allowtransparency attribute to iframe\n- Use CSS !important override for transparent background\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git commit:*)",
+      "Bash(dir:*)",
+      "Bash(ls -la \"C:\\\\Users\\\\user\\\\Builds\\\\Command Center\\\\brand\\\\proxe\\\\web-agent\"\" | grep -E \"next)",
+      "Bash(tsconfig:*)",
+      "Bash(package \")"
+    ]
+  }
+}

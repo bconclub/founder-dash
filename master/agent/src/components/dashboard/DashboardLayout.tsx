@@ -46,19 +46,19 @@ const navigation: NavItem[] = [
   { name: 'Overview', href: '/dashboard', icon: MdDashboard },
   { name: 'Conversations', href: '/dashboard/inbox', icon: MdInbox },
   { name: 'Leads', href: '/dashboard/leads', icon: MdPeople },
+  { name: 'Pipeline', href: '/dashboard/pipeline', icon: MdViewKanban },
+  // OPERATIONS
   { name: 'Events', href: '/dashboard/bookings', icon: MdCalendarToday },
   { name: 'Tasks', href: '/dashboard/tasks', icon: MdChecklist },
-  { name: 'Pipeline', href: '/dashboard/pipeline', icon: MdViewKanban },
-  // TOOLS
   { name: 'Flow', href: '/dashboard/settings/sequences', icon: MdTimeline },
+  // SYSTEM
   { name: 'Agents', href: '/dashboard/agents', icon: MdChatBubbleOutline },
   { name: 'Knowledge', href: '/dashboard/settings/knowledge-base', icon: MdMenuBook },
-  // SYSTEM
   { name: 'Configure', href: '/dashboard/settings', icon: MdSettings },
 ]
 
-// Divider positions: after Pipeline (index 5), after Knowledge (index 8)
-const DIVIDER_AFTER_INDICES = [5, 8]
+// Divider positions: after Pipeline (index 3), after Flow (index 6)
+const DIVIDER_AFTER_INDICES = [3, 6]
 
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const pathname = usePathname()
