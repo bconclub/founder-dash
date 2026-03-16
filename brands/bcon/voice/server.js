@@ -126,7 +126,7 @@ async function sarvamSTT(audioBuffer) {
       filename: 'audio.wav',
       contentType: 'audio/x-wav',
     });
-    form.append('model', 'saaras:v2');
+    form.append('model', 'saaras:v3');
     form.append('language_code', 'unknown');
 
     const response = await axios.post(
