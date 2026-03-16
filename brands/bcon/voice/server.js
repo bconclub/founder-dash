@@ -59,10 +59,16 @@ wss.on('connection', (ws, req) => {
       }
 
       if (msg.event === 'media' && msg.media?.payload) {
-        audioBuffer.push(Buffer.from(msg.media.payload, 'base64'));
-        clearTimeout(silenceTimer);
+        const chunk = Buffer.from(msg.media.payload, 'base64');
+        const isSilence = chunk.every(b => b === 0xFF || b === 0x7F);
 
-        if (!isProcessing) {
+        if (!isSilence) {
+          audioBuffer.push(chunk);
+          clearTimeout(silenceTimer);
+        }
+
+        if (!isProcessing && (!isSilence || audioBuffer.length > 0)) {
+          clearTimeout(silenceTimer);
           silenceTimer = setTimeout(async () => {
             if (audioBuffer.length > 20) {
               isProcessing = true;
