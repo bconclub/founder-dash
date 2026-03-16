@@ -24,18 +24,20 @@ interface Stage {
   id: string
   dbValues: string[]
   label: string
-  color: string
+  bg: string
+  text: string
+  sub: string
 }
 
 const STAGES: Stage[] = [
-  { id: 'new', dbValues: ['New', ''], label: 'New', color: '#64748b' },
-  { id: 'engaged', dbValues: ['Engaged'], label: 'Engaged', color: '#6b7fa8' },
-  { id: 'qualified', dbValues: ['Qualified'], label: 'Qualified', color: '#7181be' },
-  { id: 'key_events', dbValues: ['Booking Made'], label: 'Key Events', color: '#7580d0' },
-  { id: 'call_done', dbValues: ['High Intent'], label: 'Call Done', color: '#7c7ee0' },
-  { id: 'proposal_sent', dbValues: ['Proposal Sent'], label: 'Proposal Sent', color: '#8478ec' },
-  { id: 'closed_won', dbValues: ['Converted'], label: 'Closed Won', color: '#34d399' },
-  { id: 'closed_lost', dbValues: ['Cold', 'Closed Lost'], label: 'Closed Lost', color: '#78716c' },
+  { id: 'new',           dbValues: ['New', ''],          label: 'New',           bg: '#3266ad', text: '#E6F1FB', sub: '#9ec5e8' },
+  { id: 'engaged',       dbValues: ['Engaged'],          label: 'Engaged',       bg: '#3d5fa0', text: '#E6F1FB', sub: '#8fb0d6' },
+  { id: 'qualified',     dbValues: ['Qualified'],        label: 'Qualified',     bg: '#485693', text: '#EEEDFE', sub: '#9e9bd0' },
+  { id: 'key_events',    dbValues: ['Booking Made'],     label: 'Key Events',    bg: '#534AB7', text: '#EEEDFE', sub: '#b0ace0' },
+  { id: 'call_done',     dbValues: ['High Intent'],      label: 'Call Done',     bg: '#1D9E75', text: '#E1F5EE', sub: '#8ed4ba' },
+  { id: 'proposal_sent', dbValues: ['Proposal Sent'],    label: 'Proposal Sent', bg: '#BA7517', text: '#FAEEDA', sub: '#d4b477' },
+  { id: 'won',           dbValues: ['Converted'],        label: 'Won',           bg: '#639922', text: '#EAF3DE', sub: '#a8c97a' },
+  { id: 'lost',          dbValues: ['Cold', 'Closed Lost'], label: 'Lost',       bg: '#993C1D', text: '#FAECE7', sub: '#c98d78' },
 ]
 
 function mapLeadToStageId(lead: Lead): string {
@@ -50,7 +52,7 @@ function relativeTime(dateStr: string | null): string {
   if (!dateStr) return ''
   const diff = Date.now() - new Date(dateStr).getTime()
   const mins = Math.floor(diff / 60000)
-  if (mins < 1) return 'just now'
+  if (mins < 1) return 'now'
   if (mins < 60) return `${mins}m ago`
   const hrs = Math.floor(mins / 60)
   if (hrs < 24) return `${hrs}h ago`
@@ -64,6 +66,35 @@ function daysBetween(a: string | null, b: string | null): number {
   return Math.max(0, Math.round((new Date(b).getTime() - new Date(a).getTime()) / 86400000))
 }
 
+// --- Chevron clip-paths ---
+const NOTCH = 10 // px depth of the arrow notch
+
+function chevronClip(position: 'first' | 'middle' | 'last'): string {
+  // first: flat left, arrow right
+  // middle: notch left, arrow right
+  // last: notch left, flat right
+  if (position === 'first') {
+    return `polygon(0 0, calc(100% - ${NOTCH}px) 0, 100% 50%, calc(100% - ${NOTCH}px) 100%, 0 100%)`
+  }
+  if (position === 'last') {
+    return `polygon(0 0, 100% 0, 100% 100%, 0 100%, ${NOTCH}px 50%)`
+  }
+  return `polygon(0 0, calc(100% - ${NOTCH}px) 0, 100% 50%, calc(100% - ${NOTCH}px) 100%, 0 100%, ${NOTCH}px 50%)`
+}
+
+// --- Score dot ---
+function ScoreDot({ score }: { score: number | null }) {
+  if (score === null || score === undefined) return <span style={{ color: '#525252', fontSize: 11 }}>—</span>
+  const color = score >= 60 ? '#34d399' : score >= 30 ? '#fbbf24' : '#f87171'
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+      <span style={{ width: 7, height: 7, borderRadius: '50%', background: color, flexShrink: 0 }} />
+      <span style={{ color, fontSize: 11, fontWeight: 600 }}>{score}</span>
+    </span>
+  )
+}
+
+// --- Channel icon ---
 function ChannelIcon({ lead }: { lead: Lead }) {
   const ch = lead.last_touchpoint || lead.first_touchpoint
   if (ch === 'whatsapp') {
@@ -81,18 +112,30 @@ function ChannelIcon({ lead }: { lead: Lead }) {
   )
 }
 
-// --- Score dot ---
-function ScoreDot({ score }: { score: number | null }) {
-  if (score === null || score === undefined) {
-    return <span style={{ color: '#525252', fontSize: 11 }}>—</span>
-  }
-  const color = score >= 60 ? '#34d399' : score >= 30 ? '#fbbf24' : '#f87171'
-  const bg = score >= 60 ? 'rgba(52,211,153,0.12)' : score >= 30 ? 'rgba(251,191,36,0.12)' : 'rgba(248,113,113,0.12)'
+// --- Loading skeleton ---
+function Skeleton() {
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-      <span style={{ width: 7, height: 7, borderRadius: '50%', background: color, flexShrink: 0 }} />
-      <span style={{ background: bg, color, padding: '1px 5px', borderRadius: 3, fontSize: 11, fontWeight: 700, lineHeight: '16px' }}>{score}</span>
-    </span>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+      {/* Chevron skeleton */}
+      <div style={{ display: 'flex', gap: -4, overflow: 'hidden' }}>
+        {Array.from({ length: 8 }).map((_, i) => (
+          <div key={i} style={{ flex: '1 0 100px', height: 56, background: 'rgba(255,255,255,0.04)', borderRadius: 4, animation: 'pulse 1.5s ease-in-out infinite', animationDelay: `${i * 0.1}s` }} />
+        ))}
+      </div>
+      {/* Insight skeleton */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} style={{ height: 80, background: 'rgba(255,255,255,0.03)', borderRadius: 8, animation: 'pulse 1.5s ease-in-out infinite', animationDelay: `${i * 0.15}s` }} />
+        ))}
+      </div>
+      {/* Table skeleton */}
+      <div style={{ background: 'rgba(255,255,255,0.02)', borderRadius: 8, overflow: 'hidden' }}>
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} style={{ height: 44, borderBottom: '1px solid rgba(255,255,255,0.03)', animation: 'pulse 1.5s ease-in-out infinite', animationDelay: `${i * 0.08}s` }} />
+        ))}
+      </div>
+      <style>{`@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }`}</style>
+    </div>
   )
 }
 
@@ -119,7 +162,11 @@ export default function PipelinePage() {
     }
   }, [])
 
-  useEffect(() => { fetchLeads() }, [fetchLeads])
+  useEffect(() => {
+    fetchLeads()
+    const interval = setInterval(fetchLeads, 60000)
+    return () => clearInterval(interval)
+  }, [fetchLeads])
 
   // --- Computed ---
 
@@ -129,8 +176,6 @@ export default function PipelinePage() {
     leads.forEach((l) => { counts[mapLeadToStageId(l)]++ })
     return counts
   }, [leads])
-
-  const maxCount = useMemo(() => Math.max(1, ...Object.values(stageCounts)), [stageCounts])
 
   const conversionPcts = useMemo(() => {
     const pcts: Record<string, number | null> = {}
@@ -145,16 +190,14 @@ export default function PipelinePage() {
   const insights = useMemo(() => {
     const totalActive = leads.filter((l) => {
       const sid = mapLeadToStageId(l)
-      return sid !== 'closed_won' && sid !== 'closed_lost'
+      return sid !== 'won' && sid !== 'lost'
     }).length
 
-    const wonLeads = leads.filter((l) => mapLeadToStageId(l) === 'closed_won')
+    const wonLeads = leads.filter((l) => mapLeadToStageId(l) === 'won')
     const avgDays = wonLeads.length > 0
       ? Math.round(wonLeads.reduce((sum, l) => sum + daysBetween(l.created_at || null, l.last_interaction_at), 0) / wonLeads.length)
       : -1
 
-    // Biggest drop-off: only consider transitions where previous stage has >0 leads
-    // and the drop isn't 100% (which just means nobody progressed yet)
     let biggestDrop = { from: '', to: '', pct: -1 }
     for (let i = 1; i < STAGES.length - 1; i++) {
       const prev = stageCounts[STAGES[i - 1].id]
@@ -167,8 +210,8 @@ export default function PipelinePage() {
       }
     }
 
-    const won = stageCounts['closed_won'] || 0
-    const lost = stageCounts['closed_lost'] || 0
+    const won = stageCounts['won'] || 0
+    const lost = stageCounts['lost'] || 0
     const winRate = won + lost > 0 ? Math.round((won / (won + lost)) * 100) : -1
 
     return { totalActive, avgDays, biggestDrop, winRate }
@@ -196,78 +239,59 @@ export default function PipelinePage() {
 
   useEffect(() => { setPage(1) }, [activeStage, search, sortBy])
 
-  if (loading) {
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>
-        <span style={{ color: 'var(--text-secondary)', fontSize: 14 }}>Loading pipeline…</span>
-      </div>
-    )
-  }
+  if (loading) return <Skeleton />
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
-        <h1 style={{ color: 'var(--text-primary)', fontSize: 20, fontWeight: 700, margin: 0, letterSpacing: '-0.3px' }}>Pipeline</h1>
-        <span style={{ color: '#525252', fontSize: 12 }}>{leads.length} leads</span>
-      </div>
 
-      {/* ── FUNNEL ── */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-        {STAGES.map((stage, i) => {
-          const count = stageCounts[stage.id]
-          const widthPct = Math.max(15, (count / maxCount) * 100)
-          const conv = conversionPcts[stage.id]
-          const isActive = activeStage === stage.id
-          const isLast = i === STAGES.length - 1
+      {/* ── SECTION 1: CHEVRON FLOW ── */}
+      <div style={{ position: 'sticky', top: 0, zIndex: 10, paddingTop: 2, paddingBottom: 2 }}>
+        <div className="chevron-scroll" style={{ display: 'flex', overflowX: 'auto', marginLeft: -4 }}>
+          {STAGES.map((stage, i) => {
+            const count = stageCounts[stage.id]
+            const isActive = activeStage === stage.id
+            const position = i === 0 ? 'first' : i === STAGES.length - 1 ? 'last' : 'middle'
 
-          return (
-            <div key={stage.id} style={{ display: 'flex', alignItems: 'center', gap: 0 }}>
-              {/* Bar */}
+            return (
               <button
+                key={stage.id}
                 onClick={() => setActiveStage(isActive ? null : stage.id)}
-                className="funnel-bar"
+                className="chevron-btn"
                 style={{
-                  width: `${widthPct}%`,
-                  minWidth: 120,
-                  height: 38,
-                  background: isActive ? stage.color : `${stage.color}14`,
-                  borderLeft: isActive ? `3px solid #fff` : `3px solid ${stage.color}50`,
-                  borderRadius: 4,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '0 12px 0 10px',
-                  cursor: 'pointer',
-                  border: 'none',
-                  borderLeftWidth: 3,
-                  borderLeftStyle: 'solid',
-                  borderLeftColor: isActive ? '#e2e8f0' : `${stage.color}60`,
-                  transition: 'all 0.15s ease',
-                  boxShadow: isActive ? '0 1px 8px rgba(0,0,0,0.25)' : 'none',
+                  flex: '1 0 100px',
+                  minWidth: 100,
+                  height: 56,
+                  marginLeft: i === 0 ? 4 : -4,
                   position: 'relative',
+                  zIndex: STAGES.length - i,
+                  background: stage.bg,
+                  clipPath: chevronClip(position),
+                  border: 'none',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 1,
+                  padding: `0 ${NOTCH + 4}px`,
+                  transition: 'filter 0.15s',
+                  filter: isActive ? 'brightness(1.15)' : 'brightness(1)',
+                  borderBottom: isActive ? `3px solid rgba(255,255,255,0.9)` : '3px solid transparent',
                 }}
               >
-                <span style={{ fontSize: 12, fontWeight: 600, color: isActive ? '#fff' : 'var(--text-primary)', letterSpacing: '-0.1px' }}>
+                <span style={{ fontSize: 10, fontWeight: 500, color: stage.sub, lineHeight: 1.2, letterSpacing: '0.3px', textTransform: 'uppercase' }}>
                   {stage.label}
                 </span>
-                <span style={{ fontSize: 13, fontWeight: 700, color: isActive ? '#fff' : stage.color, fontVariantNumeric: 'tabular-nums' }}>
+                <span style={{ fontSize: 18, fontWeight: 700, color: stage.text, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>
                   {count}
                 </span>
               </button>
-
-              {/* Conversion arrow */}
-              {conv !== null && !isLast && (
-                <span style={{ fontSize: 10, color: '#525252', marginLeft: 10, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
-                  {conv}%
-                </span>
-              )}
-            </div>
-          )
-        })}
+            )
+          })}
+        </div>
       </div>
 
-      {/* ── INSIGHTS ── */}
+      {/* ── SECTION 2: INSIGHTS ── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
         <InsightCard label="Active Pipeline" value={String(insights.totalActive)} sub="in progress" />
         <InsightCard label="Avg Time to Close" value={insights.avgDays >= 0 ? `${insights.avgDays}d` : 'No data'} sub={insights.avgDays >= 0 ? 'days to win' : ''} />
@@ -279,7 +303,7 @@ export default function PipelinePage() {
         <InsightCard label="Win Rate" value={insights.winRate >= 0 ? `${insights.winRate}%` : 'No data'} sub={insights.winRate >= 0 ? 'won vs lost' : ''} />
       </div>
 
-      {/* ── LEAD TABLE ── */}
+      {/* ── SECTION 3: LEAD TABLE ── */}
       <div style={{ background: 'var(--bg-secondary)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, overflow: 'hidden' }}>
         {/* Toolbar */}
         <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
@@ -312,20 +336,19 @@ export default function PipelinePage() {
           {activeStage && (
             <button
               onClick={() => setActiveStage(null)}
-              style={{ padding: '4px 9px', borderRadius: 4, background: 'rgba(255,255,255,0.06)', color: 'var(--text-secondary)', border: 'none', fontSize: 11, fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+              style={{ padding: '4px 9px', borderRadius: 4, background: `${STAGES.find((s) => s.id === activeStage)?.bg}30`, color: STAGES.find((s) => s.id === activeStage)?.text, border: 'none', fontSize: 11, fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
             >
-              <span style={{ width: 6, height: 6, borderRadius: '50%', background: STAGES.find((s) => s.id === activeStage)?.color }} />
               {STAGES.find((s) => s.id === activeStage)?.label}
-              <span style={{ opacity: 0.5, marginLeft: 2 }}>✕</span>
+              <span style={{ opacity: 0.6 }}>✕</span>
             </button>
           )}
-          <span style={{ color: '#525252', fontSize: 11, marginLeft: 'auto' }}>
-            {tableLeads.length}
+          <span style={{ color: '#525252', fontSize: 11, marginLeft: 'auto', fontVariantNumeric: 'tabular-nums' }}>
+            {tableLeads.length} result{tableLeads.length !== 1 ? 's' : ''}
           </span>
         </div>
 
         {/* Header */}
-        <div style={{ display: 'grid', gridTemplateColumns: '2.5fr 1fr 0.6fr 0.4fr 1fr 0.7fr 1fr', gap: 0, padding: '7px 14px', borderBottom: '1px solid rgba(255,255,255,0.05)', fontSize: 10, fontWeight: 600, color: '#525252', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+        <div className="table-grid" style={{ padding: '7px 14px', borderBottom: '1px solid rgba(255,255,255,0.05)', fontSize: 10, fontWeight: 600, color: '#525252', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
           <span>Name</span>
           <span>Stage</span>
           <span>Score</span>
@@ -337,9 +360,7 @@ export default function PipelinePage() {
 
         {/* Rows */}
         {pagedLeads.length === 0 ? (
-          <div style={{ padding: '36px 14px', textAlign: 'center', color: '#525252', fontSize: 12 }}>
-            No leads found
-          </div>
+          <div style={{ padding: '36px 14px', textAlign: 'center', color: '#525252', fontSize: 12 }}>No leads found</div>
         ) : (
           pagedLeads.map((lead) => {
             const stageObj = STAGES.find((s) => s.id === mapLeadToStageId(lead))
@@ -347,19 +368,17 @@ export default function PipelinePage() {
             return (
               <div
                 key={lead.id}
-                className="pipeline-row"
-                style={{ display: 'grid', gridTemplateColumns: '2.5fr 1fr 0.6fr 0.4fr 1fr 0.7fr 1fr', gap: 0, padding: '9px 14px', borderBottom: '1px solid rgba(255,255,255,0.03)', alignItems: 'center', cursor: 'pointer', transition: 'background 0.1s' }}
+                className="table-grid pipeline-row"
+                style={{ padding: '9px 14px', borderBottom: '1px solid rgba(255,255,255,0.03)', alignItems: 'center', cursor: 'pointer', transition: 'background 0.1s' }}
               >
                 <div style={{ minWidth: 0 }}>
                   <div style={{ color: 'var(--text-primary)', fontWeight: 600, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', letterSpacing: '-0.1px' }}>
                     {lead.name || 'Unknown'}
                   </div>
-                  {lead.phone && (
-                    <div style={{ color: '#525252', fontSize: 11, marginTop: 1 }}>{lead.phone}</div>
-                  )}
+                  {lead.phone && <div style={{ color: '#525252', fontSize: 11, marginTop: 1 }}>{lead.phone}</div>}
                 </div>
                 <span>
-                  <span style={{ background: `${stageObj?.color}15`, color: stageObj?.color, padding: '1px 6px', borderRadius: 3, fontSize: 10, fontWeight: 600, letterSpacing: '0.1px' }}>
+                  <span style={{ background: `${stageObj?.bg}25`, color: stageObj?.text, padding: '1px 6px', borderRadius: 3, fontSize: 10, fontWeight: 600 }}>
                     {stageObj?.label}
                   </span>
                 </span>
@@ -376,21 +395,11 @@ export default function PipelinePage() {
         {/* Pagination */}
         {totalPages > 1 && (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '10px 14px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-            <button
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page === 1}
-              style={{ background: 'none', border: 'none', cursor: page === 1 ? 'default' : 'pointer', color: page === 1 ? 'rgba(255,255,255,0.1)' : '#525252', padding: 2 }}
-            >
+            <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} style={{ background: 'none', border: 'none', cursor: page === 1 ? 'default' : 'pointer', color: page === 1 ? 'rgba(255,255,255,0.1)' : '#525252', padding: 2 }}>
               <MdChevronLeft size={18} />
             </button>
-            <span style={{ color: '#525252', fontSize: 11, fontVariantNumeric: 'tabular-nums' }}>
-              {page} / {totalPages}
-            </span>
-            <button
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              disabled={page === totalPages}
-              style={{ background: 'none', border: 'none', cursor: page === totalPages ? 'default' : 'pointer', color: page === totalPages ? 'rgba(255,255,255,0.1)' : '#525252', padding: 2 }}
-            >
+            <span style={{ color: '#525252', fontSize: 11, fontVariantNumeric: 'tabular-nums' }}>{page} / {totalPages}</span>
+            <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages} style={{ background: 'none', border: 'none', cursor: page === totalPages ? 'default' : 'pointer', color: page === totalPages ? 'rgba(255,255,255,0.1)' : '#525252', padding: 2 }}>
               <MdChevronRight size={18} />
             </button>
           </div>
@@ -398,10 +407,13 @@ export default function PipelinePage() {
       </div>
 
       <style>{`
-        .funnel-bar:hover { filter: brightness(1.2); }
+        .chevron-scroll { -ms-overflow-style: none; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+        .chevron-scroll::-webkit-scrollbar { display: none; }
+        .chevron-btn:hover { filter: brightness(1.2) !important; }
         .pipeline-row:hover { background: rgba(255,255,255,0.02); }
+        .table-grid { display: grid; grid-template-columns: 2.5fr 1fr 0.6fr 0.4fr 1fr 0.6fr 1fr; gap: 0; }
         @media (max-width: 768px) {
-          .funnel-bar { min-width: 100px !important; }
+          .table-grid { grid-template-columns: 2fr 0.8fr 0.5fr 0.4fr 0.8fr 0.5fr 0.8fr; font-size: 11px; }
         }
       `}</style>
     </div>
@@ -412,10 +424,10 @@ export default function PipelinePage() {
 
 function InsightCard({ label, value, sub }: { label: string; value: string; sub: string }) {
   return (
-    <div style={{ background: 'var(--bg-secondary)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, padding: '12px 14px' }}>
-      <div style={{ color: '#525252', fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 6 }}>{label}</div>
-      <div style={{ color: 'var(--text-primary)', fontSize: 22, fontWeight: 800, lineHeight: 1, letterSpacing: '-0.5px', fontVariantNumeric: 'tabular-nums' }}>{value}</div>
-      {sub && <div style={{ color: '#525252', fontSize: 11, marginTop: 4 }}>{sub}</div>}
+    <div style={{ background: 'var(--bg-secondary)', borderRadius: 8, padding: '12px 14px' }}>
+      <div style={{ color: '#525252', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 6 }}>{label}</div>
+      <div style={{ color: 'var(--text-primary)', fontSize: 24, fontWeight: 500, lineHeight: 1, letterSpacing: '-0.5px', fontVariantNumeric: 'tabular-nums' }}>{value}</div>
+      {sub && <div style={{ color: '#525252', fontSize: 13, marginTop: 4 }}>{sub}</div>}
     </div>
   )
 }
