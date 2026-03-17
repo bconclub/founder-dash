@@ -14,7 +14,7 @@ let greetingAudioChunks = null;
 
 async function preloadGreeting() {
   console.log('Pre-loading greeting audio...');
-  const raw = await sarvamTTS("Hello! Welcome to Bee-Con Club. How can I help you today?", 'en-IN');
+  const raw = await sarvamTTS("Hi there! Thank you for calling Bee-Con Club. I'm Prox-ee How can I help you today?", 'en-IN');
   if (raw) {
     greetingAudioChunks = prepareAudioChunks(raw);
     console.log('Greeting audio ready, chunks:', greetingAudioChunks.length);
@@ -97,6 +97,8 @@ wss.on('connection', (ws, req) => {
   let isProcessing = false;
   let silenceTimer = null;
   let isSpeaking = false;
+  let aiFailures = 0;
+  let conversationHistory = [];
 
   ws.on('message', async (data) => {
     try {
@@ -117,7 +119,7 @@ wss.on('connection', (ws, req) => {
           console.log('Greeting sent from cache');
         } else {
           console.log('No cached greeting, generating...');
-          await speakToVobiz(ws, "Hello! Welcome to Bee-Con Club. How can I help you today?", 'en-IN');
+          await speakToVobiz(ws, "Hi there! Thank you for calling Bee-Con Club. I'm Prox-ee How can I help you today?", 'en-IN');
         }
       }
 
@@ -148,13 +150,25 @@ wss.on('connection', (ws, req) => {
               audioBuffer = [];
 
               try {
-                const { transcript, language } = await sarvamSTT(audio);
-                console.log(`Transcript: "${transcript}"`);
+                const { transcript, language: detectedLanguage } = await sarvamSTT(audio);
+                console.log(`Transcript: "${transcript}" [lang: ${detectedLanguage}]`);
 
                 if (transcript?.trim()) {
-                  const response = await getAIResponse(transcript);
+                  const response = await getAIResponse(transcript, conversationHistory, detectedLanguage);
                   console.log(`AI Response: "${response}"`);
-                  await speakToVobiz(ws, response, 'en-IN');
+                  if (response === null) {
+                    aiFailures++;
+                    console.log('AI failure count:', aiFailures);
+                    if (aiFailures >= 2) {
+                      await speakToVobiz(ws, "Apologies for the inconvenience. Let me connect you with our team. We will call you back within the next few minutes. Thank you for reaching out to Bee-Con Club.", detectedLanguage || 'en-IN');
+                      ws.close();
+                      return;
+                    }
+                    await speakToVobiz(ws, "I'm having a bit of trouble right now. Someone from our team will call you back shortly. Thank you for your patience.", detectedLanguage || 'en-IN');
+                  } else {
+                    aiFailures = 0;
+                    await speakToVobiz(ws, response, detectedLanguage || 'en-IN');
+                  }
                 }
               } catch (err) {
                 console.error('Processing error:', err.message);
@@ -285,15 +299,17 @@ async function speakToVobiz(ws, text, language = 'en-IN') {
   }
 }
 
-async function getAIResponse(transcript) {
+async function getAIResponse(transcript, conversationHistory, detectedLanguage) {
   try {
+    conversationHistory.push({ role: 'user', content: '[Caller language: ' + detectedLanguage + '] ' + transcript });
+
     const response = await axios.post(
       'https://api.anthropic.com/v1/messages',
       {
         model: 'claude-haiku-4-5-20251001',
-        max_tokens: 150,
-        system: `You are a voice assistant for BCON Club, a Human x AI business solutions agency. Keep responses to 1-2 sentences. No markdown. No bullet points. Speak naturally for voice calls. Services: AI agents, lead management, business automation. For booking: say "I'll have our team reach out to schedule a call with you." IMPORTANT: Always respond in English only, regardless of what language the user speaks in. Keep responses under 2 sentences. PRONUNCIATION RULES: Always spell out abbreviations for voice. Write "Bee-Con" instead of "BCON". Write "A.I." instead of "AI". Never use abbreviations that a text-to-speech system would mispronounce.`,
-        messages: [{ role: 'user', content: transcript }],
+        max_tokens: 200,
+        system: `You are the voice assistant for Bee-Con Club, a Human and A.I. business solutions agency based in India. Your name is Prox-ee. You speak in a warm, professional, and confident tone. You sound like a real human receptionist, not a robot. Keep every response to 1 to 2 short sentences. Never use markdown, bullet points, or lists. Speak naturally as if on a phone call. What Bee-Con Club does: We build A.I. agents that handle sales, lead management, customer follow-ups, and business automation for companies. We help businesses never miss a lead and convert more customers using A.I. Your job on this call: First, greet warmly and ask how you can help. Second, understand what the caller needs by asking 1 to 2 probing questions. Ask about their business type, what problem they want solved, and how they currently handle leads or customers. Third, once you understand their need, briefly explain how Bee-Con can help them specifically. Fourth, offer to schedule a callback with the team. Ask for their preferred time. Fifth, if the caller is off-topic or has a wrong number, politely let them know and offer to help anyway. Rules: Respond in the same language the caller is speaking. If they speak Hindi, respond in Hindi. If they speak Tamil, respond in Tamil. If English, respond in English. Match their language naturally. Always write Bee-Con and Prox-ee in English spelling even when responding in other languages. Never say "Bee-Con" as "B-C-O-N". Always say "Bee-Con". Say "A.I." not "AI". Never repeat what the caller just said back to them. Never ask more than one question at a time. If you do not understand, say "I did not catch that clearly, could you say that once more?" If something goes wrong, say "I am having a bit of trouble. Someone from our team will call you back shortly. Thank you for calling Bee-Con Club."`,
+        messages: conversationHistory,
       },
       {
         headers: {
@@ -303,10 +319,13 @@ async function getAIResponse(transcript) {
         },
       }
     );
-    return response.data.content[0].text;
+
+    const aiText = response.data.content[0].text;
+    conversationHistory.push({ role: 'assistant', content: aiText });
+    return aiText;
   } catch (err) {
-    console.error('Claude error:', err.message);
-    return "Sorry, could you please repeat that?";
+    console.error('Claude error:', err.response?.status, JSON.stringify(err.response?.data));
+    return null;
   }
 }
 
