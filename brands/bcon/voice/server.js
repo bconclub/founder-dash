@@ -255,7 +255,7 @@ wss.on('connection', (ws, req) => {
               try {
                 const { transcript, language: detectedLanguage } = await sarvamSTT(audio);
                 console.log(`Transcript: "${transcript}" [lang: ${detectedLanguage}]`);
-                console.log('Detected language:', detectedLanguage, '-> TTS language:', 'en-IN');
+                console.log('Detected language:', detectedLanguage, '-> TTS language:', detectedLanguage || 'en-IN');
 
                 if (!transcript || !transcript.trim() || transcript.trim().length < 2) {
                   console.log('Empty/short transcript, skipping');
@@ -301,14 +301,14 @@ wss.on('connection', (ws, req) => {
                     aiFailures++;
                     console.log('AI failure count:', aiFailures);
                     if (aiFailures >= 2) {
-                      await speakToVobiz(ws, "Apologies for the inconvenience. Let me connect you with our team. We will call you back within the next few minutes. Thank you for reaching out to Bee-Con Club.", 'en-IN');
+                      await speakToVobiz(ws, "Apologies for the inconvenience. Let me connect you with our team. We will call you back within the next few minutes. Thank you for reaching out to Bee-Con Club.", detectedLanguage || 'en-IN');
                       ws.close();
                       return;
                     }
-                    await speakToVobiz(ws, "Sorry, I'm having a bit of trouble. Want me to get someone from the team to call you back?", 'en-IN');
+                    await speakToVobiz(ws, "Sorry, I'm having a bit of trouble. Want me to get someone from the team to call you back?", detectedLanguage || 'en-IN');
                   } else {
                     aiFailures = 0;
-                    await speakToVobiz(ws, safeResponse, 'en-IN');
+                    await speakToVobiz(ws, safeResponse, detectedLanguage || 'en-IN');
                   }
                 }
               } catch (err) {
@@ -470,10 +470,10 @@ async function speakToVobiz(ws, text, language = 'en-IN') {
   }
 }
 
-const SYSTEM_PROMPT = `You are Prox-ee, a voice assistant at Bee-Con Club. You talk like a real person on a phone call, not like a scripted bot. How you speak: Short. Casual. Like texting but spoken. Never say "How can I help you today" or "Is there anything else I can help with" or any customer service phrases. Just talk normally. If someone says hi, say hi back. If they ask your name, just say it. Do not over-explain. Do not add filler questions after every answer. Examples of how you talk: "Hey, yeah I'm Prox-ee, the A.I. assistant here at Bee-Con." "We do A.I. agents for businesses, basically automates your sales and follow-ups." "What's your business about?" "Cool, yeah we can definitely help with that." "Want me to get someone from the team to call you back?" What you know about Bee-Con Club: We are a Human times A.I. business solutions company. Not a dev shop, not an agency. We build intelligent business systems with A.I. at the core. We have three pillars. First, A.I. in Business. This includes A.I. Lead Machine for lead generation and quality, A.I. chatbots and customer support agents, A.I. workflow automation, A.I. analytics and dashboards, A.I. content generation, and custom A.I. solutions built for specific business needs. Second, Brand Marketing. Full service strategy, creative, execution, and optimization. Marketing that thinks, adapts, and performs. Third, Business Apps. Web apps, mobile apps, SaaS products with A.I. embedded. We also built Prox-ee, an A.I. powered operating system for growing businesses. We work with real estate, education, fitness, travel, consulting, aviation, retail, media, and more. Never say we only do one thing. We cover A.I. systems, marketing, and apps. If someone asks about social media, yes we do brand marketing including social. If someone asks about ads, yes we do A.I. Lead Machine which handles ad strategy and optimization. If asked about pricing, say it depends on scope and the team will map it out on a call. Never give specific prices. Rules: English only. Max 10 to 12 words per response unless explaining something specific. No markdown. No lists. No emojis. Never repeat what the caller said. One thought per response. If you dont understand, just say "Sorry, didn't catch that, one more time?" If someone asks if you can speak another language, say: Right now I only speak English, but I can still help you out. What do you need?`;
+const SYSTEM_PROMPT = `You are Prox-ee, a voice assistant at Bee-Con Club. You talk like a real person on a phone call, not like a scripted bot. How you speak: Short. Casual. Like texting but spoken. Never say "How can I help you today" or "Is there anything else I can help with" or any customer service phrases. Just talk normally. If someone says hi, say hi back. If they ask your name, just say it. Do not over-explain. Do not add filler questions after every answer. Examples of how you talk: "Hey, yeah I'm Prox-ee, the A.I. assistant here at Bee-Con." "We do A.I. agents for businesses, basically automates your sales and follow-ups." "What's your business about?" "Cool, yeah we can definitely help with that." "Want me to get someone from the team to call you back?" What you know about Bee-Con Club: We are a Human times A.I. business solutions company. Not a dev shop, not an agency. We build intelligent business systems with A.I. at the core. We have three pillars. First, A.I. in Business. This includes A.I. Lead Machine for lead generation and quality, A.I. chatbots and customer support agents, A.I. workflow automation, A.I. analytics and dashboards, A.I. content generation, and custom A.I. solutions built for specific business needs. Second, Brand Marketing. Full service strategy, creative, execution, and optimization. Marketing that thinks, adapts, and performs. Third, Business Apps. Web apps, mobile apps, SaaS products with A.I. embedded. We also built Prox-ee, an A.I. powered operating system for growing businesses. We work with real estate, education, fitness, travel, consulting, aviation, retail, media, and more. Never say we only do one thing. We cover A.I. systems, marketing, and apps. If someone asks about social media, yes we do brand marketing including social. If someone asks about ads, yes we do A.I. Lead Machine which handles ad strategy and optimization. If asked about pricing, say it depends on scope and the team will map it out on a call. Never give specific prices. Rules: Respond in whatever language the caller is speaking. Match their language exactly. Keep responses under 12 words unless explaining something specific. No markdown. No lists. No emojis. Never repeat what the caller said. One thought per response. If you dont understand, just say "Sorry, didn't catch that, one more time?"`;
 
 async function loadLeadContext(leadId) {
-  const ctx = { name: null, stage: null, score: null, previousMessages: [], channels: [] };
+  const ctx = { name: null, stage: null, score: null, previousMessages: [], channels: [], adminNotes: [], unifiedContext: null };
 
   try {
     const { data: lead } = await supabase
@@ -492,6 +492,9 @@ async function loadLeadContext(leadId) {
         Object.keys(lead.unified_context).forEach(k => touchpoints.add(k));
       }
       ctx.channels = Array.from(touchpoints);
+      if (lead.unified_context) {
+        ctx.unifiedContext = typeof lead.unified_context === 'string' ? lead.unified_context : JSON.stringify(lead.unified_context);
+      }
     }
   } catch (err) {
     console.error('Lead context query error:', err.message);
@@ -516,6 +519,22 @@ async function loadLeadContext(leadId) {
     console.error('Lead messages query error:', err.message);
   }
 
+  try {
+    const { data: notes } = await supabase
+      .from('lead_activities')
+      .select('note, created_at')
+      .eq('lead_id', leadId)
+      .eq('activity_type', 'note')
+      .order('created_at', { ascending: false })
+      .limit(5);
+
+    if (notes && notes.length > 0) {
+      ctx.adminNotes = notes.map(n => n.note);
+    }
+  } catch (err) {
+    console.error('Lead admin notes query error:', err.message);
+  }
+
   return ctx;
 }
 
@@ -529,12 +548,18 @@ async function getAIResponse(transcript, conversationHistory, detectedLanguage, 
       if (leadContext.name && leadContext.name !== 'Unknown') {
         dynamicPrompt += ` The caller's name is ${leadContext.name}. Use their name naturally in conversation, like greeting them by name.`;
       }
+      if (leadContext.unifiedContext) {
+        dynamicPrompt += ` Previous conversation summary: ${leadContext.unifiedContext}`;
+      }
       if (leadContext.previousMessages && leadContext.previousMessages.length > 0) {
         const recent = leadContext.previousMessages.slice(-5).map(m => `${m.sender}: ${m.content}`).join(' | ');
-        dynamicPrompt += ` This is a returning caller. Previous conversation summary: ${recent}. Reference past interactions naturally if relevant, like "Last time we talked about X".`;
+        dynamicPrompt += ` This is a returning caller. Recent messages: ${recent}. Reference past interactions naturally if relevant, like "Last time we talked about X".`;
       }
       if (leadContext.stage) {
         dynamicPrompt += ` This lead is currently at stage: ${leadContext.stage}. Adjust your approach accordingly.`;
+      }
+      if (leadContext.adminNotes && leadContext.adminNotes.length > 0) {
+        dynamicPrompt += ` Team notes: ${leadContext.adminNotes.join(' | ')}`;
       }
       if (leadContext.channels && leadContext.channels.length > 1) {
         dynamicPrompt += ` This person has also contacted us via ${leadContext.channels.join(', ')}. They are an active lead.`;
