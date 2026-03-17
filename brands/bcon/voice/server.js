@@ -34,7 +34,7 @@ function stripWavHeader(base64Audio) {
     console.log('WAV actual sample rate:', actualSampleRate, 'bits:', bitsPerSample, 'channels:', numChannels);
     return { pcm: buf.slice(44), sampleRate: actualSampleRate };
   }
-  return { pcm: Buffer.from(base64Audio, 'base64'), sampleRate: 8000 };
+  return { pcm: Buffer.from(base64Audio, 'base64'), sampleRate: 16000 };
 }
 
 // Resample 16-bit PCM from srcRate to dstRate using linear interpolation
@@ -57,11 +57,11 @@ function resamplePCM(pcmBuffer, srcRate, dstRate) {
   return output;
 }
 
-// Break raw audio buffer into chunks (300ms at 8kHz 16-bit mono)
+// Break raw audio buffer into chunks (300ms at 16kHz 16-bit mono)
 function prepareAudioChunks(base64Audio) {
   const { pcm, sampleRate } = stripWavHeader(base64Audio);
-  const rawBuffer = resamplePCM(pcm, sampleRate, 8000);
-  const CHUNK_SIZE = 4800; // 300ms at 8kHz, 16-bit mono
+  const rawBuffer = sampleRate === 16000 ? pcm : resamplePCM(pcm, sampleRate, 16000);
+  const CHUNK_SIZE = 9600; // 300ms at 16kHz, 16-bit mono
   const chunks = [];
   for (let i = 0; i < rawBuffer.length; i += CHUNK_SIZE) {
     const chunk = rawBuffer.slice(i, i + CHUNK_SIZE);
@@ -81,7 +81,7 @@ async function sendChunkedAudio(ws, chunks) {
       event: 'playAudio',
       media: {
         contentType: 'audio/x-l16',
-        sampleRate: 8000,
+        sampleRate: 16000,
         payload: chunks[i]
       }
     }));
@@ -408,7 +408,7 @@ async function sarvamTTS(text, language = 'en-IN') {
         speaker: 'shubh',
         model: 'bulbul:v3',
         encoding: 'pcm',
-        sample_rate: 8000,
+        sample_rate: 16000,
       },
       {
         headers: {
