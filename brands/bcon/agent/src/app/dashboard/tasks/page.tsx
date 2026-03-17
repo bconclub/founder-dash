@@ -7,9 +7,10 @@ import {
   MdBarChart,
   MdDescription,
   MdCheckCircle,
-  MdError,
-  MdSchedule,
-  MdHourglassEmpty,
+  MdScheduleSend,
+  MdWhatsapp,
+  MdPhoneInTalk,
+  MdLanguage,
 } from 'react-icons/md'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 
@@ -40,21 +41,48 @@ interface Stats {
   successRate: number
 }
 
-type FilterTab = 'all' | 'reminders' | 'follow_ups' | 'scoring' | 'other'
+type FilterTab = 'all' | 'reminders' | 'nudges' | 'follow_ups' | 'other'
+
+// --- Type badge colors ---
+
+const TYPE_COLORS: Record<string, { bg: string; color: string }> = {
+  reminder: { bg: 'rgba(59,130,246,0.15)', color: '#3b82f6' },
+  booking_reminder: { bg: 'rgba(59,130,246,0.15)', color: '#3b82f6' },
+  nudge: { bg: 'rgba(249,115,22,0.15)', color: '#f97316' },
+  follow: { bg: 'rgba(34,197,94,0.15)', color: '#22c55e' },
+  push_to_book: { bg: 'rgba(168,85,247,0.15)', color: '#a855f7' },
+  re_engage: { bg: 'rgba(239,68,68,0.15)', color: '#ef4444' },
+  post_booking: { bg: 'rgba(34,197,94,0.15)', color: '#22c55e' },
+}
+
+function getTypeColor(type: string): { bg: string; color: string } {
+  const key = Object.keys(TYPE_COLORS).find((k) => type.includes(k))
+  return key ? TYPE_COLORS[key] : { bg: 'rgba(255,255,255,0.06)', color: 'var(--text-secondary)' }
+}
 
 // --- Helpers ---
 
 function taskTypeIcon(type: string) {
-  if (type.includes('reminder')) return <MdNotifications size={16} />
-  if (type.includes('follow')) return <MdMessage size={16} />
-  if (type.includes('scor')) return <MdBarChart size={16} />
+  if (type.includes('reminder') || type.includes('booking_reminder')) return <MdNotifications size={16} />
+  if (type.includes('nudge')) return <MdScheduleSend size={16} />
+  if (type.includes('follow') || type.includes('post_booking')) return <MdMessage size={16} />
+  if (type.includes('push_to_book')) return <MdBarChart size={16} />
+  if (type.includes('re_engage')) return <MdMessage size={16} />
   return <MdDescription size={16} />
+}
+
+function channelIcon(metadata: Record<string, unknown>) {
+  const channel = (metadata?.channel as string) || 'whatsapp'
+  if (channel === 'voice') return <MdPhoneInTalk size={13} style={{ opacity: 0.5 }} />
+  if (channel === 'web') return <MdLanguage size={13} style={{ opacity: 0.5 }} />
+  return <MdWhatsapp size={13} style={{ opacity: 0.5 }} />
 }
 
 function statusPill(status: string) {
   const styles: Record<string, { bg: string; color: string; label: string }> = {
     completed: { bg: 'rgba(34,197,94,0.12)', color: '#22c55e', label: 'Completed' },
     failed: { bg: 'rgba(239,68,68,0.12)', color: '#ef4444', label: 'Failed' },
+    failed_24h_window: { bg: 'rgba(239,68,68,0.12)', color: '#ef4444', label: 'Window Expired' },
     pending: { bg: 'rgba(245,158,11,0.12)', color: '#f59e0b', label: 'Pending' },
     in_queue: { bg: 'rgba(107,114,128,0.12)', color: '#9ca3af', label: 'Queued' },
   }
@@ -67,9 +95,20 @@ function statusPill(status: string) {
 }
 
 function typeBadge(type: string) {
+  const style = getTypeColor(type)
   const label = type.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
   return (
-    <span style={{ fontSize: 11, color: 'var(--text-secondary)', background: 'rgba(255,255,255,0.06)', padding: '2px 6px', borderRadius: 4 }}>
+    <span
+      style={{
+        fontSize: 11,
+        color: style.color,
+        background: style.bg,
+        padding: '2px 8px',
+        borderRadius: 4,
+        fontWeight: 500,
+        whiteSpace: 'nowrap',
+      }}
+    >
       {label}
     </span>
   )
@@ -87,24 +126,19 @@ function formatDate(dateStr: string | null): string {
   return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })
 }
 
-function firesIn(scheduledAt: string | null): string {
-  if (!scheduledAt) return ''
-  const diff = new Date(scheduledAt).getTime() - Date.now()
-  if (diff <= 0) return 'Overdue'
-  const mins = Math.floor(diff / 60000)
-  if (mins < 60) return `Fires in ${mins} min`
-  const hrs = Math.floor(mins / 60)
-  if (hrs < 24) return `Fires in ${hrs}h ${mins % 60}m`
-  return `Fires at ${formatTime(scheduledAt)}`
-}
-
 function matchesFilter(task: AgentTask, filter: FilterTab): boolean {
   if (filter === 'all') return true
-  if (filter === 'reminders') return task.task_type.includes('reminder')
-  if (filter === 'follow_ups') return task.task_type.includes('follow')
-  if (filter === 'scoring') return task.task_type.includes('scor') || task.task_type.includes('summary')
-  // 'other'
-  return !task.task_type.includes('reminder') && !task.task_type.includes('follow') && !task.task_type.includes('scor') && !task.task_type.includes('summary')
+  if (filter === 'reminders') return task.task_type.includes('reminder') || task.task_type.includes('booking_reminder')
+  if (filter === 'nudges') return task.task_type.includes('nudge') || task.task_type.includes('push_to_book')
+  if (filter === 'follow_ups') return task.task_type.includes('follow') || task.task_type.includes('re_engage') || task.task_type.includes('post_booking')
+  return (
+    !task.task_type.includes('reminder') &&
+    !task.task_type.includes('nudge') &&
+    !task.task_type.includes('follow') &&
+    !task.task_type.includes('re_engage') &&
+    !task.task_type.includes('push_to_book') &&
+    !task.task_type.includes('post_booking')
+  )
 }
 
 function buildHourlyChart(tasks: AgentTask[]): { hour: string; count: number }[] {
@@ -122,6 +156,54 @@ function buildHourlyChart(tasks: AgentTask[]): { hour: string; count: number }[]
     hours.push({ hour: label, count })
   }
   return hours
+}
+
+// --- Live Countdown Timer ---
+
+function CountdownTimer({ scheduledAt }: { scheduledAt: string | null }) {
+  const [now, setNow] = useState(Date.now())
+
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(interval)
+  }, [])
+
+  if (!scheduledAt) return null
+
+  const diff = new Date(scheduledAt).getTime() - now
+  if (diff <= 0) return <span style={{ color: '#ef4444', fontWeight: 600, fontSize: 11 }}>Overdue</span>
+
+  const totalSecs = Math.floor(diff / 1000)
+  const hrs = Math.floor(totalSecs / 3600)
+  const mins = Math.floor((totalSecs % 3600) / 60)
+  const secs = totalSecs % 60
+
+  let text: string
+  let color: string
+
+  if (hrs > 0) {
+    text = `Sends in ${hrs}h ${mins}m`
+    color = '#22c55e'
+  } else if (mins >= 5) {
+    text = `Sends in ${mins}m`
+    color = '#f59e0b'
+  } else {
+    text = `Sends in ${mins}m ${secs}s`
+    color = '#ef4444'
+  }
+
+  return (
+    <span
+      style={{
+        color,
+        fontSize: 11,
+        fontWeight: 600,
+        animation: mins < 5 && hrs === 0 ? 'taskPulse 1.5s ease-in-out infinite' : undefined,
+      }}
+    >
+      {text}
+    </span>
+  )
 }
 
 // --- Stat Card ---
@@ -167,13 +249,12 @@ export default function TasksPage() {
 
   useEffect(() => {
     fetchTasks()
-    const interval = setInterval(fetchTasks, 30000) // refresh every 30s
+    const interval = setInterval(fetchTasks, 30000)
     return () => clearInterval(interval)
   }, [fetchTasks])
 
-  // Split into timeline (completed/failed) and upcoming (pending/in_queue)
   const timelineTasks = tasks
-    .filter((t) => (t.status === 'completed' || t.status === 'failed') && matchesFilter(t, filter))
+    .filter((t) => (t.status === 'completed' || t.status === 'failed' || t.status === 'failed_24h_window') && matchesFilter(t, filter))
     .sort((a, b) => new Date(b.completed_at || b.created_at).getTime() - new Date(a.completed_at || a.created_at).getTime())
 
   const upcomingTasks = tasks
@@ -185,21 +266,23 @@ export default function TasksPage() {
   if (loading) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>
-        <span style={{ color: 'var(--text-secondary)', fontSize: 14 }}>Loading tasks…</span>
+        <span style={{ color: 'var(--text-secondary)', fontSize: 14 }}>Loading tasks...</span>
       </div>
     )
   }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      {/* Header */}
+      {/* Pulse animation for countdown */}
+      <style>{`@keyframes taskPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }`}</style>
+
       <h1 style={{ color: 'var(--text-primary)', fontSize: 18, fontWeight: 700, margin: 0 }}>Tasks</h1>
 
       {/* Stats Row */}
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
         <StatCard label="Completed Today" value={stats.completedToday} color="#22c55e" />
         <StatCard label="Pending" value={stats.pendingCount} color="#f59e0b" />
-        <StatCard label="In Queue" value={stats.queuedCount} color="#9ca3af" />
+        <StatCard label="Firing Next Hour" value={stats.queuedCount} color="#9ca3af" />
         <StatCard label="Success Rate" value={`${stats.successRate}%`} color="var(--text-primary)" />
       </div>
 
@@ -209,7 +292,7 @@ export default function TasksPage() {
         <div style={{ flex: '3 1 400px', minWidth: 0 }}>
           {/* Filter Tabs */}
           <div style={{ display: 'flex', gap: 4, marginBottom: 12 }}>
-            {(['all', 'reminders', 'follow_ups', 'scoring', 'other'] as FilterTab[]).map((tab) => (
+            {(['all', 'reminders', 'nudges', 'follow_ups', 'other'] as FilterTab[]).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setFilter(tab)}
@@ -256,32 +339,31 @@ export default function TasksPage() {
                     alignItems: 'flex-start',
                   }}
                 >
-                  {/* Timestamp */}
                   <div style={{ color: 'var(--text-secondary)', fontSize: 11, minWidth: 60, paddingTop: 2, flexShrink: 0 }}>
                     <div>{formatTime(task.completed_at || task.created_at)}</div>
                     <div style={{ opacity: 0.6 }}>{formatDate(task.completed_at || task.created_at)}</div>
                   </div>
-                  {/* Icon */}
                   <div style={{ color: 'var(--text-secondary)', paddingTop: 1, flexShrink: 0 }}>
                     {taskTypeIcon(task.task_type)}
                   </div>
-                  {/* Content */}
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ color: 'var(--text-primary)', fontSize: 13, lineHeight: '18px' }}>
                       {task.task_description}
                     </div>
-                    {task.lead_name && (
-                      <span style={{ color: 'var(--text-secondary)', fontSize: 11 }}>
-                        {task.lead_name} {task.lead_phone ? `(${task.lead_phone})` : ''}
-                      </span>
-                    )}
-                    {task.status === 'failed' && task.error_message && (
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 2 }}>
+                      {channelIcon(task.metadata)}
+                      {task.lead_name && (
+                        <span style={{ color: 'var(--text-secondary)', fontSize: 11 }}>
+                          {task.lead_name} {task.lead_phone ? `(${task.lead_phone})` : ''}
+                        </span>
+                      )}
+                    </div>
+                    {(task.status === 'failed' || task.status === 'failed_24h_window') && task.error_message && (
                       <div style={{ color: '#ef4444', fontSize: 11, marginTop: 4 }}>
                         {task.error_message}
                       </div>
                     )}
                   </div>
-                  {/* Status */}
                   <div style={{ flexShrink: 0 }}>{statusPill(task.status)}</div>
                 </div>
               ))
@@ -317,22 +399,31 @@ export default function TasksPage() {
                     borderBottom: '1px solid rgba(255,255,255,0.05)',
                     display: 'flex',
                     flexDirection: 'column',
-                    gap: 4,
+                    gap: 6,
                   }}
                 >
+                  {/* Row 1: Lead name + type badge */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ color: 'var(--text-primary)', fontSize: 13, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {task.task_description}
-                    </span>
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'center', flex: 1, minWidth: 0 }}>
+                      {channelIcon(task.metadata)}
+                      <span style={{ color: 'var(--text-primary)', fontSize: 13, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {task.lead_name || 'Unknown lead'}
+                      </span>
+                      {task.lead_phone && (
+                        <span style={{ color: 'var(--text-secondary)', fontSize: 11 }}>
+                          ({task.lead_phone})
+                        </span>
+                      )}
+                    </div>
                     {typeBadge(task.task_type)}
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ color: 'var(--text-secondary)', fontSize: 11 }}>
-                      {task.lead_name || 'Unknown lead'}
-                    </span>
-                    <span style={{ color: '#f59e0b', fontSize: 11, fontWeight: 500 }}>
-                      {firesIn(task.scheduled_at)}
-                    </span>
+                  {/* Row 2: Description preview */}
+                  <div style={{ color: 'var(--text-secondary)', fontSize: 12, lineHeight: '16px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {task.task_description}
+                  </div>
+                  {/* Row 3: Countdown */}
+                  <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                    <CountdownTimer scheduledAt={task.scheduled_at} />
                   </div>
                 </div>
               ))

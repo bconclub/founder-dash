@@ -1,9 +1,10 @@
 /**
- * PROXe Autonomous Task Worker
+ * PROXe Autonomous Task Worker — Sequence Engine
  *
  * PM2 runs this every 5 minutes via cron_restart.
- * Checks for due actions (booking reminders, follow-ups, cold lead re-engagement),
- * executes them via WhatsApp, and logs everything to agent_tasks table.
+ * Processes flow tasks created by engine.ts (nudge, booking reminders, push-to-book)
+ * AND scans for conditions (follow-ups, cold lead re-engagement).
+ * Executes via WhatsApp with 24h window detection + template fallback.
  */
 
 const { createClient } = require('@supabase/supabase-js');
@@ -12,6 +13,7 @@ require('dotenv').config();
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 const WA_TOKEN = process.env.META_WHATSAPP_ACCESS_TOKEN;
 const WA_PHONE_ID = process.env.META_WHATSAPP_PHONE_NUMBER_ID;
+const WA_TEMPLATE_NAME = process.env.WA_TEMPLATE_NAME || 'bcon_followup';
 
 async function main() {
   console.log(`[TaskWorker] Run started at ${new Date().toISOString()}`);
@@ -28,7 +30,7 @@ async function main() {
 }
 
 // ============================================
-// 1. BOOKING REMINDERS
+// 1. BOOKING REMINDERS (from whatsapp_sessions)
 // ============================================
 async function createBookingReminderTasks() {
   const now = new Date();
@@ -44,13 +46,12 @@ async function createBookingReminderTasks() {
   for (const session of sessions) {
     try {
       const bookingDateTime = new Date(`${session.booking_date}T${session.booking_time}`);
-      if (bookingDateTime < now) continue; // Past booking, skip
+      if (bookingDateTime < now) continue;
 
       const hoursUntil = (bookingDateTime - now) / (1000 * 60 * 60);
       const phone = session.customer_phone_normalized || session.whatsapp_id;
       const name = session.customer_name || 'there';
 
-      // 24h reminder: create if within 24-25h window and not sent
       if (hoursUntil <= 25 && hoursUntil > 23 && !session.reminder_24h_sent) {
         await createTaskIfNotExists({
           taskType: 'reminder_24h',
@@ -62,7 +63,6 @@ async function createBookingReminderTasks() {
         });
       }
 
-      // 1h reminder: create if within 1-2h window and not sent
       if (hoursUntil <= 2 && hoursUntil > 0.5 && !session.reminder_1h_sent) {
         await createTaskIfNotExists({
           taskType: 'reminder_1h',
@@ -74,7 +74,6 @@ async function createBookingReminderTasks() {
         });
       }
 
-      // 30min reminder: create if within 30-45min window and not sent
       if (hoursUntil <= 0.75 && hoursUntil > 0.25 && !session.reminder_30m_sent) {
         await createTaskIfNotExists({
           taskType: 'reminder_30m',
@@ -111,7 +110,6 @@ async function createFollowUpTasks() {
 
   for (const lead of leads) {
     try {
-      // Check if last message was from agent (not customer)
       const { data: lastMsg } = await supabase
         .from('conversations')
         .select('sender, created_at')
@@ -121,12 +119,14 @@ async function createFollowUpTasks() {
         .single();
 
       if (lastMsg && lastMsg.sender === 'agent') {
+        // Schedule 24h from their last interaction, not NOW
+        const scheduledAt = new Date(new Date(lead.last_interaction_at).getTime() + 24 * 60 * 60 * 1000).toISOString();
         await createTaskIfNotExists({
           taskType: 'follow_up_24h',
           leadId: lead.id,
           leadPhone: lead.customer_phone_normalized,
           leadName: lead.customer_name || 'Lead',
-          scheduledAt: new Date().toISOString(),
+          scheduledAt,
           metadata: { lead_stage: lead.lead_stage, lead_score: lead.lead_score }
         });
       }
@@ -156,12 +156,14 @@ async function createColdLeadTasks() {
 
   for (const lead of leads) {
     try {
+      // Schedule 7 days from their last interaction, not NOW
+      const scheduledAt = new Date(new Date(lead.last_interaction_at).getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
       await createTaskIfNotExists({
         taskType: 're_engage',
         leadId: lead.id,
         leadPhone: lead.customer_phone_normalized,
         leadName: lead.customer_name || 'Lead',
-        scheduledAt: new Date().toISOString(),
+        scheduledAt,
         metadata: {
           lead_stage: lead.lead_stage,
           days_inactive: Math.floor((Date.now() - new Date(lead.last_interaction_at).getTime()) / (1000 * 60 * 60 * 24))
@@ -196,7 +198,19 @@ async function processPendingTasks() {
 
   for (const task of tasks) {
     try {
-      await executeTask(task);
+      const result = await executeTask(task);
+
+      // If task was skipped (e.g. lead already responded), mark completed with note
+      if (result && result.skipped) {
+        await supabase.from('agent_tasks').update({
+          status: 'completed',
+          completed_at: new Date().toISOString(),
+          error_message: result.reason || 'Skipped — condition no longer applies',
+        }).eq('id', task.id);
+        console.log(`[ProcessTasks] Skipped: ${task.task_type} for ${task.lead_name} — ${result.reason}`);
+        continue;
+      }
+
       await supabase.from('agent_tasks').update({
         status: 'completed',
         completed_at: new Date().toISOString(),
@@ -216,52 +230,159 @@ async function processPendingTasks() {
 }
 
 // ============================================
-// TASK EXECUTION
+// TASK EXECUTION — Route by type
 // ============================================
 async function executeTask(task) {
   const phone = task.lead_phone?.replace(/\D/g, '');
   if (!phone) throw new Error('No phone number');
 
-  // Ensure phone has country code for WhatsApp API
   const waPhone = phone.length === 10 ? `91${phone}` : phone;
-  const sessionId = task.metadata?.session_id;
-  let message = '';
 
   switch (task.task_type) {
-    case 'reminder_24h':
-      message = `Hey ${task.lead_name}! Just a reminder - you have a call with BCON Club tomorrow at ${task.metadata?.booking_time}. Looking forward to connecting!`;
+    // ── Flow tasks (created by engine.ts) ──
+    case 'nudge_waiting':
+      return await executeNudgeWaiting(task, waPhone);
+    case 'booking_reminder_24h':
+      return await executeSendMessage(task, waPhone,
+        `Hey ${task.lead_name}! Just a reminder — you have a call with BCON Club tomorrow at ${task.metadata?.booking_time}. Looking forward to it!`);
+    case 'booking_reminder_1h':
+      return await executeSendMessage(task, waPhone,
+        `Just a heads up ${task.lead_name}, your call is in about an hour at ${task.metadata?.booking_time}. Talk soon!`);
+    case 'booking_reminder_30m':
+      return await executeSendMessage(task, waPhone,
+        `${task.lead_name}, your call starts in 30 minutes. Talk soon!`);
+    case 'post_booking_followup':
+      return await executePostBookingFollowup(task, waPhone);
+    case 'push_to_book':
+      return await executePushToBook(task, waPhone);
+
+    // ── Legacy tasks (created by worker scan) ──
+    case 'reminder_24h': {
+      const sessionId = task.metadata?.session_id;
+      const result = await executeSendMessage(task, waPhone,
+        `Hey ${task.lead_name}! Just a reminder - you have a call with BCON Club tomorrow at ${task.metadata?.booking_time}. Looking forward to connecting!`);
       if (sessionId) await supabase.from('whatsapp_sessions').update({ reminder_24h_sent: true }).eq('id', sessionId);
-      break;
-
-    case 'reminder_1h':
-      message = `Hi ${task.lead_name}! Your call with BCON Club is in about an hour at ${task.metadata?.booking_time}. Ready to discuss how AI can grow your business!`;
+      return result;
+    }
+    case 'reminder_1h': {
+      const sessionId = task.metadata?.session_id;
+      const result = await executeSendMessage(task, waPhone,
+        `Hi ${task.lead_name}! Your call with BCON Club is in about an hour at ${task.metadata?.booking_time}. Ready to discuss how AI can grow your business!`);
       if (sessionId) await supabase.from('whatsapp_sessions').update({ reminder_1h_sent: true }).eq('id', sessionId);
-      break;
-
-    case 'reminder_30m':
-      message = `${task.lead_name}, your BCON Club call is in 30 minutes at ${task.metadata?.booking_time}. See you soon!`;
+      return result;
+    }
+    case 'reminder_30m': {
+      const sessionId = task.metadata?.session_id;
+      const result = await executeSendMessage(task, waPhone,
+        `${task.lead_name}, your BCON Club call is in 30 minutes at ${task.metadata?.booking_time}. See you soon!`);
       if (sessionId) await supabase.from('whatsapp_sessions').update({ reminder_30m_sent: true }).eq('id', sessionId);
-      break;
-
+      return result;
+    }
     case 'follow_up_24h':
-      message = `Hey ${task.lead_name}! Just checking in - did you get a chance to think about what we discussed? Happy to answer any questions you have about setting up AI for your business.`;
-      break;
-
+      return await executeSendMessage(task, waPhone,
+        `Hey ${task.lead_name}! Just checking in — did you get a chance to think about what we discussed? Happy to answer any questions about setting up AI for your business.`);
     case 're_engage':
-      message = `Hi ${task.lead_name}! It's been a while since we connected. We've been building some exciting AI solutions for businesses like yours. Would love to catch up - what's a good time this week?`;
-      break;
-
+      return await executeSendMessage(task, waPhone,
+        `Hi ${task.lead_name}! It's been a while since we connected. We've been building some exciting AI solutions for businesses like yours. Would love to catch up — what's a good time this week?`);
     case 'post_booking_confirmation':
-      message = `Great news ${task.lead_name}! Your call with BCON Club is confirmed for ${task.metadata?.booking_date} at ${task.metadata?.booking_time}. We'll discuss how to set up an AI system for your business. See you then!`;
-      break;
+      return await executeSendMessage(task, waPhone,
+        `Great news ${task.lead_name}! Your call with BCON Club is confirmed for ${task.metadata?.booking_date} at ${task.metadata?.booking_time}. We'll discuss how to set up an AI system for your business. See you then!`);
 
     default:
       throw new Error(`Unknown task type: ${task.task_type}`);
   }
+}
 
-  await sendWhatsApp(waPhone, message);
+// ============================================
+// SMART EXECUTORS
+// ============================================
 
-  // Log to conversations table
+/**
+ * Nudge waiting: check if lead responded since task was created.
+ * If yes → skip. If no → send contextual nudge.
+ */
+async function executeNudgeWaiting(task, waPhone) {
+  if (task.lead_id) {
+    const { data: recentMsg } = await supabase
+      .from('conversations')
+      .select('id')
+      .eq('lead_id', task.lead_id)
+      .eq('sender', 'customer')
+      .gt('created_at', task.created_at)
+      .limit(1);
+
+    if (recentMsg && recentMsg.length > 0) {
+      return { skipped: true, reason: 'Lead responded' };
+    }
+  }
+
+  const lastQuestion = (task.metadata?.last_question || '').toLowerCase();
+  let message;
+
+  if (lastQuestion.includes('time') || lastQuestion.includes('when') || lastQuestion.includes('day')) {
+    message = `Hey ${task.lead_name}, just circling back — did you figure out a good time?`;
+  } else if (lastQuestion.includes('business') || lastQuestion.includes('do')) {
+    message = `Hey ${task.lead_name}! Still curious about your business — would love to hear more when you get a sec.`;
+  } else if (lastQuestion.includes('help') || lastQuestion.includes('need')) {
+    message = `Hey ${task.lead_name}, just following up — let me know how I can help!`;
+  } else {
+    message = `Hey ${task.lead_name}, just following up on our chat — let me know if you have any questions!`;
+  }
+
+  return await executeSendMessage(task, waPhone, message);
+}
+
+/**
+ * Post-booking follow-up: check if booking happened and send check-in.
+ */
+async function executePostBookingFollowup(task, waPhone) {
+  return await executeSendMessage(task, waPhone,
+    `Hey ${task.lead_name}! How did the call go? Anything else you need from us?`);
+}
+
+/**
+ * Push to book: check if lead booked since task was created.
+ * If yes → skip. If no → nudge toward booking.
+ */
+async function executePushToBook(task, waPhone) {
+  if (task.lead_id) {
+    // Check if any booking reminder tasks exist for this lead (means they booked)
+    const { data: bookingTasks } = await supabase
+      .from('agent_tasks')
+      .select('id')
+      .eq('lead_id', task.lead_id)
+      .in('task_type', ['booking_reminder_24h', 'booking_reminder_1h', 'booking_reminder_30m'])
+      .gt('created_at', task.created_at)
+      .limit(1);
+
+    if (bookingTasks && bookingTasks.length > 0) {
+      return { skipped: true, reason: 'Lead booked since task was created' };
+    }
+  }
+
+  return await executeSendMessage(task, waPhone,
+    `Hey ${task.lead_name}! We had a great chat earlier. Would love to set up a quick AI Brand Audit for your business — basically we map out exactly where AI plugs in for you. When works this week?`);
+}
+
+// ============================================
+// MESSAGE SENDING (with 24h window check)
+// ============================================
+
+/**
+ * Send a message via WhatsApp. Checks 24h window first.
+ * Falls back to template message if outside window.
+ */
+async function executeSendMessage(task, waPhone, message) {
+  const within24h = task.lead_id ? await isWithin24hWindow(task.lead_id) : true;
+
+  if (within24h) {
+    await sendWhatsApp(waPhone, message);
+  } else {
+    await sendWhatsAppTemplate(waPhone, task.lead_name || 'there');
+    message = `[Template] Re-engagement sent to ${task.lead_name}`;
+  }
+
+  // Log to conversations
   if (task.lead_id) {
     await supabase.from('conversations').insert({
       lead_id: task.lead_id,
@@ -274,10 +395,31 @@ async function executeTask(task) {
       if (error) console.error('[executeTask] Conversation log error:', error.message);
     });
   }
+
+  return null;
+}
+
+/**
+ * Check if lead's last customer message was within 24 hours.
+ */
+async function isWithin24hWindow(leadId) {
+  const { data: lastCustomerMsg } = await supabase
+    .from('conversations')
+    .select('created_at')
+    .eq('lead_id', leadId)
+    .eq('sender', 'customer')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (!lastCustomerMsg) return false;
+
+  const hoursSince = (Date.now() - new Date(lastCustomerMsg.created_at).getTime()) / (1000 * 60 * 60);
+  return hoursSince < 24;
 }
 
 // ============================================
-// WHATSAPP SEND (Meta Cloud API)
+// WHATSAPP SEND — Free-form (Meta Cloud API v21.0)
 // ============================================
 async function sendWhatsApp(phone, message) {
   const url = `https://graph.facebook.com/v21.0/${WA_PHONE_ID}/messages`;
@@ -299,7 +441,6 @@ async function sendWhatsApp(phone, message) {
 
   if (!res.ok) {
     const errBody = await res.text();
-    // Check for 24h window expired (Meta error code 131047)
     if (errBody.includes('131047') || errBody.includes('Re-engagement message')) {
       const err = new Error(`24h_window expired for ${phone}`);
       err.is24hWindow = true;
@@ -312,25 +453,80 @@ async function sendWhatsApp(phone, message) {
 }
 
 // ============================================
+// WHATSAPP SEND — Template (outside 24h window)
+// ============================================
+async function sendWhatsAppTemplate(phone, leadName) {
+  const url = `https://graph.facebook.com/v21.0/${WA_PHONE_ID}/messages`;
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${WA_TOKEN}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      messaging_product: 'whatsapp',
+      recipient_type: 'individual',
+      to: phone,
+      type: 'template',
+      template: {
+        name: WA_TEMPLATE_NAME,
+        language: { code: 'en' },
+        components: [
+          {
+            type: 'body',
+            parameters: [
+              { type: 'text', text: leadName || 'there' }
+            ]
+          }
+        ]
+      }
+    })
+  });
+
+  if (!res.ok) {
+    const errBody = await res.text();
+    throw new Error(`WhatsApp Template API error: ${res.status} ${errBody}`);
+  }
+
+  console.log(`[WhatsApp] Template sent to ${phone} (${WA_TEMPLATE_NAME})`);
+}
+
+// ============================================
 // HELPER: Create task if not already exists
+// Dedup: pending (any age) + completed (last 7 days only)
 // ============================================
 async function createTaskIfNotExists({ taskType, leadId, leadPhone, leadName, scheduledAt, metadata }) {
-  // Check if same type + lead already exists and is pending or completed
-  let query = supabase
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
+  // Check for existing pending task (any age)
+  let pendingQuery = supabase
     .from('agent_tasks')
     .select('id')
     .eq('task_type', taskType)
-    .in('status', ['pending', 'completed'])
+    .eq('status', 'pending')
     .limit(1);
 
-  if (leadId) {
-    query = query.eq('lead_id', leadId);
-  } else {
-    query = query.eq('lead_phone', leadPhone);
-  }
+  if (leadId) pendingQuery = pendingQuery.eq('lead_id', leadId);
+  else pendingQuery = pendingQuery.eq('lead_phone', leadPhone);
 
-  const { data: existing } = await query;
-  if (existing && existing.length > 0) return; // Already exists
+  const { data: pendingExists } = await pendingQuery;
+  if (pendingExists && pendingExists.length > 0) return;
+
+  // Check for recently completed task (last 7 days only)
+  let completedQuery = supabase
+    .from('agent_tasks')
+    .select('id')
+    .eq('task_type', taskType)
+    .eq('status', 'completed')
+    .gte('completed_at', sevenDaysAgo)
+    .limit(1);
+
+  if (leadId) completedQuery = completedQuery.eq('lead_id', leadId);
+  else completedQuery = completedQuery.eq('lead_phone', leadPhone);
+
+  const { data: recentCompleted } = await completedQuery;
+  if (recentCompleted && recentCompleted.length > 0) return;
 
   const { error } = await supabase.from('agent_tasks').insert({
     task_type: taskType,

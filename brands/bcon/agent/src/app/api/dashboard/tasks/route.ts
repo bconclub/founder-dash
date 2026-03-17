@@ -12,29 +12,8 @@ export async function GET(request: NextRequest) {
     const from = searchParams.get('from')
     const to = searchParams.get('to')
 
-    // Default: last 24h completed/failed + all pending/queued
     const now = new Date()
     const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000)
-
-    // Query 1: pending and in_queue tasks (no date filter)
-    let pendingQuery = supabase
-      .from('agent_tasks')
-      .select('*')
-      .in('status', ['pending', 'in_queue'])
-      .order('scheduled_at', { ascending: true })
-
-    if (type) pendingQuery = pendingQuery.eq('task_type', type)
-
-    // Query 2: completed/failed tasks with date filter
-    let historyQuery = supabase
-      .from('agent_tasks')
-      .select('*')
-      .in('status', ['completed', 'failed'])
-      .gte('created_at', from || yesterday.toISOString())
-      .order('completed_at', { ascending: false })
-
-    if (to) historyQuery = historyQuery.lte('created_at', to)
-    if (type) historyQuery = historyQuery.eq('task_type', type)
 
     // If explicit status filter, only run that query
     if (status) {
@@ -53,6 +32,26 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ tasks: data || [] })
     }
 
+    // Query 1: pending and in_queue tasks (no date filter)
+    let pendingQuery = supabase
+      .from('agent_tasks')
+      .select('*')
+      .in('status', ['pending', 'in_queue'])
+      .order('scheduled_at', { ascending: true })
+
+    if (type) pendingQuery = pendingQuery.eq('task_type', type)
+
+    // Query 2: completed/failed tasks with date filter
+    let historyQuery = supabase
+      .from('agent_tasks')
+      .select('*')
+      .in('status', ['completed', 'failed', 'failed_24h_window'])
+      .gte('created_at', from || yesterday.toISOString())
+      .order('completed_at', { ascending: false })
+
+    if (to) historyQuery = historyQuery.lte('created_at', to)
+    if (type) historyQuery = historyQuery.eq('task_type', type)
+
     const [pendingResult, historyResult] = await Promise.all([
       pendingQuery.limit(100),
       historyQuery.limit(200),
@@ -66,15 +65,19 @@ export async function GET(request: NextRequest) {
     // Stats
     const todayStart = new Date()
     todayStart.setHours(0, 0, 0, 0)
+    const oneHourFromNow = new Date(now.getTime() + 60 * 60 * 1000)
 
     const completedToday = (historyResult.data || []).filter(
       (t) => t.status === 'completed' && t.completed_at && new Date(t.completed_at) >= todayStart
     ).length
     const failedToday = (historyResult.data || []).filter(
-      (t) => t.status === 'failed' && t.completed_at && new Date(t.completed_at) >= todayStart
+      (t) => (t.status === 'failed' || t.status === 'failed_24h_window') && t.completed_at && new Date(t.completed_at) >= todayStart
     ).length
     const pendingCount = (pendingResult.data || []).filter((t) => t.status === 'pending').length
-    const queuedCount = (pendingResult.data || []).filter((t) => t.status === 'in_queue').length
+    // "In Queue" = tasks with scheduled_at in the next 1 hour
+    const queuedCount = (pendingResult.data || []).filter(
+      (t) => t.status === 'pending' && t.scheduled_at && new Date(t.scheduled_at) <= oneHourFromNow
+    ).length
     const successRate = completedToday + failedToday > 0
       ? Math.round((completedToday / (completedToday + failedToday)) * 100)
       : 100

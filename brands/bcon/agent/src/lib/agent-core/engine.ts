@@ -125,7 +125,12 @@ export async function process(
 
   const cleanedResponse = cleanResponse(rawResponse, input.channel);
 
-  // 7. Generate follow-ups (skip for channels that don't support buttons)
+  // 7. Schedule flow tasks (non-blocking — fires after response is ready)
+  scheduleFlowTasks(supabase, input, cleanedResponse).catch(err => {
+    console.error('[Engine] Flow task scheduling failed:', err?.message);
+  });
+
+  // 8. Generate follow-ups (skip for channels that don't support buttons)
   let followUps: string[] = [];
   if (input.channel === 'web') {
     followUps = await generateFollowUps({
@@ -245,6 +250,11 @@ export async function* processStream(
 
     yield { type: 'followUps', followUps };
     yield { type: 'done' };
+
+    // Schedule flow tasks (non-blocking — fires after response sent to client)
+    scheduleFlowTasks(supabase, input, cleanedResponse).catch(err => {
+      console.error('[Engine] Flow task scheduling failed:', err?.message);
+    });
 
   } catch (error: any) {
     yield { type: 'error', error: getErrorMessage(error) };
@@ -599,6 +609,57 @@ function buildBookingTools(
       // Mark this booking as completed to prevent re-detection loops
       bookingsCompletedThisSession.add(bookingKey);
 
+      // Create booking reminder flow tasks (Flow B + C)
+      try {
+        const bookingDT = parseBookingDateTime(date, time);
+        if (bookingDT) {
+          const taskPhone = (bookingPhone || '').replace(/\D/g, '').slice(-10);
+          const { data: taskLead } = await supabase
+            .from('all_leads')
+            .select('id')
+            .eq('customer_phone_normalized', taskPhone)
+            .maybeSingle();
+          const taskLeadId = taskLead?.id || null;
+
+          const reminders = [
+            { type: 'booking_reminder_24h', offset: -24 * 60 * 60 * 1000, desc: 'Booking reminder: 24 hours before call' },
+            { type: 'booking_reminder_1h', offset: -1 * 60 * 60 * 1000, desc: 'Booking reminder: 1 hour before call' },
+            { type: 'booking_reminder_30m', offset: -30 * 60 * 1000, desc: 'Booking reminder: 30 minutes before call' },
+            { type: 'post_booking_followup', offset: 1 * 60 * 60 * 1000, desc: 'Check in after scheduled call' },
+          ];
+
+          for (const r of reminders) {
+            const scheduledTime = new Date(bookingDT.getTime() + r.offset);
+            if (scheduledTime.getTime() > Date.now()) {
+              supabase.from('agent_tasks').insert({
+                task_type: r.type,
+                task_description: `${r.desc} for ${bookingName}`,
+                lead_id: taskLeadId,
+                lead_phone: bookingPhone,
+                lead_name: bookingName,
+                scheduled_at: scheduledTime.toISOString(),
+                status: 'pending',
+                metadata: {
+                  booking_date: date,
+                  booking_time: time,
+                  session_id: input.sessionId,
+                  channel: input.channel || 'whatsapp',
+                  meet_link: calendarResult?.meetLink || null,
+                  title: bookingTitle,
+                  created_by: 'engine',
+                },
+                created_at: new Date().toISOString(),
+              }).then(({ error: taskErr }) => {
+                if (taskErr) console.error(`[Engine] Failed to create ${r.type}:`, taskErr.message);
+                else console.log(`[Engine] Created ${r.type} for ${bookingName} at ${scheduledTime.toISOString()}`);
+              });
+            }
+          }
+        }
+      } catch (flowErr: any) {
+        console.error('[Engine] Booking flow task creation failed:', flowErr?.message);
+      }
+
       // NOTE: No separate WhatsApp confirmation — Claude's response IS the only message
 
       return JSON.stringify({
@@ -738,6 +799,159 @@ function buildBookingTools(
   };
 
   return { tools, toolHandlers };
+}
+
+// ─── Flow Task Scheduling ──────────────────────────────────────────────────
+
+/**
+ * Parse "3:00 PM" style time + "2026-03-20" date into a Date (IST)
+ */
+function parseBookingDateTime(date: string, time: string): Date | null {
+  const match = time.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+  if (!match) return null;
+  let hours = parseInt(match[1]);
+  const minutes = parseInt(match[2]);
+  const ampm = match[3].toUpperCase();
+  if (ampm === 'PM' && hours !== 12) hours += 12;
+  if (ampm === 'AM' && hours === 12) hours = 0;
+  return new Date(`${date}T${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:00+05:30`);
+}
+
+/**
+ * Create a flow task in agent_tasks with dedup (pending + completed within 7 days)
+ */
+async function createFlowTask(
+  supabase: SupabaseClient,
+  params: {
+    taskType: string;
+    leadId: string;
+    leadPhone: string;
+    leadName: string;
+    scheduledAt: string;
+    taskDescription: string;
+    metadata: Record<string, any>;
+  }
+): Promise<void> {
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
+  // Check for existing pending task (any age)
+  const { data: pendingExists } = await supabase
+    .from('agent_tasks')
+    .select('id')
+    .eq('task_type', params.taskType)
+    .eq('lead_id', params.leadId)
+    .eq('status', 'pending')
+    .limit(1);
+
+  if (pendingExists && pendingExists.length > 0) return;
+
+  // Check for recently completed task (last 7 days)
+  const { data: recentCompleted } = await supabase
+    .from('agent_tasks')
+    .select('id')
+    .eq('task_type', params.taskType)
+    .eq('lead_id', params.leadId)
+    .eq('status', 'completed')
+    .gte('completed_at', sevenDaysAgo)
+    .limit(1);
+
+  if (recentCompleted && recentCompleted.length > 0) return;
+
+  const { error } = await supabase.from('agent_tasks').insert({
+    task_type: params.taskType,
+    task_description: params.taskDescription,
+    lead_id: params.leadId,
+    lead_phone: params.leadPhone,
+    lead_name: params.leadName,
+    scheduled_at: params.scheduledAt,
+    status: 'pending',
+    metadata: params.metadata,
+    created_at: new Date().toISOString(),
+  });
+
+  if (error) {
+    console.error(`[Engine] Failed to create ${params.taskType}:`, error.message);
+  } else {
+    console.log(`[Engine] Created ${params.taskType} for ${params.leadName}`);
+  }
+}
+
+/**
+ * Analyze conversation state after every AI response and schedule flow tasks.
+ * Called non-blocking from process() and processStream().
+ *
+ * Flow A: nudge_waiting — AI asked a question, lead hasn't responded (2h timer)
+ * Flow D: push_to_book — 5+ messages exchanged, no booking yet (4h timer)
+ * Flows B/C (booking reminders) are created in the book_consultation tool handler.
+ */
+async function scheduleFlowTasks(
+  supabase: SupabaseClient,
+  input: AgentInput,
+  aiResponse: string,
+): Promise<void> {
+  const phone = input.userProfile.phone;
+  if (!phone) return;
+
+  const normalizedPhone = phone.replace(/\D/g, '').slice(-10);
+  if (!normalizedPhone || normalizedPhone.length < 10) return;
+
+  const { data: lead } = await supabase
+    .from('all_leads')
+    .select('id, customer_name, customer_phone_normalized')
+    .eq('customer_phone_normalized', normalizedPhone)
+    .maybeSingle();
+
+  if (!lead) return;
+
+  const leadId = lead.id;
+  const leadName = lead.customer_name || input.userProfile.name || 'Lead';
+  const leadPhone = lead.customer_phone_normalized || normalizedPhone;
+
+  // Flow A: If AI response ends with a question, schedule a nudge
+  if (aiResponse.includes('?')) {
+    await createFlowTask(supabase, {
+      taskType: 'nudge_waiting',
+      leadId,
+      leadPhone,
+      leadName,
+      scheduledAt: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
+      taskDescription: `Nudge: waiting for reply on ${input.channel} — "${aiResponse.substring(0, 80)}..."`,
+      metadata: {
+        last_question: aiResponse.substring(0, 200),
+        channel: input.channel,
+        session_id: input.sessionId,
+        created_by: 'engine',
+      },
+    });
+  }
+
+  // Flow D: 5+ messages but no booking — nudge toward booking
+  if (input.messageCount >= 5) {
+    const sessionTable = input.channel === 'web' ? 'web_sessions' : 'whatsapp_sessions';
+    const { data: session } = await supabase
+      .from(sessionTable)
+      .select('booking_status')
+      .eq('external_session_id', input.sessionId)
+      .maybeSingle();
+
+    const hasBooking = session?.booking_status && session.booking_status !== 'none';
+    if (!hasBooking) {
+      await createFlowTask(supabase, {
+        taskType: 'push_to_book',
+        leadId,
+        leadPhone,
+        leadName,
+        scheduledAt: new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString(),
+        taskDescription: `Lead engaged (${input.messageCount} msgs on ${input.channel}) but no booking yet`,
+        metadata: {
+          message_count: input.messageCount,
+          channel: input.channel,
+          session_id: input.sessionId,
+          created_by: 'engine',
+        },
+      });
+    }
+  }
 }
 
 export { isConfigured, getErrorMessage };
