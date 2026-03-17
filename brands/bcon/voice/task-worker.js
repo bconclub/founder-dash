@@ -35,7 +35,7 @@ async function createBookingReminderTasks() {
 
   const { data: sessions } = await supabase
     .from('whatsapp_sessions')
-    .select('id, whatsapp_id, customer_name, booking_date, booking_time, reminder_24h_sent, reminder_1h_sent, reminder_30m_sent, customer_phone_normalized')
+    .select('id, whatsapp_id, customer_name, booking_date, booking_time, reminder_24h_sent, reminder_1h_sent, reminder_30m_sent, customer_phone_normalized, lead_id')
     .not('booking_date', 'is', null)
     .not('booking_time', 'is', null);
 
@@ -54,11 +54,11 @@ async function createBookingReminderTasks() {
       if (hoursUntil <= 25 && hoursUntil > 23 && !session.reminder_24h_sent) {
         await createTaskIfNotExists({
           taskType: 'reminder_24h',
-          leadId: session.id,
+          leadId: session.lead_id || null,
           leadPhone: phone,
           leadName: name,
           scheduledAt: new Date(bookingDateTime.getTime() - 24 * 60 * 60 * 1000).toISOString(),
-          metadata: { booking_date: session.booking_date, booking_time: session.booking_time }
+          metadata: { booking_date: session.booking_date, booking_time: session.booking_time, session_id: session.id }
         });
       }
 
@@ -66,11 +66,11 @@ async function createBookingReminderTasks() {
       if (hoursUntil <= 2 && hoursUntil > 0.5 && !session.reminder_1h_sent) {
         await createTaskIfNotExists({
           taskType: 'reminder_1h',
-          leadId: session.id,
+          leadId: session.lead_id || null,
           leadPhone: phone,
           leadName: name,
           scheduledAt: new Date(bookingDateTime.getTime() - 1 * 60 * 60 * 1000).toISOString(),
-          metadata: { booking_date: session.booking_date, booking_time: session.booking_time }
+          metadata: { booking_date: session.booking_date, booking_time: session.booking_time, session_id: session.id }
         });
       }
 
@@ -78,11 +78,11 @@ async function createBookingReminderTasks() {
       if (hoursUntil <= 0.75 && hoursUntil > 0.25 && !session.reminder_30m_sent) {
         await createTaskIfNotExists({
           taskType: 'reminder_30m',
-          leadId: session.id,
+          leadId: session.lead_id || null,
           leadPhone: phone,
           leadName: name,
           scheduledAt: new Date(bookingDateTime.getTime() - 30 * 60 * 1000).toISOString(),
-          metadata: { booking_date: session.booking_date, booking_time: session.booking_time }
+          metadata: { booking_date: session.booking_date, booking_time: session.booking_time, session_id: session.id }
         });
       }
     } catch (err) {
@@ -101,6 +101,7 @@ async function createFollowUpTasks() {
   const { data: leads } = await supabase
     .from('all_leads')
     .select('id, customer_name, customer_phone_normalized, last_interaction_at, lead_stage, lead_score')
+    .eq('brand', 'bcon')
     .not('customer_phone_normalized', 'is', null)
     .not('lead_stage', 'in', '("Converted","Closed Won","Closed Lost","Cold")')
     .lt('last_interaction_at', twentyFourHoursAgo)
@@ -109,24 +110,28 @@ async function createFollowUpTasks() {
   if (!leads || leads.length === 0) return;
 
   for (const lead of leads) {
-    // Check if last message was from agent (not customer)
-    const { data: lastMsg } = await supabase
-      .from('conversations')
-      .select('sender, created_at')
-      .eq('lead_id', lead.id)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single();
+    try {
+      // Check if last message was from agent (not customer)
+      const { data: lastMsg } = await supabase
+        .from('conversations')
+        .select('sender, created_at')
+        .eq('lead_id', lead.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
 
-    if (lastMsg && lastMsg.sender === 'agent') {
-      await createTaskIfNotExists({
-        taskType: 'follow_up_24h',
-        leadId: lead.id,
-        leadPhone: lead.customer_phone_normalized,
-        leadName: lead.customer_name || 'Lead',
-        scheduledAt: new Date().toISOString(),
-        metadata: { lead_stage: lead.lead_stage, lead_score: lead.lead_score }
-      });
+      if (lastMsg && lastMsg.sender === 'agent') {
+        await createTaskIfNotExists({
+          taskType: 'follow_up_24h',
+          leadId: lead.id,
+          leadPhone: lead.customer_phone_normalized,
+          leadName: lead.customer_name || 'Lead',
+          scheduledAt: new Date().toISOString(),
+          metadata: { lead_stage: lead.lead_stage, lead_score: lead.lead_score }
+        });
+      }
+    } catch (err) {
+      console.error(`[FollowUp] Error for lead ${lead.id}:`, err.message);
     }
   }
 }
@@ -141,6 +146,7 @@ async function createColdLeadTasks() {
   const { data: leads } = await supabase
     .from('all_leads')
     .select('id, customer_name, customer_phone_normalized, last_interaction_at, lead_stage, lead_score')
+    .eq('brand', 'bcon')
     .not('customer_phone_normalized', 'is', null)
     .not('lead_stage', 'in', '("Converted","Closed Won","Closed Lost")')
     .lt('last_interaction_at', sevenDaysAgo)
@@ -149,17 +155,21 @@ async function createColdLeadTasks() {
   if (!leads || leads.length === 0) return;
 
   for (const lead of leads) {
-    await createTaskIfNotExists({
-      taskType: 're_engage',
-      leadId: lead.id,
-      leadPhone: lead.customer_phone_normalized,
-      leadName: lead.customer_name || 'Lead',
-      scheduledAt: new Date().toISOString(),
-      metadata: {
-        lead_stage: lead.lead_stage,
-        days_inactive: Math.floor((Date.now() - new Date(lead.last_interaction_at).getTime()) / (1000 * 60 * 60 * 24))
-      }
-    });
+    try {
+      await createTaskIfNotExists({
+        taskType: 're_engage',
+        leadId: lead.id,
+        leadPhone: lead.customer_phone_normalized,
+        leadName: lead.customer_name || 'Lead',
+        scheduledAt: new Date().toISOString(),
+        metadata: {
+          lead_stage: lead.lead_stage,
+          days_inactive: Math.floor((Date.now() - new Date(lead.last_interaction_at).getTime()) / (1000 * 60 * 60 * 24))
+        }
+      });
+    } catch (err) {
+      console.error(`[ColdLead] Error for lead ${lead.id}:`, err.message);
+    }
   }
 }
 
@@ -212,22 +222,25 @@ async function executeTask(task) {
   const phone = task.lead_phone?.replace(/\D/g, '');
   if (!phone) throw new Error('No phone number');
 
+  // Ensure phone has country code for WhatsApp API
+  const waPhone = phone.length === 10 ? `91${phone}` : phone;
+  const sessionId = task.metadata?.session_id;
   let message = '';
 
   switch (task.task_type) {
     case 'reminder_24h':
       message = `Hey ${task.lead_name}! Just a reminder - you have a call with BCON Club tomorrow at ${task.metadata?.booking_time}. Looking forward to connecting!`;
-      await supabase.from('whatsapp_sessions').update({ reminder_24h_sent: true }).eq('id', task.lead_id);
+      if (sessionId) await supabase.from('whatsapp_sessions').update({ reminder_24h_sent: true }).eq('id', sessionId);
       break;
 
     case 'reminder_1h':
       message = `Hi ${task.lead_name}! Your call with BCON Club is in about an hour at ${task.metadata?.booking_time}. Ready to discuss how AI can grow your business!`;
-      await supabase.from('whatsapp_sessions').update({ reminder_1h_sent: true }).eq('id', task.lead_id);
+      if (sessionId) await supabase.from('whatsapp_sessions').update({ reminder_1h_sent: true }).eq('id', sessionId);
       break;
 
     case 'reminder_30m':
       message = `${task.lead_name}, your BCON Club call is in 30 minutes at ${task.metadata?.booking_time}. See you soon!`;
-      await supabase.from('whatsapp_sessions').update({ reminder_30m_sent: true }).eq('id', task.lead_id);
+      if (sessionId) await supabase.from('whatsapp_sessions').update({ reminder_30m_sent: true }).eq('id', sessionId);
       break;
 
     case 'follow_up_24h':
@@ -246,17 +259,21 @@ async function executeTask(task) {
       throw new Error(`Unknown task type: ${task.task_type}`);
   }
 
-  await sendWhatsApp(phone, message);
+  await sendWhatsApp(waPhone, message);
 
   // Log to conversations table
-  await supabase.from('conversations').insert({
-    lead_id: task.lead_id,
-    content: message,
-    sender: 'agent',
-    channel: 'whatsapp',
-    message_type: 'text',
-    metadata: { task_type: task.task_type, task_id: task.id, autonomous: true }
-  });
+  if (task.lead_id) {
+    await supabase.from('conversations').insert({
+      lead_id: task.lead_id,
+      channel: 'whatsapp',
+      sender: 'agent',
+      content: message,
+      message_type: 'text',
+      metadata: { task_type: task.task_type, task_id: task.id, autonomous: true }
+    }).then(({ error }) => {
+      if (error) console.error('[executeTask] Conversation log error:', error.message);
+    });
+  }
 }
 
 // ============================================
@@ -282,8 +299,8 @@ async function sendWhatsApp(phone, message) {
   if (!res.ok) {
     const errBody = await res.text();
     // Check for 24h window expired (Meta error code 131047)
-    if (errBody.includes('131047')) {
-      const err = new Error(`WhatsApp 24h window expired for ${phone}`);
+    if (errBody.includes('131047') || errBody.includes('Re-engagement message')) {
+      const err = new Error(`24h_window expired for ${phone}`);
       err.is24hWindow = true;
       throw err;
     }
@@ -298,20 +315,26 @@ async function sendWhatsApp(phone, message) {
 // ============================================
 async function createTaskIfNotExists({ taskType, leadId, leadPhone, leadName, scheduledAt, metadata }) {
   // Check if same type + lead already exists and is pending or completed
-  const { data: existing } = await supabase
+  let query = supabase
     .from('agent_tasks')
     .select('id')
     .eq('task_type', taskType)
-    .eq('lead_id', leadId)
     .in('status', ['pending', 'completed'])
     .limit(1);
 
+  if (leadId) {
+    query = query.eq('lead_id', leadId);
+  } else {
+    query = query.eq('lead_phone', leadPhone);
+  }
+
+  const { data: existing } = await query;
   if (existing && existing.length > 0) return; // Already exists
 
   const { error } = await supabase.from('agent_tasks').insert({
     task_type: taskType,
     task_description: `Auto: ${taskType} for ${leadName}`,
-    lead_id: leadId,
+    lead_id: leadId || null,
     lead_phone: leadPhone,
     lead_name: leadName,
     scheduled_at: scheduledAt,

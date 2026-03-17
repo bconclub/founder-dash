@@ -13,3 +13,4 @@ ALTER TABLE agent_tasks ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '{}';
 -- Add composite indexes for the task worker queries
 CREATE INDEX IF NOT EXISTS idx_agent_tasks_status_scheduled ON agent_tasks(status, scheduled_at);
 CREATE INDEX IF NOT EXISTS idx_agent_tasks_type_lead ON agent_tasks(task_type, lead_id);
+CREATE INDEX IF NOT EXISTS idx_agent_tasks_type_phone ON agent_tasks(task_type, lead_phone);
