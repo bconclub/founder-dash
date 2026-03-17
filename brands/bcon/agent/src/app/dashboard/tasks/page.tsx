@@ -84,6 +84,7 @@ function statusPill(status: string) {
     failed: { bg: 'rgba(239,68,68,0.12)', color: '#ef4444', label: 'Failed' },
     failed_24h_window: { bg: 'rgba(239,68,68,0.12)', color: '#ef4444', label: 'Window Expired' },
     pending: { bg: 'rgba(245,158,11,0.12)', color: '#f59e0b', label: 'Pending' },
+    queued: { bg: 'rgba(107,114,128,0.12)', color: '#9ca3af', label: 'Queued' },
     in_queue: { bg: 'rgba(107,114,128,0.12)', color: '#9ca3af', label: 'Queued' },
   }
   const s = styles[status] || styles.pending
@@ -258,7 +259,7 @@ export default function TasksPage() {
     .sort((a, b) => new Date(b.completed_at || b.created_at).getTime() - new Date(a.completed_at || a.created_at).getTime())
 
   const upcomingTasks = tasks
-    .filter((t) => t.status === 'pending' || t.status === 'in_queue')
+    .filter((t) => t.status === 'pending' || t.status === 'in_queue' || t.status === 'queued')
     .sort((a, b) => new Date(a.scheduled_at || a.created_at).getTime() - new Date(b.scheduled_at || b.created_at).getTime())
 
   const hourlyData = buildHourlyChart(tasks)

@@ -1,11 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { getServiceClient, getClient } from '@/lib/services'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient()
+    // Use service role client to bypass RLS on agent_tasks table
+    const supabase = getServiceClient() || getClient()
+    if (!supabase) {
+      console.error('[tasks/route] No Supabase client available')
+      return NextResponse.json(
+        { error: 'No database connection', tasks: [], stats: { completedToday: 0, failedToday: 0, pendingCount: 0, queuedCount: 0, successRate: 100 } },
+        { status: 500 }
+      )
+    }
+
     const searchParams = request.nextUrl.searchParams
     const status = searchParams.get('status')
     const type = searchParams.get('type')
@@ -28,7 +37,10 @@ export async function GET(request: NextRequest) {
       if (to) query = query.lte('created_at', to)
 
       const { data, error } = await query.limit(200)
-      if (error) throw error
+      if (error) {
+        console.error('[tasks/route] Filtered query error:', error.message, error.code)
+        throw error
+      }
       return NextResponse.json({ tasks: data || [] })
     }
 
@@ -36,7 +48,7 @@ export async function GET(request: NextRequest) {
     let pendingQuery = supabase
       .from('agent_tasks')
       .select('*')
-      .in('status', ['pending', 'in_queue'])
+      .in('status', ['pending', 'in_queue', 'queued'])
       .order('scheduled_at', { ascending: true })
 
     if (type) pendingQuery = pendingQuery.eq('task_type', type)
@@ -57,8 +69,16 @@ export async function GET(request: NextRequest) {
       historyQuery.limit(200),
     ])
 
-    if (pendingResult.error) throw pendingResult.error
-    if (historyResult.error) throw historyResult.error
+    if (pendingResult.error) {
+      console.error('[tasks/route] Pending query error:', pendingResult.error.message, pendingResult.error.code)
+      throw pendingResult.error
+    }
+    if (historyResult.error) {
+      console.error('[tasks/route] History query error:', historyResult.error.message, historyResult.error.code)
+      throw historyResult.error
+    }
+
+    console.log(`[tasks/route] Found ${pendingResult.data?.length || 0} pending, ${historyResult.data?.length || 0} history tasks`)
 
     const tasks = [...(pendingResult.data || []), ...(historyResult.data || [])]
 
@@ -74,7 +94,7 @@ export async function GET(request: NextRequest) {
       (t) => (t.status === 'failed' || t.status === 'failed_24h_window') && t.completed_at && new Date(t.completed_at) >= todayStart
     ).length
     const pendingCount = (pendingResult.data || []).filter((t) => t.status === 'pending').length
-    // "In Queue" = tasks with scheduled_at in the next 1 hour
+    // "Firing Next Hour" = pending tasks with scheduled_at in the next 1 hour
     const queuedCount = (pendingResult.data || []).filter(
       (t) => t.status === 'pending' && t.scheduled_at && new Date(t.scheduled_at) <= oneHourFromNow
     ).length
@@ -93,10 +113,10 @@ export async function GET(request: NextRequest) {
       },
     })
   } catch (error) {
-    console.error('Error fetching tasks:', error)
+    console.error('[tasks/route] Error:', error)
     const errorMessage = error instanceof Error ? error.message : 'Unknown error'
     return NextResponse.json(
-      { error: 'Failed to fetch tasks', details: process.env.NODE_ENV === 'development' ? errorMessage : undefined },
+      { error: 'Failed to fetch tasks', details: errorMessage },
       { status: 500 }
     )
   }
