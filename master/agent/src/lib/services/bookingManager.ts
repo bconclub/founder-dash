@@ -258,6 +258,56 @@ export async function storeBooking(
     sessionData = data[0];
   }
 
+  // Create autonomous task worker entries for reminders + confirmation
+  try {
+    const bookingDateTime = new Date(`${booking.date}T${booking.time}`);
+    const taskPhone = booking.phone || '';
+    const taskName = booking.name || 'Lead';
+    const taskRefId = externalSessionId;
+
+    const reminderOffsets = [
+      { type: 'reminder_24h', offset: 24 * 60 * 60 * 1000 },
+      { type: 'reminder_1h', offset: 1 * 60 * 60 * 1000 },
+      { type: 'reminder_30m', offset: 30 * 60 * 1000 },
+    ];
+
+    for (const r of reminderOffsets) {
+      const scheduledAt = new Date(bookingDateTime.getTime() - r.offset);
+      if (scheduledAt > new Date()) {
+        await client.from('agent_tasks').insert({
+          task_type: r.type,
+          task_description: `Auto: ${r.type} for ${taskName}`,
+          lead_id: sessionData?.lead_id || currentLeadId || null,
+          lead_phone: taskPhone,
+          lead_name: taskName,
+          scheduled_at: scheduledAt.toISOString(),
+          status: 'pending',
+          metadata: { booking_date: booking.date, booking_time: booking.time, session_id: taskRefId },
+          created_at: new Date().toISOString()
+        }).then(({ error: taskErr }) => {
+          if (taskErr) console.error(`[bookingManager] Task creation error (${r.type}):`, taskErr);
+        });
+      }
+    }
+
+    // Post-booking confirmation task (fire immediately)
+    await client.from('agent_tasks').insert({
+      task_type: 'post_booking_confirmation',
+      task_description: `Auto: post_booking_confirmation for ${taskName}`,
+      lead_id: sessionData?.lead_id || currentLeadId || null,
+      lead_phone: taskPhone,
+      lead_name: taskName,
+      scheduled_at: new Date().toISOString(),
+      status: 'pending',
+      metadata: { booking_date: booking.date, booking_time: booking.time, session_id: taskRefId },
+      created_at: new Date().toISOString()
+    }).then(({ error: taskErr }) => {
+      if (taskErr) console.error('[bookingManager] Confirmation task error:', taskErr);
+    });
+  } catch (taskErr) {
+    console.error('[bookingManager] Failed to create task worker entries:', taskErr);
+  }
+
   // Sync to all_leads — ALWAYS attempt this, even if session update failed.
   // Resolve lead_id from session data, or from profile update, or by looking up the session.
   let leadId = sessionData?.lead_id || currentLeadId;
