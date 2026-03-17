@@ -1,8 +1,8 @@
 # PROXe — Build Truth
 
-**Last updated:** March 2026
+**Last updated:** 2026-03-17
 
-PROXe is a multi-brand AI agent platform. One codebase powers web chat, WhatsApp, and voice across multiple brands, each with its own database, theme, prompts, and deployment.
+PROXe is a multi-brand AI agent platform. One codebase powers web chat, WhatsApp, voice, and social channels across multiple brands, each with its own database, theme, prompts, and deployment.
 
 ---
 
@@ -19,13 +19,15 @@ master/agent/src/  ──sync──►  brands/{brand}/agent/src/  ──deploy�
 3. Each brand has its own `.env.local`, Supabase project, and public assets
 4. GitHub Actions deploy each brand independently to VPS
 
+**Note:** BCON (`brands/bcon/`) is currently the most evolved brand and has features ahead of master (voice, task worker, admin notes, human handoff). These are being upstreamed.
+
 ---
 
 ## Repository Structure
 
 ```
 PROXe/
-├── master/                        Source of truth
+├── master/                        Source of truth (base)
 │   ├── agent/                     Unified Next.js 14 app
 │   │   ├── src/
 │   │   │   ├── app/               App Router (pages + API routes)
@@ -56,8 +58,13 @@ PROXe/
 │   │   ├── agent/
 │   │   ├── nginx/
 │   │   └── supabase/migrations/   24 migration files
-│   └── bcon/                      BCON Club consulting
-│       ├── agent/
+│   └── bcon/                      BCON Club consulting (most evolved)
+│       ├── agent/                 Extended: admin notes, handoff, tools
+│       ├── voice/                 Standalone voice server (Node.js)
+│       │   ├── server.js          WebSocket voice pipeline
+│       │   ├── task-worker.js     Autonomous task worker (PM2 cron)
+│       │   ├── ecosystem.config.js PM2 config
+│       │   └── package.json
 │       └── nginx/
 │
 ├── scripts/                       Automation
@@ -84,6 +91,8 @@ PROXe/
 | UI | React 18, Tailwind CSS 3.4 |
 | Database | Supabase (PostgreSQL per brand) |
 | AI | Anthropic Claude SDK (`@anthropic-ai/sdk ^0.71.0`) |
+| Voice STT/TTS | Sarvam AI (speech-to-text, text-to-speech) |
+| Voice Telephony | Vobiz (WebSocket-based inbound calls) |
 | Charts | Recharts 2.10 |
 | Calendar | Google Calendar API (googleapis) |
 | Knowledge Base | pdf-parse, mammoth (DOCX), unpdf |
@@ -98,46 +107,54 @@ PROXe/
 ### Unified Agent — One App, All Channels
 
 ```
-Website (embed.js)    WhatsApp (webhook)    Voice    Social DMs
-       │                     │                │           │
-       ▼                     ▼                ▼           ▼
-┌──────────────────────────────────────────────────────────────┐
-│                    UNIFIED AGENT (Next.js 14)                │
-│                                                              │
-│  lib/agent-core/         Channel-agnostic AI brain           │
-│    engine.ts             Orchestrator: AgentInput → Output   │
-│    claudeClient.ts       Claude API (stream + sync)          │
-│    promptBuilder.ts      Channel-aware system prompts        │
-│    knowledgeSearch.ts    RAG search (Supabase vectors)       │
-│    intentExtractor.ts    User type, course, timeline         │
-│    followUpGenerator.ts  Suggested response buttons          │
-│    summarizer.ts         Conversation summarization          │
-│                                                              │
-│  lib/services/           Shared business logic               │
-│    sessionManager.ts     Session CRUD (web/WA/voice)         │
-│    leadManager.ts        Lead creation + phone dedup         │
-│    conversationLogger.ts Message logging + summaries         │
-│    bookingManager.ts     Google Calendar integration         │
-│    contextBuilder.ts     Cross-channel context assembly      │
-│    supabase.ts           Service-role Supabase client        │
-│                                                              │
-│  configs/                Brand identity                      │
-│    index.ts              Config loader (env + hostname)      │
-│    proxe.config.ts       PROXe colors, buttons, avatar      │
-│    brand.config.ts       Windchasers config                  │
-│    bcon.config.ts        BCON Club config                    │
-│    prompts/              System prompts per brand            │
-└──────────────────────────────────────────────────────────────┘
-                            │
-                   Supabase (per-brand DB)
+Website (embed.js)    WhatsApp (webhook)    Voice (Vobiz)    Social DMs
+       │                     │                  │                 │
+       ▼                     ▼                  ▼                 ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│                    UNIFIED AGENT (Next.js 14)                        │
+│                                                                      │
+│  lib/agent-core/         Channel-agnostic AI brain                   │
+│    engine.ts             Orchestrator: AgentInput → Output           │
+│    claudeClient.ts       Claude API (stream + sync + tools)          │
+│    promptBuilder.ts      Channel-aware, brand-aware prompts          │
+│    knowledgeSearch.ts    RAG search (Supabase vectors)               │
+│    intentExtractor.ts    User type, course, timeline                 │
+│    followUpGenerator.ts  Claude-powered contextual buttons           │
+│    summarizer.ts         Conversation summarization                  │
+│                                                                      │
+│  lib/services/           Shared business logic                       │
+│    sessionManager.ts     Session CRUD (web/WA/voice)                 │
+│    leadManager.ts        Lead creation + phone dedup                 │
+│    conversationLogger.ts Message logging + summaries                 │
+│    bookingManager.ts     Google Calendar + Meet links                │
+│    contextBuilder.ts     Cross-channel context + admin notes         │
+│    whatsappSender.ts     WhatsApp message dispatch (template + free) │
+│    supabase.ts           Service-role Supabase client                │
+│                                                                      │
+│  configs/                Brand identity                              │
+│    index.ts              Config loader (env + hostname)              │
+│    proxe.config.ts       PROXe colors, buttons, avatar              │
+│    brand.config.ts       Windchasers config                          │
+│    bcon.config.ts        BCON Club config                            │
+│    prompts/              System prompts per brand                    │
+└──────────────────────────────────────────────────────────────────────┘
+         │                                              │
+  Supabase (per-brand DB)                    Voice Server (standalone)
+                                             Vobiz → Sarvam STT → Claude
+                                             → Sarvam TTS → WebSocket audio
 ```
 
 ### Key Design Decisions
 
 - **Channel-agnostic core**: `engine.ts` takes `AgentInput`, returns `AgentOutput` — no HTTP/SSE knowledge
+- **Tool-enabled AI**: Engine uses Claude tool_use for booking (`check_availability`, `book_consultation`) and lead profiling (`update_lead_profile`) across all channels
+- **Retry + graceful fallback**: AI generation retries once, then returns human-sounding fallback + flags lead for human follow-up
+- **Human handoff detection**: Regex-based detection of "talk to a human" patterns → flags `needs_human_followup` on lead
+- **Admin notes in AI context**: Team notes from dashboard flow into Claude's system prompt via `crossChannelContext`
+- **Booking loop prevention**: `bookingsCompletedThisSession` Set prevents re-booking within a single tool session
 - **Client-safe widget**: Widget uses `fetch()` to API routes, never imports server-only modules (googleapis, fs)
 - **CSS scoping**: Widget uses `data-theme` attribute for style isolation from dashboard
-- **Brand detection**: `NEXT_PUBLIC_BRAND_ID` env var → hostname fallback → defaults to windchasers
+- **Brand detection**: `NEXT_PUBLIC_BRAND_ID` env var → hostname fallback → defaults per brand
 - **Static env access**: `NEXT_PUBLIC_*` vars must use static string keys (Next.js build-time inlining)
 - **Backward-compat stubs**: `/api/chat` proxies to `/api/agent/web/chat` for old embed scripts
 
@@ -150,6 +167,7 @@ Website (embed.js)    WhatsApp (webhook)    Voice    Social DMs
 | Windchasers | `windchasers` | Gold/Brown (aviation-gold) | 4000 | 3003 | proxe.windchasers.in |
 | PROXe | `proxe` | Purple (proxe-purple) | 4001 | 3000 | — |
 | BCON Club | `bcon` | Electric Purple (bcon-electric) | 4003 | 3005 | proxe.bconclub.com |
+| BCON Voice | — | — | — | 3006 | voiceproxe.bconclub.com |
 | Master | — | — | 4002 | — | — |
 
 ---
@@ -160,10 +178,12 @@ Website (embed.js)    WhatsApp (webhook)    Voice    Social DMs
 
 | Endpoint | Method | Channel | Response |
 |---|---|---|---|
-| `/api/agent/web/chat` | POST | Web | SSE stream (`chunk`, `followUps`, `done`) |
+| `/api/agent/web/chat` | POST | Web | JSON (tool-enabled response + follow-ups) |
 | `/api/agent/whatsapp/webhook` | POST | WhatsApp | JSON (stores incoming message) |
 | `/api/agent/whatsapp/respond` | POST | WhatsApp | JSON (AI response, plain text) |
 | `/api/agent/whatsapp/meta` | POST | WhatsApp | Meta Cloud API webhook |
+| `/api/agent/voice/answer` | POST | Voice | JSON (Vobiz call answer) |
+| `/api/agent/voice/test-call` | POST | Voice | JSON (trigger test call) |
 | `/api/agent/calendar/book` | POST | Any | JSON (Google Calendar event) |
 | `/api/agent/calendar/availability` | POST | Any | JSON (available time slots) |
 | `/api/agent/summarize` | POST | Any | JSON (conversation summary) |
@@ -177,6 +197,7 @@ Website (embed.js)    WhatsApp (webhook)    Voice    Social DMs
 | `/api/dashboard/leads/[id]/stage` | Update lead stage |
 | `/api/dashboard/leads/[id]/score` | Lead score breakdown |
 | `/api/dashboard/leads/[id]/activities` | Activity log CRUD |
+| `/api/dashboard/leads/[id]/admin-notes` | Admin notes CRUD (dual-writes to unified_context + activities) |
 | `/api/dashboard/metrics` | Overall dashboard metrics |
 | `/api/dashboard/channels/[channel]/metrics` | Per-channel analytics |
 | `/api/dashboard/bookings` | Calendar bookings |
@@ -186,6 +207,17 @@ Website (embed.js)    WhatsApp (webhook)    Voice    Social DMs
 | `/api/dashboard/whatsapp/messages` | WhatsApp messages |
 | `/api/dashboard/summarize` | Conversation summaries |
 | `/api/dashboard/settings/widget-style` | Widget styling config |
+| `/api/dashboard/inbox/reply` | Inbox reply (AI generate or send via channel) |
+| `/api/dashboard/tasks` | Autonomous task monitoring |
+
+### Cron & Admin Routes
+
+| Endpoint | Purpose |
+|---|---|
+| `/api/cron/booking-reminders` | Sends 24h/1h/30m reminders via WhatsApp templates |
+| `/api/admin/backfill-calendar` | Backfill Google Calendar events |
+| `/api/admin/backfill-leads` | Backfill lead records |
+| `/api/whatsapp/templates` | WhatsApp template management |
 
 ### Knowledge Base Routes
 
@@ -248,7 +280,11 @@ Website (embed.js)    WhatsApp (webhook)    Voice    Social DMs
 | `/dashboard/leads` | Leads management table |
 | `/dashboard/metrics` | Analytics charts |
 | `/dashboard/bookings` | Calendar view |
-| `/dashboard/inbox` | Conversation inbox |
+| `/dashboard/inbox` | Multi-channel conversation inbox |
+| `/dashboard/tasks` | Autonomous task monitoring |
+| `/dashboard/agents` | Agent management hub |
+| `/dashboard/agents` (Voice tab) | Voice agent testing + status |
+| `/dashboard/agents` (WhatsApp tab) | WhatsApp agent config |
 | `/dashboard/channels/web` | Web chat analytics |
 | `/dashboard/channels/whatsapp` | WhatsApp analytics |
 | `/dashboard/channels/voice` | Voice channel analytics |
@@ -277,8 +313,9 @@ Each brand has its own Supabase project. Key tables:
 | `voice_sessions` | Voice call sessions | — |
 | `social_sessions` | Social media sessions | — |
 | `conversations` | All messages (cross-channel) | — |
+| `agent_tasks` | Autonomous task queue + execution logs | — |
 | `lead_stage_changes` | Stage transition audit log | — |
-| `activities` | Team-logged activities | — |
+| `activities` | Team-logged activities + admin notes | — |
 
 ### Auth & Config
 
@@ -311,6 +348,8 @@ all_leads (
   last_interaction_at TIMESTAMPTZ,
   brand TEXT,                           -- proxe | windchasers | bcon
   unified_context JSONB,               -- cross-channel data, brand-specific fields
+  needs_human_followup BOOLEAN,        -- flagged for human agent
+  metadata JSONB,                      -- human_followup_reason, human_followup_at
   lead_score INTEGER (0-100),
   lead_stage TEXT,                      -- New | Engaged | Qualified | High Intent | Booking Made | Converted | Cold
   sub_stage TEXT,                       -- proposal | negotiation | on-hold
@@ -323,22 +362,42 @@ all_leads (
 )
 ```
 
+### unified_context JSONB Structure
+
+```jsonc
+{
+  "web": {
+    "booking_date": "2026-03-20",
+    "booking_time": "3:00 PM",
+    "profile": { "full_name", "email", "city", "company", "business_type", "notes" }
+  },
+  "whatsapp": {
+    "booking_date": "...",
+    "booking_time": "...",
+    "profile": { "full_name", "email", "city", "company", "business_type", "notes" }
+  },
+  "admin_notes": [
+    { "text": "...", "created_by": "admin@...", "created_at": "2026-03-17T..." }
+  ]
+}
+```
+
 ### Lead Stages
 
 | Stage | Score Range | Meaning |
 |---|---|---|
-| New | 0–20 | Initial contact |
-| Engaged | 21–40 | Active conversation |
-| Qualified | 41–60 | Shows interest, gave contact info |
-| High Intent | 61–80 | Pricing/timeline discussions |
-| Booking Made | 81–90 | Appointment scheduled |
-| Converted | 91–100 | Purchase/enrollment completed |
+| New | 0-20 | Initial contact |
+| Engaged | 21-40 | Active conversation |
+| Qualified | 41-60 | Shows interest, gave contact info |
+| High Intent | 61-80 | Pricing/timeline discussions |
+| Booking Made | 81-90 | Appointment scheduled |
+| Converted | 91-100 | Purchase/enrollment completed |
 | Cold | N/A | 30+ days inactive |
 | Closed Lost | N/A | Explicit rejection |
 
 ### Lead Score Formula
 
-**Total = (AI × 0.6) + (Activity × 0.3) + (Business × 0.1)**
+**Total = (AI x 0.6) + (Activity x 0.3) + (Business x 0.1)**
 
 - **AI Score (60%)**: Intent keywords (40%) + Sentiment (30%) + Buying signals (30%)
 - **Activity Score (30%)**: Message count + Response rate + Recency + Channel mix bonus
@@ -346,15 +405,176 @@ all_leads (
 
 ---
 
+## Agent Core — How It Works
+
+### Engine Pipeline (engine.ts)
+
+```
+Message in → extractIntent() → searchKnowledgeBase() → checkBooking()
+           → buildPrompt() → generateResponseWithTools() → cleanResponse()
+           → generateFollowUps() → AgentOutput
+```
+
+**Key behaviors by channel:**
+
+| Channel | Tools | Follow-ups | Formatting | Booking |
+|---|---|---|---|---|
+| Web | check_availability, book_consultation, update_lead_profile | Claude-generated buttons | HTML (`<br><br>`, `**bold**`) | Requires email or phone |
+| WhatsApp | check_availability, book_consultation, update_lead_profile | None (no buttons) | Plain text only, no markdown | Phone known from WA |
+| Voice | None | None | Plain spoken text | N/A |
+
+**Error handling:** Retry once after 2s delay. If both attempts fail → return friendly fallback message + flag lead for human follow-up.
+
+### Tool Definitions (engine.ts)
+
+| Tool | Purpose | Required Fields |
+|---|---|---|
+| `check_availability` | Get open calendar slots for a date | `date` (YYYY-MM-DD) |
+| `book_consultation` | Create Google Calendar event + store booking | `date`, `time`, `name`, `phone`, `title` |
+| `update_lead_profile` | Save lead info to unified_context | Any of: `full_name`, `email`, `city`, `company`, `business_type`, `notes` |
+
+### Prompt Architecture (promptBuilder.ts)
+
+```
+System Prompt = getBrandSystemPrompt(brand, knowledgeBase, messageCount)
+              + userName line
+              + channelInstructions (WhatsApp rules / Web rules / Voice rules)
+              + crossChannelContext (admin notes)
+
+User Prompt   = conversationSummary
+              + recentHistory
+              + bookingNote
+              + formattingInstructions
+              + dateContext
+              + firstMessageGuidance (messageCount 0-1)
+              + thirdMessageGuidance (messageCount 3)
+              + "Latest user message: {message}"
+```
+
+**Channel instructions:**
+- **WhatsApp**: Plain text only, no HTML/markdown, 1-2 sentences max, booking tool flow documented
+- **Web**: 2-4 sentences, `**bold**` allowed, collect name/email early, booking tools enabled
+- **Voice**: Brief, natural-sounding, no formatting
+
+### Intent Extraction (intentExtractor.ts)
+
+Keyword-based classification:
+- **Questions**: cost/price/fee, eligibility/requirements, timeline/duration, course/program
+- **User type**: student, parent, professional
+- **Course interest**: pilot, helicopter, drone, cabin crew
+- **Timeline**: asap, 1-3mo, 6+mo, 1yr+
+- **Booking intent**: call, demo, book, schedule, meeting, appointment
+
+### Follow-Up Buttons (followUpGenerator.ts)
+
+Brand-specific button pools (windchasers, bcon, proxe). Logic:
+- First message → 2 buttons (Claude-generated + pool)
+- Subsequent → 1 button (contextual to cost/interest/generic)
+- Booking-aware filtering (no booking buttons if already booked)
+- Explore click → show brand's explore buttons
+- Web only (WhatsApp/voice get no buttons)
+
+### Human Handoff Detection (engine.ts — bcon)
+
+Regex patterns match phrases like "talk to a human", "real person", "stop the bot", "need someone real". When detected:
+1. AI still generates a response
+2. Lead flagged: `needs_human_followup = true` on `all_leads`
+3. Reason + timestamp stored in `metadata`
+
+---
+
+## Brand Prompts
+
+### BCON (bcon-prompt.ts)
+
+**Tone:** Bold, confident, direct. Like a smart founder.
+**Strategy:** Understand pain point → Probe deeper → Push AI Brand Audit
+**Conversation flow:**
+1. Engage (messages 1-2): Greet + ask what they do
+2. Probe (messages 3-5): Dig into pain point, one question at a time
+3. Connect (messages 5-7): Mirror problem, connect to AI
+4. Push AI Brand Audit (message 6+): Position audit as next step
+
+**First message rules:** Max 1-2 sentences, greet warmly + ask what they do, never parrot form data, never qualify early.
+**Objection handling:** Cost → "Audit scopes that out", Info → "Audit > brochure", Thinking → reference their pain.
+**CTA:** AI Brand Audit (never "book a call" or "strategy session").
+
+### Windchasers (windchasers-prompt.ts)
+
+**Tone:** Honest, warm, professional aviation career advisor.
+**Programs:** CPL, Helicopter, Cabin Crew, Drone, DGCA Ground Classes.
+**Pricing:** ₹40-75 lakhs (only when asked). Timeline: 18-24 months.
+**Qualification flow (after message 3+):** User type → Education → Timeline → Course interest.
+**Data collection:** Name (after 3 msgs) → Phone (after 5) → Email (after 7).
+**De-escalation:** Acknowledge frustration immediately, hand off to admissions, never repeat/pitch after frustration.
+
+---
+
+## Voice Agent (BCON only)
+
+Standalone Node.js server at `brands/bcon/voice/`.
+
+### Pipeline
+
+```
+Inbound call (Vobiz) → WebSocket connection → Pre-recorded greeting
+  → User speaks → Sarvam STT (multipart) → Text
+  → Claude Haiku (with lead context from Supabase) → Response text
+  → Sarvam TTS → WAV audio → Chunked delivery (300ms @ 16kHz)
+  → Repeat until hangup
+```
+
+**Phone:** +918046733388
+**Server:** voiceproxe.bconclub.com:3006
+**Features:** Pre-loaded greeting audio, WAV header stripping, silence detection, conversation history, lead context loading from Supabase.
+
+---
+
+## Autonomous Task Worker (BCON only)
+
+Runs via PM2 every 5 minutes (`brands/bcon/voice/task-worker.js`).
+
+### Task Types
+
+| Task | Trigger | Action |
+|---|---|---|
+| Booking reminder (24h) | 24h before call | WhatsApp template message |
+| Booking reminder (1h) | 1h before call | Free-form WhatsApp message |
+| Booking reminder (30m) | 30m before call | Free-form WhatsApp message |
+| Follow-up | Lead at specific stage | Automated WhatsApp follow-up |
+| Cold re-engagement | Lead inactive 30+ days | Re-engagement message |
+
+**Tables:** `agent_tasks` (queue), `whatsapp_sessions` (booking tracking).
+**WhatsApp message types:** Template messages (outside 24h window), free-form messages (within 24h window).
+
+---
+
+## Inbox & Multi-Channel View
+
+### Features
+- Multi-channel badges (web, whatsapp, voice, social) with visual indicators
+- Unified conversation view across all channels
+- Customer journey timeline in sidebar
+- Voice tab integration
+- Reply system: AI-generated responses for review, or direct send via channel
+- 24-hour window validation for WhatsApp replies
+- Admin notes passed to AI for context-aware responses
+
+### Reply Flow (`/api/dashboard/inbox/reply`)
+- **"generate" mode**: AI generates response draft using full engine pipeline (with admin notes)
+- **"send" mode**: Dispatches message via appropriate channel (WhatsApp API or web session)
+
+---
+
 ## Components
 
-### Dashboard (25+ files)
+### Dashboard (30+ files)
 
 | Component | Purpose |
 |---|---|
 | `DashboardLayout.tsx` | Main layout with sidebar |
-| `LeadsTable.tsx` | Leads list + pagination |
-| `LeadDetailsModal.tsx` | Lead detail view |
+| `LeadsTable.tsx` | Leads list + pagination + channel badges |
+| `LeadDetailsModal.tsx` | Lead detail view + admin notes section |
 | `LeadStageSelector.tsx` | Stage/status dropdown |
 | `MetricsDashboard.tsx` | Analytics overview |
 | `WebMetrics.tsx` | Web channel analytics |
@@ -368,6 +588,14 @@ all_leads (
 | `ActivityLoggerModal.tsx` | Activity timeline |
 | `ErrorLogsModal.tsx` | Error viewer |
 | `LoadingOverlay.tsx` | Loading indicator |
+
+### Agent Management Pages
+
+| Component | Purpose |
+|---|---|
+| `AgentsClient.tsx` | Agent management hub (tabs) |
+| `VoiceAgentTab.tsx` | Voice agent status + test calls |
+| `WhatsAppAgentTab.tsx` | WhatsApp agent configuration |
 
 ### Widget (6 files)
 
@@ -414,7 +642,44 @@ interface BrandConfig {
 }
 ```
 
-Brand detection order: `NEXT_PUBLIC_BRAND_ID` → `NEXT_PUBLIC_BRAND` → hostname → fallback (windchasers).
+Brand detection order: `NEXT_PUBLIC_BRAND_ID` → `NEXT_PUBLIC_BRAND` → hostname → fallback.
+
+---
+
+## Agent Core Types
+
+```typescript
+type Channel = 'web' | 'whatsapp' | 'voice' | 'social';
+
+interface AgentInput {
+  channel: Channel;
+  message: string;
+  messageCount: number;
+  sessionId: string;
+  userProfile: { name?, email?, phone?, websiteUrl? };
+  conversationHistory: HistoryEntry[];
+  summary: string;
+  usedButtons?: string[];
+  metadata?: Record<string, any>;
+  adminNotes?: Array<{ text: string; created_by: string; created_at: string }>;
+}
+
+interface AgentOutput {
+  response: string;
+  followUps: string[];
+  updatedSummary?: string;
+  intent: ExtractedIntent;
+  leadId?: string | null;
+}
+
+interface ExtractedIntent {
+  buttonClicks?: string[];
+  questionsAsked?: string[];
+  userType?: 'student' | 'parent' | 'professional';
+  courseInterest?: 'pilot' | 'helicopter' | 'drone' | 'cabin';
+  timeline?: 'asap' | '1-3mo' | '6+mo' | '1yr+';
+}
+```
 
 ---
 
@@ -436,7 +701,7 @@ CLAUDE_MODEL=claude-haiku-4-5-20251001
 NEXT_PUBLIC_BRAND_ID=windchasers|proxe|bcon
 NEXT_PUBLIC_APP_URL=https://proxe.yourdomain.com
 
-# Google Calendar (optional — Windchasers uses this)
+# Google Calendar (optional)
 GOOGLE_CALENDAR_ID=xxx@group.calendar.google.com
 GOOGLE_CALENDAR_TIMEZONE=Asia/Kolkata
 GOOGLE_SERVICE_ACCOUNT_EMAIL=xxx@xxx.iam.gserviceaccount.com
@@ -447,7 +712,10 @@ META_WHATSAPP_ACCESS_TOKEN=...
 META_WHATSAPP_PHONE_NUMBER_ID=...
 META_WHATSAPP_VERIFY_TOKEN=...
 
-# Scoring (optional)
+# Voice — Sarvam AI (BCON only)
+SARVAM_API_KEY=...
+
+# Scoring / Cron (optional)
 CRON_SECRET=xxx
 ```
 
@@ -473,11 +741,11 @@ npm run dev:master         # port 4002 (template)
 ### Workflow: Making Changes
 
 ```
-1. Edit in master/agent/src/         ← all code changes here
-2. npm run dev:master                ← test locally (port 4002)
-3. npm run sync                      ← push master → all brands
-4. npm run build                     ← build all brands
-5. git add + commit + push
+1. Edit in master/agent/src/         <- all code changes here
+2. npm run dev:master                <- test locally (port 4002)
+3. npm run sync                      <- push master -> all brands
+4. npm run build                     <- build all brands
+5. git add + commit + push to main
 ```
 
 ### Sync Behavior
@@ -534,6 +802,7 @@ Three workflows in `.github/workflows/`:
 | Windchasers | 4000 | 3003 | proxe.windchasers.in |
 | PROXe | 4001 | 3000 | — |
 | BCON | 4003 | 3005 | proxe.bconclub.com |
+| BCON Voice | — | 3006 | voiceproxe.bconclub.com |
 | Master | 4002 | — | — |
 
 ### Nginx
@@ -551,7 +820,7 @@ Each brand has `brands/{brand}/nginx/proxe-unified.conf`:
 # Root package.json
 npm run dev              # concurrently run all brands
 npm run build            # build all brands sequentially
-npm run sync             # master → all brands
+npm run sync             # master -> all brands
 npm run kill-ports       # kill dev server ports (4000-4003)
 
 # Per-brand agent
@@ -559,34 +828,6 @@ npm run dev              # next dev -p {PORT}
 npm run build            # prebuild (set-build-time.js) + next build
 npm start                # next start -p {PORT}
 npm run type-check       # tsc --noEmit
-```
-
----
-
-## Agent Core Types
-
-```typescript
-type Channel = 'web' | 'whatsapp' | 'voice' | 'social';
-
-interface AgentInput {
-  channel: Channel;
-  message: string;
-  messageCount: number;
-  sessionId: string;
-  userProfile: { name?, email?, phone?, websiteUrl? };
-  conversationHistory: HistoryEntry[];
-  summary: string;
-  usedButtons?: string[];
-  metadata?: Record<string, any>;
-}
-
-interface AgentOutput {
-  response: string;
-  followUps: string[];
-  updatedSummary?: string;
-  intent: ExtractedIntent;
-  leadId?: string | null;
-}
 ```
 
 ---
@@ -601,20 +842,25 @@ interface AgentOutput {
 | Knowledge search | `src/lib/agent-core/knowledgeSearch.ts` |
 | Intent extraction | `src/lib/agent-core/intentExtractor.ts` |
 | Follow-up generator | `src/lib/agent-core/followUpGenerator.ts` |
+| Summarizer | `src/lib/agent-core/summarizer.ts` |
 | Session manager | `src/lib/services/sessionManager.ts` |
 | Lead manager | `src/lib/services/leadManager.ts` |
 | Booking manager | `src/lib/services/bookingManager.ts` |
 | Context builder | `src/lib/services/contextBuilder.ts` |
 | Conversation logger | `src/lib/services/conversationLogger.ts` |
+| WhatsApp sender | `src/lib/services/whatsappSender.ts` |
 | Supabase service client | `src/lib/services/supabase.ts` |
 | Lead score calculator | `src/lib/leadScoreCalculator.ts` |
 | Brand config loader | `src/configs/index.ts` |
 | Windchasers config | `src/configs/brand.config.ts` |
 | PROXe config | `src/configs/proxe.config.ts` |
 | BCON config | `src/configs/bcon.config.ts` |
+| BCON prompt | `src/configs/prompts/bcon-prompt.ts` |
+| Windchasers prompt | `src/configs/prompts/windchasers-prompt.ts` |
 | Chat widget | `src/components/widget/ChatWidget.tsx` |
 | Dashboard layout | `src/components/dashboard/DashboardLayout.tsx` |
 | Leads table | `src/components/dashboard/LeadsTable.tsx` |
+| Lead details modal | `src/components/dashboard/LeadDetailsModal.tsx` |
 | Founder dashboard | `src/components/dashboard/FounderDashboard.tsx` |
 | Chat hook | `src/hooks/useChat.ts` |
 | Stream hook | `src/hooks/useChatStream.ts` |
@@ -622,9 +868,37 @@ interface AgentOutput {
 | Theme CSS | `src/styles/theme.css` |
 | Root layout | `src/app/layout.tsx` |
 | Widget layout | `src/app/widget/layout.tsx` |
+| Voice server | `brands/bcon/voice/server.js` |
+| Task worker | `brands/bcon/voice/task-worker.js` |
 | Next.js config | `next.config.js` |
 | Tailwind config | `tailwind.config.ts` |
 | Brand onboarding | `master/BRAND-ONBOARDING.md` |
+
+---
+
+## master/ vs brands/bcon/ Differences
+
+BCON is the most evolved brand. Key differences from master:
+
+| Feature | master/ | brands/bcon/ |
+|---|---|---|
+| Default brand fallback | `windchasers` | `bcon` |
+| Engine retry + fallback | No | Yes (retry once, then friendly fallback) |
+| Human handoff detection | No | Yes (regex patterns → flag lead) |
+| `update_lead_profile` tool | No | Yes (saves name/email/city/company/business) |
+| `book_consultation.title` field | No | Yes (AI-generated call title) |
+| Booking loop prevention | No | Yes (`bookingsCompletedThisSession` Set) |
+| Admin notes in AI context | No | Yes (via `crossChannelContext`) |
+| Web channel instructions | No | Yes (collect name/email, 2-4 sentences) |
+| Web booking tools | No | Yes (same tools as WhatsApp) |
+| Frustrated customer de-escalation | No | Yes (in windchasers prompt) |
+| WhatsApp sender service | No | Yes (`whatsappSender.ts`) |
+| Voice server | No | Yes (standalone Node.js) |
+| Task worker | No | Yes (PM2 cron, booking reminders) |
+| Inbox reply API | No | Yes (AI generate + send) |
+| Admin notes API | No | Yes (dual-write) |
+| Cron: booking reminders | No | Yes (24h/1h/30m) |
+| Agent management pages | No | Yes (Voice + WhatsApp tabs) |
 
 ---
 
@@ -641,12 +915,20 @@ The unified agent was built in 7 phases:
 
 Then the repo was restructured from `brand/*/dashboard/build/` into the current `master/ + brands/` layout.
 
+Recent evolution (Phase 8+):
+8. Voice agent (Vobiz + Sarvam STT/TTS + Claude Haiku)
+9. Autonomous task worker (booking reminders, follow-ups, cold re-engagement)
+10. Admin notes + human handoff detection
+11. Multi-channel inbox (unified conversation view, channel badges, journey timeline)
+12. Tool-enabled web chat (booking tools for web, not just WhatsApp)
+13. Lead profile tool (`update_lead_profile` — AI saves lead info during conversation)
+
 ---
 
 ## What's Live (March 2026)
 
-| Brand | Dashboard | Web Agent | WhatsApp | Knowledge Base |
-|---|---|---|---|---|
-| Windchasers | proxe.windchasers.in | widget embedded | Meta Cloud API | 31 migrations |
-| PROXe | deployed | deployed | — | 24 migrations |
-| BCON | proxe.bconclub.com | deployed | Meta Cloud API | new (no migrations) |
+| Brand | Dashboard | Web Agent | WhatsApp | Voice | Task Worker | Knowledge Base |
+|---|---|---|---|---|---|---|
+| Windchasers | proxe.windchasers.in | widget embedded | Meta Cloud API | — | — | 31 migrations |
+| PROXe | deployed | deployed | — | — | — | 24 migrations |
+| BCON | proxe.bconclub.com | deployed + booking tools | Meta Cloud API | voiceproxe.bconclub.com | PM2 cron (5min) | active |
