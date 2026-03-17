@@ -126,9 +126,10 @@ wss.on('connection', (ws, req) => {
         console.log('Vobiz start event keys:', JSON.stringify(msg.start));
         console.log('Vobiz extra_headers:', JSON.stringify(msg.extra_headers));
 
-        // Extract caller phone from extra_headers string
+        // Extract caller phone from extra_headers (Vobiz sends "{X-PH-callerPhone: 919353253817, ...}")
+        console.log('extra_headers typeof:', typeof msg.extra_headers);
         const extraHeaders = msg.extra_headers ? (typeof msg.extra_headers === 'string' ? msg.extra_headers : JSON.stringify(msg.extra_headers)) : '';
-        const phoneMatch = extraHeaders.match(/callerPhone[=:](\d+)/);
+        const phoneMatch = extraHeaders.match(/callerPhone[:\s]+(\d+)/);
         const callerPhone = phoneMatch ? phoneMatch[1] : null;
         const normalizedPhone = callerPhone ? (callerPhone.length === 12 && callerPhone.startsWith('91') ? callerPhone.slice(2) : callerPhone) : null;
         ws.callerPhone = callerPhone;
@@ -501,8 +502,10 @@ async function getAIResponse(transcript, conversationHistory, detectedLanguage) 
             if (event.type === 'content_block_delta' && event.delta?.text) {
               buffer += event.delta.text;
               fullText += event.delta.text;
-              // Check for sentence boundary: . ? ! followed by space/end
-              const sentenceMatch = buffer.match(/^(.*?[.?!])(?:\s|$)/);
+              // Check for sentence boundary: . ? ! followed by space+capital letter
+              // Skip abbreviations like A.I. U.S. (period after single uppercase letter)
+              // Only split once buffer has 40+ characters to avoid premature cuts
+              const sentenceMatch = buffer.length >= 40 && buffer.match(/^(.*?(?<![A-Z])[.?!])\s+(?=[A-Z])/);
               if (sentenceMatch) {
                 clearTimeout(timeout);
                 response.data.destroy();
