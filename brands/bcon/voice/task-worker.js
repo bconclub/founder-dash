@@ -280,7 +280,7 @@ async function executeTask(task) {
 // WHATSAPP SEND (Meta Cloud API)
 // ============================================
 async function sendWhatsApp(phone, message) {
-  const url = `https://graph.facebook.com/v18.0/${WA_PHONE_ID}/messages`;
+  const url = `https://graph.facebook.com/v21.0/${WA_PHONE_ID}/messages`;
 
   const res = await fetch(url, {
     method: 'POST',
@@ -290,6 +290,7 @@ async function sendWhatsApp(phone, message) {
     },
     body: JSON.stringify({
       messaging_product: 'whatsapp',
+      recipient_type: 'individual',
       to: phone,
       type: 'text',
       text: { body: message }
