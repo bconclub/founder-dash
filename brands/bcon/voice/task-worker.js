@@ -22,6 +22,16 @@ async function main() {
     await createBookingReminderTasks();
     await createFollowUpTasks();
     await createColdLeadTasks();
+
+    // Log task counts before processing
+    const { data: taskCounts } = await supabase
+      .from('agent_tasks')
+      .select('status')
+      .in('status', ['pending', 'queued']);
+    const pendingCount = (taskCounts || []).filter(t => t.status === 'pending').length;
+    const queuedCount = (taskCounts || []).filter(t => t.status === 'queued').length;
+    console.log(`[TaskWorker] Tasks: ${pendingCount} pending (will fire), ${queuedCount} queued (needs approval)`);
+
     await processPendingTasks();
     console.log(`[TaskWorker] Run complete`);
   } catch (err) {
@@ -146,7 +156,8 @@ async function createFollowUpTasks() {
           leadPhone: lead.customer_phone_normalized,
           leadName: lead.customer_name || 'Lead',
           scheduledAt,
-          metadata: { lead_stage: lead.lead_stage, lead_score: lead.lead_score }
+          metadata: { lead_stage: lead.lead_stage, lead_score: lead.lead_score },
+          initialStatus: 'queued',
         });
       }
     } catch (err) {
@@ -186,7 +197,8 @@ async function createColdLeadTasks() {
         metadata: {
           lead_stage: lead.lead_stage,
           days_inactive: Math.floor((Date.now() - new Date(lead.last_interaction_at).getTime()) / (1000 * 60 * 60 * 24))
-        }
+        },
+        initialStatus: 'queued',
       });
     } catch (err) {
       console.error(`[ColdLead] Error for lead ${lead.id}:`, err.message);
@@ -515,22 +527,23 @@ async function sendWhatsAppTemplate(phone, leadName) {
 // HELPER: Create task if not already exists
 // Dedup: pending (any age) + completed (last 7 days only)
 // ============================================
-async function createTaskIfNotExists({ taskType, leadId, leadPhone, leadName, scheduledAt, metadata }) {
+async function createTaskIfNotExists({ taskType, leadId, leadPhone, leadName, scheduledAt, metadata, initialStatus }) {
+  const status = initialStatus || 'pending';
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
-  // Check for existing pending task (any age)
-  let pendingQuery = supabase
+  // Check for existing pending/queued task (any age)
+  let activeQuery = supabase
     .from('agent_tasks')
     .select('id')
     .eq('task_type', taskType)
-    .eq('status', 'pending')
+    .in('status', ['pending', 'queued'])
     .limit(1);
 
-  if (leadId) pendingQuery = pendingQuery.eq('lead_id', leadId);
-  else pendingQuery = pendingQuery.eq('lead_phone', leadPhone);
+  if (leadId) activeQuery = activeQuery.eq('lead_id', leadId);
+  else activeQuery = activeQuery.eq('lead_phone', leadPhone);
 
-  const { data: pendingExists } = await pendingQuery;
-  if (pendingExists && pendingExists.length > 0) return;
+  const { data: activeExists } = await activeQuery;
+  if (activeExists && activeExists.length > 0) return;
 
   // Check for recently completed task (last 7 days only)
   let completedQuery = supabase
@@ -554,7 +567,7 @@ async function createTaskIfNotExists({ taskType, leadId, leadPhone, leadName, sc
     lead_phone: leadPhone,
     lead_name: leadName,
     scheduled_at: scheduledAt,
-    status: 'pending',
+    status,
     metadata,
     created_at: new Date().toISOString()
   });
@@ -562,7 +575,7 @@ async function createTaskIfNotExists({ taskType, leadId, leadPhone, leadName, sc
   if (error) {
     console.error(`[CreateTask] Error creating ${taskType} for ${leadName}:`, error.message);
   } else {
-    console.log(`[CreateTask] Created ${taskType} for ${leadName}, scheduled at ${scheduledAt}`);
+    console.log(`[CreateTask] Created ${taskType} (${status}) for ${leadName}, scheduled at ${scheduledAt}`);
   }
 }
 
