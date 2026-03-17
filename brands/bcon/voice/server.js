@@ -139,21 +139,24 @@ wss.on('connection', (ws, req) => {
         // Create lead and voice session in Supabase
         if (normalizedPhone) {
           try {
-            const { data: existingLead } = await supabase
+            const { data: existingLeads } = await supabase
               .from('all_leads')
-              .select('id, first_touchpoint')
-              .eq('customer_phone_normalized', normalizedPhone)
-              .eq('brand', 'bcon')
-              .maybeSingle();
+              .select('id, first_touchpoint, brand')
+              .eq('customer_phone_normalized', normalizedPhone);
+
+            // Prefer bcon-branded lead, otherwise use first match
+            const existingLead = existingLeads?.find(l => l.brand === 'bcon') || existingLeads?.[0] || null;
 
             let leadId;
             if (existingLead) {
               leadId = existingLead.id;
+              const updates = { last_touchpoint: 'voice', last_interaction_at: new Date().toISOString() };
+              if (existingLead.brand === 'default') updates.brand = 'bcon';
               await supabase
                 .from('all_leads')
-                .update({ last_touchpoint: 'voice', last_interaction_at: new Date().toISOString() })
+                .update(updates)
                 .eq('id', leadId);
-              console.log('Updated existing lead:', leadId);
+              console.log('Updated existing lead:', leadId, 'brand:', existingLead.brand);
             } else {
               const { data: newLead } = await supabase
                 .from('all_leads')
