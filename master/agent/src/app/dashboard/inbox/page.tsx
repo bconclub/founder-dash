@@ -49,7 +49,7 @@ const ChannelIcon = ({ channel, size = 16, active = false }: { channel: string; 
   }
 };
 
-const ALL_CHANNELS = ['web', 'whatsapp'];
+const ALL_CHANNELS = ['web', 'whatsapp', 'voice'];
 
 // Score Ring — circular progress indicator with score inside
 const ScoreRing = ({ score, size = 28 }: { score: number | null; size?: number }) => {
@@ -648,10 +648,11 @@ export default function InboxPage() {
   async function fetchMessages(leadId: string) {
     setMessagesLoading(true)
     try {
-      console.log('Fetching messages for lead:', leadId, 'channel:', selectedChannel)
+      console.log('Fetching messages for lead:', leadId, 'channel:', selectedChannel, 'filter:', channelFilter)
 
-      // First, try to fetch messages for the selected channel if one is set
-      if (selectedChannel) {
+      // When channelFilter is 'all', fetch ALL messages across all channels (unified view)
+      // When a specific channel is selected, filter by it
+      if (channelFilter !== 'all' && selectedChannel) {
         const { data: channelData, error: channelError } = await supabase
           .from('conversations')
           .select('*')
@@ -669,8 +670,8 @@ export default function InboxPage() {
         }
       }
 
-      // Fallback: Fetch all conversations for this lead (regardless of channel)
-      console.log('Fetching all conversations for lead (no channel filter)')
+      // Unified view: Fetch all conversations for this lead across all channels
+      console.log('Fetching all conversations for lead (unified multi-channel)')
       const { data, error } = await supabase
         .from('conversations')
         .select('*')
@@ -1033,7 +1034,7 @@ export default function InboxPage() {
             />
           </div>
           <div className="flex gap-1">
-            {['all', 'web', 'whatsapp'].map((ch) => (
+            {['all', 'web', 'whatsapp', 'voice'].map((ch) => (
               <button
                 key={ch}
                 onClick={() => setChannelFilter(ch)}
@@ -1174,12 +1175,19 @@ export default function InboxPage() {
                   }}
                 >
                   <div className="px-3 py-2.5">
-                    {/* Line 1: Name + Timestamp */}
+                    {/* Line 1: Name + Channel Badges + Timestamp */}
                     <div className="flex items-center">
                       <span className="text-[12px] font-semibold truncate flex-1" style={{ color: 'var(--text-primary)' }}>
                         {conv.lead_name || conv.lead_phone || 'Unknown'}
                       </span>
-                      <span className="text-[9px] flex-shrink-0 ml-2" style={{ color: '#6b7280' }}>
+                      {conv.channels && conv.channels.length > 0 && (
+                        <span className="flex items-center gap-0.5 mr-2 flex-shrink-0">
+                          {conv.channels.map((ch: string) => (
+                            <ChannelIcon key={ch} channel={ch} size={10} active={true} />
+                          ))}
+                        </span>
+                      )}
+                      <span className="text-[9px] flex-shrink-0" style={{ color: '#6b7280' }}>
                         {timeAgo(conv.last_message_at)}
                       </span>
                     </div>
@@ -1348,6 +1356,9 @@ export default function InboxPage() {
                             >
                               {isCustomer ? selectedConversation?.lead_name || 'Customer' : 'PROXe AI'}
                             </span>
+                            <span className="text-[8px] uppercase px-1 py-px rounded" style={{ color: 'var(--text-muted)', background: 'var(--bg-tertiary)' }}>
+                              {msg.channel === 'whatsapp' ? 'WA' : msg.channel === 'voice' ? 'Voice' : msg.channel === 'web' ? 'Web' : msg.channel}
+                            </span>
                           </div>
                           <span className="text-[8px]" style={{ color: 'var(--text-muted)' }}>
                             {formatTime(msg.created_at)}
@@ -1434,6 +1445,7 @@ export default function InboxPage() {
             const uc = leadDetails.unified_context || {}
             const webCtx = uc.web || {}
             const waCtx = uc.whatsapp || {}
+            const voiceCtx = uc.voice || {}
             const bconCtx = uc.bcon || {}
             const profileCtx = waCtx.profile || webCtx.profile || {}
 
@@ -1598,6 +1610,38 @@ export default function InboxPage() {
                 </a>
               )}
             </div>
+
+            {/* Section 3c -- Voice Activity */}
+            {(voiceCtx.call_duration_seconds || voiceCtx.last_call_date || channels.includes('voice')) && (
+              <div className="px-4 py-3 border-b space-y-1.5" style={{ borderColor: 'var(--border-primary)' }}>
+                <p className="text-[10px] font-bold uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>
+                  <img src="/ai-voice-stroke-rounded.svg" alt="Voice" width={10} height={10}
+                    style={{ filter: 'invert(1) brightness(2)', display: 'inline', verticalAlign: 'middle', marginRight: 4 }} />
+                  Voice
+                </p>
+                {voiceCtx.call_duration_seconds && (
+                  <div className="flex items-center gap-2">
+                    <MdPhone size={13} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                    <span className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>
+                      Last call: {Math.floor(voiceCtx.call_duration_seconds / 60)}m {voiceCtx.call_duration_seconds % 60}s
+                    </span>
+                  </div>
+                )}
+                {voiceCtx.last_call_date && (
+                  <div className="flex items-center gap-2">
+                    <MdEvent size={13} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                    <span className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>
+                      {new Date(voiceCtx.last_call_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </span>
+                  </div>
+                )}
+                {voiceCtx.conversation_summary && (
+                  <p className="text-[11px] leading-relaxed mt-1" style={{ color: 'var(--text-secondary)' }}>
+                    {voiceCtx.conversation_summary.length > 120 ? voiceCtx.conversation_summary.substring(0, 120) + '...' : voiceCtx.conversation_summary}
+                  </p>
+                )}
+              </div>
+            )}
 
             {/* Section 4 -- Business Snapshot */}
             {(businessType || urgency || volume || hasWebsite !== null || hasAI !== null) && (
