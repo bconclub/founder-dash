@@ -184,7 +184,34 @@ export default function TasksPage() {
   const hourlyData = buildHourlyChart(tasks)
 
   if (loading) {
-    return <TasksSkeleton />
+    return (
+      <div style={{ padding: '24px' }}>
+        <style>{`@keyframes skpulse { 0%,100% { opacity: 0.4 } 50% { opacity: 0.8 } }`}</style>
+        <h1 style={{ fontSize: 24, fontWeight: 600, marginBottom: 20, color: 'white' }}>Tasks</h1>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 24 }}>
+          {[0,1,2,3].map(i => (
+            <div key={i} style={{ background: 'rgba(255,255,255,0.04)', borderRadius: 12, padding: 20, height: 90, animation: 'skpulse 1.5s ease-in-out infinite', animationDelay: `${i * 0.15}s` }}>
+              <div style={{ height: 12, width: 80, background: 'rgba(255,255,255,0.06)', borderRadius: 4, marginBottom: 12 }} />
+              <div style={{ height: 28, width: 50, background: 'rgba(255,255,255,0.08)', borderRadius: 4 }} />
+            </div>
+          ))}
+        </div>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+          {[0,1,2,3,4].map(i => (
+            <div key={i} style={{ height: 32, width: 80, background: 'rgba(255,255,255,0.06)', borderRadius: 16, animation: 'skpulse 1.5s ease-in-out infinite' }} />
+          ))}
+        </div>
+        {[0,1,2,3,4].map(i => (
+          <div key={i} style={{ display: 'flex', gap: 12, padding: '12px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+            <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'rgba(255,255,255,0.06)', flexShrink: 0, animation: 'skpulse 1.5s ease-in-out infinite', animationDelay: `${i * 0.1}s` }} />
+            <div style={{ flex: 1 }}>
+              <div style={{ height: 14, width: '60%', background: 'rgba(255,255,255,0.06)', borderRadius: 4, marginBottom: 8, animation: 'skpulse 1.5s ease-in-out infinite', animationDelay: `${i * 0.1}s` }} />
+              <div style={{ height: 12, width: '40%', background: 'rgba(255,255,255,0.04)', borderRadius: 4, animation: 'skpulse 1.5s ease-in-out infinite', animationDelay: `${i * 0.1}s` }} />
+            </div>
+          </div>
+        ))}
+      </div>
+    )
   }
 
   return (
