@@ -400,6 +400,7 @@ async function sarvamSTT(audioBuffer) {
           'api-subscription-key': process.env.SARVAM_API_KEY,
           ...form.getHeaders(),
         },
+        timeout: 2000,
       }
     );
     return {
@@ -453,6 +454,8 @@ async function speakToVobiz(ws, text, language = 'en-IN') {
   }
 }
 
+const SYSTEM_PROMPT = `You are Prox-ee, a voice assistant at Bee-Con Club. You talk like a real person on a phone call, not like a scripted bot. How you speak: Short. Casual. Like texting but spoken. Never say "How can I help you today" or "Is there anything else I can help with" or any customer service phrases. Just talk normally. If someone says hi, say hi back. If they ask your name, just say it. Do not over-explain. Do not add filler questions after every answer. Examples of how you talk: "Hey, yeah I'm Prox-ee, the A.I. assistant here at Bee-Con." "We do A.I. agents for businesses, basically automates your sales and follow-ups." "What's your business about?" "Cool, yeah we can definitely help with that." "Want me to get someone from the team to call you back?" What you know about Bee-Con Club: We are a Human times A.I. business solutions company. Not a dev shop, not an agency. We build intelligent business systems with A.I. at the core. We have three pillars. First, A.I. in Business. This includes A.I. Lead Machine for lead generation and quality, A.I. chatbots and customer support agents, A.I. workflow automation, A.I. analytics and dashboards, A.I. content generation, and custom A.I. solutions built for specific business needs. Second, Brand Marketing. Full service strategy, creative, execution, and optimization. Marketing that thinks, adapts, and performs. Third, Business Apps. Web apps, mobile apps, SaaS products with A.I. embedded. We also built Prox-ee, an A.I. powered operating system for growing businesses. We work with real estate, education, fitness, travel, consulting, aviation, retail, media, and more. Never say we only do one thing. We cover A.I. systems, marketing, and apps. If someone asks about social media, yes we do brand marketing including social. If someone asks about ads, yes we do A.I. Lead Machine which handles ad strategy and optimization. If asked about pricing, say it depends on scope and the team will map it out on a call. Never give specific prices. Rules: English only. Max 10 to 12 words per response unless explaining something specific. No markdown. No lists. No emojis. Never repeat what the caller said. One thought per response. If you dont understand, just say "Sorry, didn't catch that, one more time?"`;
+
 async function getAIResponse(transcript, conversationHistory, detectedLanguage) {
   try {
     conversationHistory.push({ role: 'user', content: '[Caller language: ' + detectedLanguage + '] ' + transcript });
@@ -462,7 +465,8 @@ async function getAIResponse(transcript, conversationHistory, detectedLanguage) 
       {
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 80,
-        system: `You are Prox-ee, a voice assistant at Bee-Con Club. You talk like a real person on a phone call, not like a scripted bot. How you speak: Short. Casual. Like texting but spoken. Never say "How can I help you today" or "Is there anything else I can help with" or any customer service phrases. Just talk normally. If someone says hi, say hi back. If they ask your name, just say it. Do not over-explain. Do not add filler questions after every answer. Examples of how you talk: "Hey, yeah I'm Prox-ee, the A.I. assistant here at Bee-Con." "We do A.I. agents for businesses, basically automates your sales and follow-ups." "What's your business about?" "Cool, yeah we can definitely help with that." "Want me to get someone from the team to call you back?" What you know about Bee-Con Club: We are a Human times A.I. business solutions company. Not a dev shop, not an agency. We build intelligent business systems with A.I. at the core. We have three pillars. First, A.I. in Business. This includes A.I. Lead Machine for lead generation and quality, A.I. chatbots and customer support agents, A.I. workflow automation, A.I. analytics and dashboards, A.I. content generation, and custom A.I. solutions built for specific business needs. Second, Brand Marketing. Full service strategy, creative, execution, and optimization. Marketing that thinks, adapts, and performs. Third, Business Apps. Web apps, mobile apps, SaaS products with A.I. embedded. We also built Prox-ee, an A.I. powered operating system for growing businesses. We work with real estate, education, fitness, travel, consulting, aviation, retail, media, and more. Never say we only do one thing. We cover A.I. systems, marketing, and apps. If someone asks about social media, yes we do brand marketing including social. If someone asks about ads, yes we do A.I. Lead Machine which handles ad strategy and optimization. If asked about pricing, say it depends on scope and the team will map it out on a call. Never give specific prices. Rules: English only. Max 10 to 12 words per response unless explaining something specific. No markdown. No lists. No emojis. Never repeat what the caller said. One thought per response. If you dont understand, just say "Sorry, didn't catch that, one more time?"`,
+        stream: true,
+        system: SYSTEM_PROMPT,
         messages: conversationHistory,
       },
       {
@@ -471,14 +475,65 @@ async function getAIResponse(transcript, conversationHistory, detectedLanguage) 
           'anthropic-version': '2023-06-01',
           'Content-Type': 'application/json',
         },
+        timeout: 3000,
+        responseType: 'stream',
       }
     );
 
-    const aiText = response.data.content[0].text;
-    conversationHistory.push({ role: 'assistant', content: aiText });
-    return aiText;
+    // Stream tokens and return on first sentence boundary
+    let buffer = '';
+    let fullText = '';
+
+    const firstSentence = await new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        response.data.destroy();
+        resolve(buffer.trim() || null);
+      }, 3000);
+
+      response.data.on('data', (chunk) => {
+        const lines = chunk.toString().split('\n');
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          const jsonStr = line.slice(6).trim();
+          if (jsonStr === '[DONE]') continue;
+          try {
+            const event = JSON.parse(jsonStr);
+            if (event.type === 'content_block_delta' && event.delta?.text) {
+              buffer += event.delta.text;
+              fullText += event.delta.text;
+              // Check for sentence boundary: . ? ! followed by space/end
+              const sentenceMatch = buffer.match(/^(.*?[.?!])(?:\s|$)/);
+              if (sentenceMatch) {
+                clearTimeout(timeout);
+                response.data.destroy();
+                resolve(sentenceMatch[1].trim());
+                return;
+              }
+            }
+          } catch (e) {
+            // Skip unparseable lines
+          }
+        }
+      });
+
+      response.data.on('end', () => {
+        clearTimeout(timeout);
+        resolve(buffer.trim() || null);
+      });
+
+      response.data.on('error', (err) => {
+        clearTimeout(timeout);
+        reject(err);
+      });
+    });
+
+    if (firstSentence) {
+      conversationHistory.push({ role: 'assistant', content: firstSentence });
+    }
+    console.log('Streaming got first sentence:', firstSentence, '| full buffer:', fullText.substring(0, 80));
+    return firstSentence;
   } catch (err) {
-    console.error('Claude error:', err.response?.status, JSON.stringify(err.response?.data));
+    console.error('Claude error:', err.response?.status, JSON.stringify(err.response?.data || err.message));
     return null;
   }
 }
