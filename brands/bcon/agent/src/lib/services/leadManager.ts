@@ -213,6 +213,7 @@ export async function ensureOrUpdateLead(
       email: email,
       phone: phone,
       customer_phone_normalized: normalizedPhone,
+      brand: process.env.NEXT_PUBLIC_BRAND || 'bcon',
       first_touchpoint: channel,
       last_touchpoint: channel,
       last_interaction_at: new Date().toISOString(),

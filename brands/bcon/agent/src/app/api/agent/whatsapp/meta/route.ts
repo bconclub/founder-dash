@@ -398,10 +398,16 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
       console.error('[meta/webhook] Failed to send reply to', customerPhone);
     }
 
-    // 11. Link lead_id to whatsapp session
+    // 11. Link lead_id + phone to whatsapp session
+    const normalizedSessionPhone = normalizePhone(customerPhone);
     await supabase
       .from('whatsapp_sessions')
-      .update({ lead_id: leadId })
+      .update({
+        lead_id: leadId,
+        customer_phone: customerPhone,
+        customer_phone_normalized: normalizedSessionPhone,
+        customer_name: customerName !== 'WhatsApp User' ? customerName : undefined,
+      })
       .eq('external_session_id', sessionId);
 
     // 12. Fire-and-forget: trigger AI scoring

@@ -37,7 +37,7 @@ async function createBookingReminderTasks() {
 
   const { data: sessions } = await supabase
     .from('whatsapp_sessions')
-    .select('id, whatsapp_id, customer_name, booking_date, booking_time, reminder_24h_sent, reminder_1h_sent, reminder_30m_sent, customer_phone_normalized, lead_id')
+    .select('id, customer_name, booking_date, booking_time, reminder_24h_sent, reminder_1h_sent, reminder_30m_sent, customer_phone_normalized, lead_id, external_session_id')
     .not('booking_date', 'is', null)
     .not('booking_time', 'is', null);
 
@@ -49,7 +49,26 @@ async function createBookingReminderTasks() {
       if (bookingDateTime < now) continue;
 
       const hoursUntil = (bookingDateTime - now) / (1000 * 60 * 60);
-      const phone = session.customer_phone_normalized || session.whatsapp_id;
+
+      // Resolve phone: session field → lead lookup → session ID parse
+      let phone = session.customer_phone_normalized;
+      if (!phone && session.lead_id) {
+        const { data: lead } = await supabase
+          .from('all_leads')
+          .select('customer_phone_normalized, phone')
+          .eq('id', session.lead_id)
+          .maybeSingle();
+        phone = lead?.customer_phone_normalized || lead?.phone?.replace(/\D/g, '').slice(-10) || null;
+      }
+      if (!phone && session.external_session_id) {
+        // Parse phone from session ID format: wa_meta_9876543210
+        const match = session.external_session_id.match(/wa_meta_(\d+)/);
+        if (match) phone = match[1];
+      }
+      if (!phone) {
+        console.log(`[BookingReminder] No phone for session ${session.id}, skipping`);
+        continue;
+      }
       const name = session.customer_name || 'there';
 
       if (hoursUntil <= 25 && hoursUntil > 23 && !session.reminder_24h_sent) {
@@ -100,7 +119,7 @@ async function createFollowUpTasks() {
   const { data: leads } = await supabase
     .from('all_leads')
     .select('id, customer_name, customer_phone_normalized, last_interaction_at, lead_stage, lead_score')
-    .eq('brand', 'bcon')
+    .in('brand', ['bcon', 'default'])
     .not('customer_phone_normalized', 'is', null)
     .not('lead_stage', 'in', '("Converted","Closed Won","Closed Lost","Cold")')
     .lt('last_interaction_at', twentyFourHoursAgo)
@@ -146,7 +165,7 @@ async function createColdLeadTasks() {
   const { data: leads } = await supabase
     .from('all_leads')
     .select('id, customer_name, customer_phone_normalized, last_interaction_at, lead_stage, lead_score')
-    .eq('brand', 'bcon')
+    .in('brand', ['bcon', 'default'])
     .not('customer_phone_normalized', 'is', null)
     .not('lead_stage', 'in', '("Converted","Closed Won","Closed Lost")')
     .lt('last_interaction_at', sevenDaysAgo)
