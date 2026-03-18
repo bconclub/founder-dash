@@ -319,6 +319,9 @@ async function executeTask(task) {
       return await executeSendMessage(task, waPhone,
         `Great news ${task.lead_name}! Your call with BCON Club is confirmed for ${task.metadata?.booking_date} at ${task.metadata?.booking_time}. We'll discuss how to set up an AI system for your business. See you then!`);
 
+    case 'human_callback':
+      return await executeHumanCallback(task, waPhone);
+
     default:
       throw new Error(`Unknown task type: ${task.task_type}`);
   }
@@ -361,6 +364,29 @@ async function executeNudgeWaiting(task, waPhone) {
   }
 
   return await executeSendMessage(task, waPhone, message);
+}
+
+/**
+ * Human callback: admin scheduled a follow-up from a note.
+ * Check if lead responded since task was created — if so, skip.
+ */
+async function executeHumanCallback(task, waPhone) {
+  if (task.lead_id) {
+    const { data: recentMsg } = await supabase
+      .from('conversations')
+      .select('id')
+      .eq('lead_id', task.lead_id)
+      .eq('sender', 'customer')
+      .gt('created_at', task.created_at)
+      .limit(1);
+
+    if (recentMsg && recentMsg.length > 0) {
+      return { skipped: true, reason: 'Lead responded since callback was scheduled' };
+    }
+  }
+
+  return await executeSendMessage(task, waPhone,
+    `Hey ${task.lead_name}, following up as promised. Got a few minutes to chat?`);
 }
 
 /**
@@ -508,6 +534,16 @@ async function sendWhatsAppTemplate(phone, task) {
     ];
   } else if (taskType === 're_engage') {
     templateName = 'bcon_reengagement';
+    components = [
+      {
+        type: 'body',
+        parameters: [
+          { type: 'text', text: leadName },
+        ]
+      }
+    ];
+  } else if (taskType === 'human_callback') {
+    templateName = 'bcon_proxe_followup';
     components = [
       {
         type: 'body',
