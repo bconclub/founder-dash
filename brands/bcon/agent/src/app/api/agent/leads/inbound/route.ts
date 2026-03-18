@@ -151,10 +151,16 @@ export async function POST(request: NextRequest) {
       is_new: isNew,
       task_created: !taskErr,
     })
-  } catch (error) {
-    console.error('[inbound] Error:', error)
+  } catch (error: any) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : typeof error === 'string'
+          ? error
+          : error?.message || error?.details || JSON.stringify(error) || 'Unknown error'
+    console.error('[inbound] Error:', message, error)
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Unknown error' },
+      { error: message },
       { status: 500 }
     )
   }
