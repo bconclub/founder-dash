@@ -72,13 +72,13 @@ function renderMarkdown(text: string) {
   const parts = text.split(/(\*\*.*?\*\*)/g);
   return parts.map((part, i) => {
     if (part.startsWith('**') && part.endsWith('**')) {
-      return <strong key={i} className="font-bold text-gray-900 dark:text-white">{part.slice(2, -2)}</strong>;
+      return <strong key={i} className="font-bold text-[var(--text-primary)]">{part.slice(2, -2)}</strong>;
     }
     return part;
   });
 }
 
-/** Render summary as plain text — just sentences, no formatting */
+/** Render summary as plain text - just sentences, no formatting */
 function renderSummary(text: string) {
   if (!text) return null;
   return (
@@ -1031,7 +1031,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
       >
         <dialog
           open={isOpen}
-          className="lead-modal-dialog lead-details-modal relative bg-white dark:bg-[#1A1A1A] rounded-lg shadow-xl z-50 flex flex-col"
+          className="lead-modal-dialog lead-details-modal relative bg-[var(--bg-primary)] rounded-lg shadow-xl z-50 flex flex-col"
           style={{
             width: '54vw',
             maxWidth: '720px',
@@ -1043,16 +1043,16 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
           aria-modal="true"
         >
           {/* Single Row Header: Contact Card (Left) + Journey & Stats (Right) */}
-          <header className="lead-modal-header lead-details-modal-header flex flex-row items-stretch gap-6 p-4 border-b border-gray-200 dark:border-[#262626] flex-shrink-0 relative min-h-[140px]">
+          <header className="lead-modal-header lead-details-modal-header flex flex-row items-stretch gap-6 p-4 border-b border-[var(--border-primary)] flex-shrink-0 relative min-h-[140px]">
             {/* LEFT HALF: Contact Card - Business Card Style */}
-            <section className="lead-contact-card flex-1 flex flex-col justify-between h-full p-3 bg-gray-50/50 dark:bg-gray-800/30 rounded-xl border border-gray-200/50 dark:border-gray-700/30">
+            <section className="lead-contact-card flex-1 flex flex-col justify-between h-full p-3 bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-primary)]">
               {/* Top Section: Name, Score, Status */}
               <div className="lead-contact-card-header">
                 {/* Name + Score badge (top row) */}
                 <div className="lead-contact-name-row flex items-start justify-between mb-1 gap-2">
                   <h2
                     id="lead-modal-title"
-                    className="lead-contact-name text-xl font-bold text-gray-900 dark:text-white leading-tight flex-1 min-w-0 truncate"
+                    className="lead-contact-name text-xl font-bold text-[var(--text-primary)] leading-tight flex-1 min-w-0 truncate"
                   >
                     {currentLead.name || 'Unknown Lead'}
                   </h2>
@@ -1106,13 +1106,13 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                   <button
                     ref={stageButtonRef}
                     onClick={() => setShowStageDropdown(!showStageDropdown)}
-                    className="lead-stage-edit-button p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex-shrink-0"
+                    className="lead-stage-edit-button p-0.5 rounded hover:bg-[var(--bg-hover)] transition-colors flex-shrink-0"
                     title="Edit stage"
                     aria-label="Edit lead stage"
                     aria-expanded={showStageDropdown}
                     aria-haspopup="true"
                   >
-                    <MdEdit size={12} className="text-gray-500 dark:text-gray-400" />
+                    <MdEdit size={12} className="text-[var(--text-muted)]" />
                   </button>
                 </div>
               </div>
@@ -1122,12 +1122,12 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                 {/* Email with icon */}
                 {currentLead.email && (
                   <div className="lead-contact-email flex items-center gap-1.5">
-                    <div className="lead-contact-icon w-6 h-6 rounded bg-gray-100 dark:bg-gray-700/50 flex items-center justify-center flex-shrink-0" aria-hidden="true">
-                      <MdEmail className="text-gray-600 dark:text-gray-300" size={14} />
+                    <div className="lead-contact-icon w-6 h-6 rounded bg-[var(--bg-secondary)] flex items-center justify-center flex-shrink-0" aria-hidden="true">
+                      <MdEmail className="text-[var(--text-secondary)]" size={14} />
                     </div>
                     <a
                       href={`mailto:${currentLead.email}`}
-                      className="lead-contact-email-link text-sm font-medium text-gray-700 dark:text-gray-300 leading-tight truncate"
+                      className="lead-contact-email-link text-sm font-medium text-[var(--text-secondary)] leading-tight truncate"
                     >
                       {currentLead.email}
                     </a>
@@ -1137,12 +1137,12 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                 {/* Phone with icon */}
                 {currentLead.phone && (
                   <div className="lead-contact-phone flex items-center gap-1.5">
-                    <div className="lead-contact-icon w-6 h-6 rounded bg-gray-100 dark:bg-gray-700/50 flex items-center justify-center flex-shrink-0" aria-hidden="true">
-                      <MdPhone className="text-gray-600 dark:text-gray-300" size={14} />
+                    <div className="lead-contact-icon w-6 h-6 rounded bg-[var(--bg-secondary)] flex items-center justify-center flex-shrink-0" aria-hidden="true">
+                      <MdPhone className="text-[var(--text-secondary)]" size={14} />
                     </div>
                     <a
                       href={`tel:${currentLead.phone}`}
-                      className="lead-contact-phone-link text-sm font-medium text-gray-700 dark:text-gray-300 leading-tight"
+                      className="lead-contact-phone-link text-sm font-medium text-[var(--text-secondary)] leading-tight"
                     >
                       {currentLead.phone}
                     </a>
@@ -1150,7 +1150,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                 )}
 
                 {!currentLead.email && !currentLead.phone && (
-                  <p className="lead-contact-empty text-sm text-gray-500 dark:text-gray-400">No contact info</p>
+                  <p className="lead-contact-empty text-sm text-[var(--text-muted)]">No contact info</p>
                 )}
               </address>
             </section>
@@ -1159,7 +1159,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
             <section className="lead-journey-stats-section flex-1 flex flex-col h-full gap-4">
               {/* Customer Journey - TOP */}
               <section className="lead-journey-section">
-                <h3 className="lead-journey-title text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">Customer Journey</h3>
+                <h3 className="lead-journey-title text-xs font-semibold text-[var(--text-secondary)] mb-2">Customer Journey</h3>
                 <div className="lead-journey-row flex items-center gap-1.5">
                   {activeChannels.length > 0 ? (
                     <nav className="lead-journey-channels flex items-center gap-1.5 flex-wrap" aria-label="Customer journey channels">
@@ -1174,13 +1174,13 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                             <channel.icon size={14} />
                           </div>
                           {index < activeChannels.length - 1 && (
-                            <MdChevronRight className="lead-journey-separator text-gray-400 dark:text-gray-500 flex-shrink-0" size={16} aria-hidden="true" />
+                            <MdChevronRight className="lead-journey-separator text-[var(--text-muted)] flex-shrink-0" size={16} aria-hidden="true" />
                           )}
                         </div>
                       ))}
                     </nav>
                   ) : (
-                    <p className="lead-journey-empty text-xs text-gray-500 dark:text-gray-400">No channels yet</p>
+                    <p className="lead-journey-empty text-xs text-[var(--text-muted)]">No channels yet</p>
                   )}
                   <button
                     onClick={() => { setShowLogCallForm(!showLogCallForm); if (showAdminNoteInput) setShowAdminNoteInput(false) }}
@@ -1210,7 +1210,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
 
                 {/* Inline admin note input */}
                 {showAdminNoteInput && (
-                  <div className="lead-admin-note-input flex items-center gap-2 mt-2 p-2 bg-white dark:bg-[#1A1A1A] rounded-lg border border-gray-200 dark:border-[#262626]">
+                  <div className="lead-admin-note-input flex items-center gap-2 mt-2 p-2 bg-[var(--bg-primary)] rounded-lg border border-[var(--border-primary)]">
                     <input
                       type="text"
                       value={adminNoteText}
@@ -1219,7 +1219,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                         if (e.key === 'Enter' && adminNoteText.trim()) handleSaveAdminNote()
                       }}
                       placeholder="Add context about this lead..."
-                      className="flex-1 text-xs bg-transparent border-none outline-none text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
+                      className="flex-1 text-xs bg-transparent border-none outline-none text-[var(--text-primary)] placeholder-[var(--text-muted)]"
                       autoFocus
                       disabled={savingAdminNote}
                     />
@@ -1228,7 +1228,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                       className={`lead-admin-note-mic w-6 h-6 flex items-center justify-center rounded-full transition-colors ${
                         isListening
                           ? 'bg-red-500 text-white animate-pulse'
-                          : 'text-gray-400 hover:text-white hover:bg-gray-600'
+                          : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'
                       }`}
                       title={isListening ? 'Stop dictation' : 'Voice dictation'}
                       aria-label={isListening ? 'Stop voice dictation' : 'Start voice dictation'}
@@ -1248,11 +1248,11 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
 
                 {/* Log a Call form */}
                 {showLogCallForm && (
-                  <div className="lead-log-call-form flex items-center gap-2 mt-2 p-2 bg-white dark:bg-[#1A1A1A] rounded-lg border border-gray-200 dark:border-[#262626]">
+                  <div className="lead-log-call-form flex items-center gap-2 mt-2 p-2 bg-[var(--bg-primary)] rounded-lg border border-[var(--border-primary)]">
                     <select
                       value={logCallOutcome}
                       onChange={(e) => setLogCallOutcome(e.target.value)}
-                      className="text-xs bg-transparent border border-gray-300 dark:border-gray-600 rounded px-1.5 py-1 text-gray-900 dark:text-white outline-none"
+                      className="text-xs bg-transparent border border-[var(--border-primary)] rounded px-1.5 py-1 text-[var(--text-primary)] outline-none"
                       disabled={savingLogCall}
                     >
                       <option value="Connected">Connected</option>
@@ -1268,7 +1268,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                         if (e.key === 'Enter') handleLogCall()
                       }}
                       placeholder="Notes (optional)..."
-                      className="flex-1 text-xs bg-transparent border-none outline-none text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
+                      className="flex-1 text-xs bg-transparent border-none outline-none text-[var(--text-primary)] placeholder-[var(--text-muted)]"
                       disabled={savingLogCall}
                     />
                     <button
@@ -1282,22 +1282,22 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                   </div>
                 )}
 
-                {/* Admin notes — 3-dot menu */}
+                {/* Admin notes - 3-dot menu */}
                 {currentLead.unified_context?.admin_notes?.length > 0 && (
                   <div className="relative inline-block mt-1">
                     <button
                       onClick={() => setShowAdminNotes(!showAdminNotes)}
-                      className="text-gray-400 hover:text-gray-200 transition-colors"
+                      className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
                       title={`${(currentLead.unified_context.admin_notes as any[]).length} admin notes`}
                     >
                       <MdMoreHoriz size={18} />
                     </button>
                     {showAdminNotes && (
-                      <div className="absolute left-0 top-6 z-50 w-64 max-h-48 overflow-y-auto bg-white dark:bg-[#1A1A1A] rounded-lg border border-gray-200 dark:border-[#262626] shadow-lg p-2 space-y-1.5">
+                      <div className="absolute left-0 top-6 z-50 w-64 max-h-48 overflow-y-auto bg-[var(--bg-primary)] rounded-lg border border-[var(--border-primary)] shadow-lg p-2 space-y-1.5">
                         {(currentLead.unified_context.admin_notes as any[]).slice().reverse().map((note: any, i: number) => (
-                          <div key={i} className="text-[11px] text-gray-500 dark:text-gray-400 flex items-start gap-1.5">
+                          <div key={i} className="text-[11px] text-[var(--text-muted)] flex items-start gap-1.5">
                             <MdNote size={11} className="mt-0.5 flex-shrink-0 text-orange-400" />
-                            <span>{note.text} <span className="text-gray-400 dark:text-gray-600">({new Date(note.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })})</span></span>
+                            <span>{note.text} <span className="text-[var(--text-muted)]">({new Date(note.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })})</span></span>
                           </div>
                         ))}
                       </div>
@@ -1308,22 +1308,22 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
 
               {/* Quick Stats - BELOW Journey (3 in a row) */}
               <section className="lead-quick-stats-section">
-                <h3 className="lead-quick-stats-title text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">Quick Stats</h3>
+                <h3 className="lead-quick-stats-title text-xs font-semibold text-[var(--text-secondary)] mb-2">Quick Stats</h3>
                 <div className="lead-quick-stats-grid grid grid-cols-3 gap-2">
-                  <article className="lead-stat-card lead-stat-messages flex flex-col justify-between h-full p-3 min-h-[80px] bg-white dark:bg-[#1A1A1A] rounded-lg border border-gray-200 dark:border-[#262626]">
-                    <p className="lead-stat-label text-sm text-gray-400 dark:text-gray-500">Messages</p>
-                    <p className="lead-stat-value text-2xl font-bold text-gray-900 dark:text-white mt-auto" aria-label={`${quickStats.totalMessages} total messages`}>{quickStats.totalMessages}</p>
+                  <article className="lead-stat-card lead-stat-messages flex flex-col justify-between h-full p-3 min-h-[80px] bg-[var(--bg-primary)] rounded-lg border border-[var(--border-primary)]">
+                    <p className="lead-stat-label text-sm text-[var(--text-muted)]">Messages</p>
+                    <p className="lead-stat-value text-2xl font-bold text-[var(--text-primary)] mt-auto" aria-label={`${quickStats.totalMessages} total messages`}>{quickStats.totalMessages}</p>
                   </article>
-                  <article className="lead-stat-card lead-stat-response-rate flex flex-col justify-between h-full p-3 min-h-[80px] bg-white dark:bg-[#1A1A1A] rounded-lg border border-gray-200 dark:border-[#262626]">
-                    <p className="lead-stat-label text-sm text-gray-400 dark:text-gray-500">Response Rate</p>
-                    <p className="lead-stat-value text-2xl font-bold text-gray-900 dark:text-white mt-auto" aria-label={`${quickStats.responseRate}% response rate`}>{quickStats.responseRate}%</p>
+                  <article className="lead-stat-card lead-stat-response-rate flex flex-col justify-between h-full p-3 min-h-[80px] bg-[var(--bg-primary)] rounded-lg border border-[var(--border-primary)]">
+                    <p className="lead-stat-label text-sm text-[var(--text-muted)]">Response Rate</p>
+                    <p className="lead-stat-value text-2xl font-bold text-[var(--text-primary)] mt-auto" aria-label={`${quickStats.responseRate}% response rate`}>{quickStats.responseRate}%</p>
                   </article>
                   <article className={`lead-stat-card lead-stat-key-event flex flex-col justify-between h-full p-3 min-h-[80px] rounded-lg border ${(() => {
                     const bd = currentLead.booking_date || currentLead.unified_context?.web?.booking_date || currentLead.unified_context?.web?.booking?.date || currentLead.unified_context?.whatsapp?.booking_date || currentLead.unified_context?.whatsapp?.booking?.date || currentLead.unified_context?.voice?.booking_date || currentLead.unified_context?.voice?.booking?.date || currentLead.unified_context?.social?.booking_date || currentLead.unified_context?.social?.booking?.date;
                     const bt = currentLead.booking_time || currentLead.unified_context?.web?.booking_time || currentLead.unified_context?.web?.booking?.time || currentLead.unified_context?.whatsapp?.booking_time || currentLead.unified_context?.whatsapp?.booking?.time || currentLead.unified_context?.voice?.booking_time || currentLead.unified_context?.voice?.booking?.time || currentLead.unified_context?.social?.booking_time || currentLead.unified_context?.social?.booking?.time;
-                    return bd && bt ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800' : 'bg-white dark:bg-[#1A1A1A] border-gray-200 dark:border-[#262626]';
+                    return bd && bt ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800' : 'bg-[var(--bg-primary)] border-[var(--border-primary)]';
                   })()}`}>
-                    <p className="lead-stat-label text-sm text-gray-400 dark:text-gray-500">Key Event</p>
+                    <p className="lead-stat-label text-sm text-[var(--text-muted)]">Key Event</p>
                     <div className="lead-stat-content mt-auto">
                       {(() => {
                         const bookingDate = currentLead.booking_date ||
@@ -1370,7 +1370,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                           );
                         }
                         return (
-                          <p className="lead-stat-empty text-2xl font-bold text-gray-500 dark:text-gray-400" aria-label="No key event">-</p>
+                          <p className="lead-stat-empty text-2xl font-bold text-[var(--text-muted)]" aria-label="No key event">-</p>
                         );
                       })()}
                     </div>
@@ -1382,7 +1382,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
             {/* Close Button - Absolute positioned top right */}
             <button
               onClick={onClose}
-              className="lead-modal-close-button absolute top-4 right-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+              className="lead-modal-close-button absolute top-4 right-4 text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
               aria-label="Close lead details modal"
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -1399,7 +1399,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                   aria-hidden="true"
                 />
                 <menu
-                  className="lead-stage-dropdown fixed z-[70] bg-white dark:bg-[#1A1A1A] border border-gray-200 dark:border-[#262626] rounded-lg shadow-xl p-2 w-[220px]"
+                  className="lead-stage-dropdown fixed z-[70] bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-lg shadow-xl p-2 w-[220px]"
                   style={{
                     top: `${stageButtonRef.current.getBoundingClientRect().bottom + 8}px`,
                     left: `${Math.max(8, stageButtonRef.current.getBoundingClientRect().right - 220)}px`,
@@ -1413,7 +1413,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                         onClick={() => handleStageChange(stage as LeadStage)}
                         className={`lead-stage-option w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${currentStage === stage
                           ? getStageBadgeClass(stage) + ' font-semibold'
-                          : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300'
+                          : 'hover:bg-[var(--bg-hover)] text-[var(--text-secondary)]'
                           }`}
                         style={currentStage === stage && stage === 'In Sequence' ? {
                           backgroundColor: 'var(--accent-subtle)',
@@ -1432,12 +1432,12 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
           </header>
 
           {/* TABS */}
-          <nav className="lead-modal-tabs lead-details-modal-tabs flex border-b border-gray-200 dark:border-[#262626] flex-shrink-0" role="tablist" aria-label="Lead details sections">
+          <nav className="lead-modal-tabs lead-details-modal-tabs flex border-b border-[var(--border-primary)] flex-shrink-0" role="tablist" aria-label="Lead details sections">
             <button
               onClick={() => setActiveTab('summary')}
               className={`lead-modal-tab lead-details-modal-tab lead-details-modal-tab-summary px-4 py-1.5 text-sm font-medium transition-colors border-b-2 ${activeTab === 'summary'
                 ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+                : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]'
                 }`}
               role="tab"
               aria-selected={activeTab === 'summary'}
@@ -1450,7 +1450,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
               onClick={() => setActiveTab('activity')}
               className={`lead-modal-tab lead-details-modal-tab lead-details-modal-tab-activity px-4 py-1.5 text-sm font-medium transition-colors border-b-2 ${activeTab === 'activity'
                 ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+                : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]'
                 }`}
               role="tab"
               aria-selected={activeTab === 'activity'}
@@ -1463,7 +1463,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
               onClick={() => setActiveTab('breakdown')}
               className={`lead-modal-tab lead-details-modal-tab lead-details-modal-tab-breakdown px-4 py-1.5 text-sm font-medium transition-colors border-b-2 ${activeTab === 'breakdown'
                 ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+                : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]'
                 }`}
               role="tab"
               aria-selected={activeTab === 'breakdown'}
@@ -1476,7 +1476,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
               onClick={() => setActiveTab('interaction')}
               className={`lead-modal-tab lead-details-modal-tab lead-details-modal-tab-interaction px-4 py-1.5 text-sm font-medium transition-colors border-b-2 ${activeTab === 'interaction'
                 ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+                : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]'
                 }`}
               role="tab"
               aria-selected={activeTab === 'interaction'}
@@ -1499,11 +1499,11 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                 style={{ width: '70%', maxWidth: '840px' }}
               >
                 {loadingActivities ? (
-                  <div className="lead-activity-loading text-sm text-center py-8 text-gray-500 dark:text-gray-400" aria-live="polite">
+                  <div className="lead-activity-loading text-sm text-center py-8 text-[var(--text-muted)]" aria-live="polite">
                     <div className="animate-pulse">Loading activities...</div>
                   </div>
                 ) : activities.length === 0 ? (
-                  <div className="lead-activity-empty text-sm text-center py-8 text-gray-500 dark:text-gray-400">
+                  <div className="lead-activity-empty text-sm text-center py-8 text-[var(--text-muted)]">
                     No activities yet
                   </div>
                 ) : (
@@ -1568,14 +1568,14 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                                 </p>
                               </div>
                             ) : activity.content ? (
-                              <p className="lead-activity-text text-sm mt-1 text-gray-700 dark:text-gray-300 leading-relaxed">
+                              <p className="lead-activity-text text-sm mt-1 text-[var(--text-secondary)] leading-relaxed">
                                 {renderMarkdown(activity.content)}
                               </p>
                             ) : null}
 
                             <div className={`lead-activity-header flex items-start justify-between gap-2 mb-1 ${isCustomer ? 'flex-row-reverse' : ''}`}>
                               <div className={`lead-activity-meta flex items-center gap-2 flex-1 min-w-0 ${isCustomer ? 'flex-row-reverse' : ''}`}>
-                                <h4 className="lead-activity-action text-sm font-semibold text-gray-900 dark:text-white">
+                                <h4 className="lead-activity-action text-sm font-semibold text-[var(--text-primary)]">
                                   {activity.action || 'Activity'}
                                 </h4>
                                 {activity.channel && (
@@ -1591,7 +1591,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                                   </span>
                                 )}
                               </div>
-                              <time className="lead-activity-time text-[10px] uppercase font-medium whitespace-nowrap text-gray-400 dark:text-gray-500 flex-shrink-0" dateTime={activity.timestamp}>
+                              <time className="lead-activity-time text-[10px] uppercase font-medium whitespace-nowrap text-[var(--text-muted)] flex-shrink-0" dateTime={activity.timestamp}>
                                 {formatDateTimeIST(activity.timestamp)}
                               </time>
                             </div>
@@ -1619,7 +1619,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                     className="lead-tabpanel-summary space-y-4"
                   >
                     <article className="lead-summary-card p-3 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20">
-                      <h3 className="lead-summary-title text-xs font-semibold mb-2 flex items-center justify-between text-gray-900 dark:text-white">
+                      <h3 className="lead-summary-title text-xs font-semibold mb-2 flex items-center justify-between text-[var(--text-primary)]">
                         <div className="flex items-center gap-1.5">
                           <MdAutoAwesome size={14} className="text-blue-500" aria-hidden="true" />
                           Summary
@@ -1635,7 +1635,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                         </button>
                       </h3>
                       {loadingSummary && !unifiedSummary ? (
-                        <div className="lead-summary-loading-state text-xs text-gray-500 dark:text-gray-400 py-1" aria-live="polite">
+                        <div className="lead-summary-loading-state text-xs text-[var(--text-muted)] py-1" aria-live="polite">
                           <div className="animate-pulse flex items-center gap-2">
                             <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce"></div>
                             Loading summary...
@@ -1644,10 +1644,10 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                       ) : (
                         <div className={`lead-summary-content transition-opacity ${loadingSummary ? 'opacity-60' : 'opacity-100'}`}>
                           <div className="lead-summary-text mb-2">
-                            {unifiedSummary ? renderSummary(unifiedSummary) : <p className="text-xs text-gray-500">No summary available. Click Refresh to generate one.</p>}
+                            {unifiedSummary ? renderSummary(unifiedSummary) : <p className="text-xs text-[var(--text-muted)]">No summary available. Click Refresh to generate one.</p>}
                           </div>
                           {summaryAttribution && (
-                            <footer className="lead-summary-attribution text-[10px] pt-2 border-t border-blue-200 dark:border-blue-800 text-gray-400 dark:text-gray-500">
+                            <footer className="lead-summary-attribution text-[10px] pt-2 border-t border-blue-200 dark:border-blue-800 text-[var(--text-muted)]">
                               {summaryAttribution}
                             </footer>
                           )}
@@ -1662,7 +1662,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                       const hasProfile = Object.keys(brandProfileCheck).length > 0
                       if (!hasKeyInfo && !hasProfile) return null
                       return (
-                    <article className="lead-intelligence-insights p-4 rounded-xl bg-gray-50/30 dark:bg-gray-800/20 border border-gray-100 dark:border-gray-800/50 shadow-sm">
+                    <article className="lead-intelligence-insights p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-primary)] shadow-sm">
                       <div className="flex flex-col gap-6">
                         {/* Buying Signals Group */}
                         {summaryData && summaryData.keyInfo && (summaryData.keyInfo.budget || summaryData.keyInfo.serviceInterest || summaryData.keyInfo.painPoints) && (
@@ -1678,8 +1678,8 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                                     <MdAccountBalanceWallet size={14} />
                                   </div>
                                   <div>
-                                    <p className="text-[9px] font-bold text-gray-500 uppercase tracking-tight">Budget</p>
-                                    <p className="text-xs font-black text-gray-900 dark:text-white">{summaryData.keyInfo.budget}</p>
+                                    <p className="text-[9px] font-bold text-[var(--text-muted)] uppercase tracking-tight">Budget</p>
+                                    <p className="text-xs font-black text-[var(--text-primary)]">{summaryData.keyInfo.budget}</p>
                                   </div>
                                 </div>
                               )}
@@ -1689,8 +1689,8 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                                     <MdOutlineInsights size={14} />
                                   </div>
                                   <div>
-                                    <p className="text-[9px] font-bold text-gray-500 uppercase tracking-tight">Interest</p>
-                                    <p className="text-xs font-black text-gray-900 dark:text-white">{summaryData.keyInfo.serviceInterest}</p>
+                                    <p className="text-[9px] font-bold text-[var(--text-muted)] uppercase tracking-tight">Interest</p>
+                                    <p className="text-xs font-black text-[var(--text-primary)]">{summaryData.keyInfo.serviceInterest}</p>
                                   </div>
                                 </div>
                               )}
@@ -1700,8 +1700,8 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                                     <MdReportProblem size={14} />
                                   </div>
                                   <div>
-                                    <p className="text-[9px] font-bold text-gray-500 uppercase tracking-tight">Pain Point</p>
-                                    <p className="text-xs font-black text-gray-900 dark:text-white max-w-[200px] truncate">{summaryData.keyInfo.painPoints}</p>
+                                    <p className="text-[9px] font-bold text-[var(--text-muted)] uppercase tracking-tight">Pain Point</p>
+                                    <p className="text-xs font-black text-[var(--text-primary)] max-w-[200px] truncate">{summaryData.keyInfo.painPoints}</p>
                                   </div>
                                 </div>
                               )}
@@ -1711,7 +1711,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
 
                         {/* Divider Line */}
                         {(summaryData?.keyInfo?.budget || summaryData?.keyInfo?.serviceInterest) && (currentLead.unified_context?.bcon || currentLead.unified_context?.windchasers) && (
-                          <div className="h-px bg-gray-100 dark:bg-gray-800 w-full" />
+                          <div className="h-px bg-[var(--border-primary)] w-full" />
                         )}
 
                         {/* Lead Profile Group */}
@@ -1722,41 +1722,41 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
 
                           return (
                             <div className="space-y-3">
-                              <h4 className="flex items-center gap-2 text-[9px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em]">
+                              <h4 className="flex items-center gap-2 text-[9px] font-bold text-[var(--text-muted)] uppercase tracking-[0.2em]">
                                 <MdPersonOutline size={12} />
                                 Lead Profile
                               </h4>
                               <div className="flex flex-wrap gap-x-8 gap-y-3">
                                 {brandProfileData.user_type && (
                                   <div className="flex items-center gap-2 group">
-                                    <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-800/50 flex items-center justify-center text-gray-500 dark:text-gray-400 group-hover:bg-amber-500 group-hover:text-white transition-all">
+                                    <div className="w-8 h-8 rounded-lg bg-[var(--bg-secondary)] flex items-center justify-center text-[var(--text-muted)] group-hover:bg-amber-500 group-hover:text-white transition-all">
                                       <MdPerson size={14} />
                                     </div>
                                     <div>
-                                      <p className="text-[9px] font-medium text-gray-500 uppercase tracking-tight">Type</p>
-                                      <p className="text-xs font-semibold text-gray-900 dark:text-gray-200 capitalize">{brandProfileData.user_type}</p>
+                                      <p className="text-[9px] font-medium text-[var(--text-muted)] uppercase tracking-tight">Type</p>
+                                      <p className="text-xs font-semibold text-[var(--text-primary)] capitalize">{brandProfileData.user_type}</p>
                                     </div>
                                   </div>
                                 )}
                                 {brandProfileData.course_interest && (
                                   <div className="flex items-center gap-2 group">
-                                    <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-800/50 flex items-center justify-center text-gray-500 dark:text-gray-400 group-hover:bg-amber-500 group-hover:text-white transition-all">
+                                    <div className="w-8 h-8 rounded-lg bg-[var(--bg-secondary)] flex items-center justify-center text-[var(--text-muted)] group-hover:bg-amber-500 group-hover:text-white transition-all">
                                       <MdFlightTakeoff size={14} />
                                     </div>
                                     <div>
-                                      <p className="text-[9px] font-medium text-gray-500 uppercase tracking-tight">Course</p>
-                                      <p className="text-xs font-semibold text-gray-900 dark:text-gray-200 capitalize">{brandProfileData.course_interest}</p>
+                                      <p className="text-[9px] font-medium text-[var(--text-muted)] uppercase tracking-tight">Course</p>
+                                      <p className="text-xs font-semibold text-[var(--text-primary)] capitalize">{brandProfileData.course_interest}</p>
                                     </div>
                                   </div>
                                 )}
                                 {(brandProfileData.plan_to_fly || brandProfileData.timeline) && (
                                   <div className="flex items-center gap-2 group">
-                                    <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-800/50 flex items-center justify-center text-gray-500 dark:text-gray-400 group-hover:bg-amber-500 group-hover:text-white transition-all">
+                                    <div className="w-8 h-8 rounded-lg bg-[var(--bg-secondary)] flex items-center justify-center text-[var(--text-muted)] group-hover:bg-amber-500 group-hover:text-white transition-all">
                                       <MdSchedule size={14} />
                                     </div>
                                     <div>
-                                      <p className="text-[9px] font-medium text-gray-500 uppercase tracking-tight">Timeline</p>
-                                      <p className="text-xs font-semibold text-gray-900 dark:text-gray-200">
+                                      <p className="text-[9px] font-medium text-[var(--text-muted)] uppercase tracking-tight">Timeline</p>
+                                      <p className="text-xs font-semibold text-[var(--text-primary)]">
                                         {(() => {
                                           const t = brandProfileData.plan_to_fly || brandProfileData.timeline;
                                           const map: any = { 'asap': 'ASAP', '1-3mo': '1-3m', '6+mo': '6m+', '1yr+': '1y+' };
@@ -1768,12 +1768,12 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                                 )}
                                 {brandProfileData.education && (
                                   <div className="flex items-center gap-2 group">
-                                    <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-800/50 flex items-center justify-center text-gray-500 dark:text-gray-400 group-hover:bg-amber-500 group-hover:text-white transition-all">
+                                    <div className="w-8 h-8 rounded-lg bg-[var(--bg-secondary)] flex items-center justify-center text-[var(--text-muted)] group-hover:bg-amber-500 group-hover:text-white transition-all">
                                       <MdSchool size={14} />
                                     </div>
                                     <div>
-                                      <p className="text-[9px] font-medium text-gray-500 uppercase tracking-tight">Edu</p>
-                                      <p className="text-xs font-semibold text-gray-900 dark:text-gray-200 capitalize">{brandProfileData.education.replace('_', ' ')}</p>
+                                      <p className="text-[9px] font-medium text-[var(--text-muted)] uppercase tracking-tight">Edu</p>
+                                      <p className="text-xs font-semibold text-[var(--text-primary)] capitalize">{brandProfileData.education.replace('_', ' ')}</p>
                                     </div>
                                   </div>
                                 )}
@@ -1801,10 +1801,10 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                         {/* Score headline */}
                         <div>
                           <div className="flex items-baseline gap-2">
-                            <span className="text-3xl font-extrabold text-gray-900 dark:text-white">{calculatedScore.score}/100</span>
+                            <span className="text-3xl font-extrabold text-[var(--text-primary)]">{calculatedScore.score}/100</span>
                             <span className="text-sm font-bold" style={{ color: healthColor.text }}>{healthColor.label}</span>
                           </div>
-                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Based on conversation activity and intent signals</p>
+                          <p className="text-xs text-[var(--text-muted)] mt-1">Based on conversation activity and intent signals</p>
                         </div>
 
                         {/* Signals list */}
@@ -1866,20 +1866,20 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                         </div>
 
                         {/* Next step */}
-                        <p className="text-sm font-semibold text-gray-900 dark:text-white pt-1">
+                        <p className="text-sm font-semibold text-[var(--text-primary)] pt-1">
                           {calculatedScore.score >= 80
-                            ? 'High intent — ready for direct outreach or closing.'
+                            ? 'High intent - ready for direct outreach or closing.'
                             : calculatedScore.score >= 60
                               ? calculatedScore.breakdown.details.hasBooking
-                                ? 'Booking exists — confirm attendance and prep for the call.'
-                                : 'Warm lead — push for a booking or direct call.'
+                                ? 'Booking exists - confirm attendance and prep for the call.'
+                                : 'Warm lead - push for a booking or direct call.'
                               : calculatedScore.score >= 40
-                                ? 'Needs a follow-up to re-engage — conversation stalled.'
-                                : 'Cold lead — nurture with value content or re-qualify.'}
+                                ? 'Needs a follow-up to re-engage - conversation stalled.'
+                                : 'Cold lead - nurture with value content or re-qualify.'}
                         </p>
                       </div>
                     ) : (
-                      <div className="text-center py-20 animate-pulse text-gray-400">
+                      <div className="text-center py-20 animate-pulse text-[var(--text-muted)]">
                         Analyzing...
                       </div>
                     )}
@@ -1895,7 +1895,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                     className="lead-tabpanel-interaction space-y-4"
                   >
                     {loading30Days ? (
-                      <div className="lead-interaction-loading text-sm text-center py-8 text-gray-500 dark:text-gray-400" aria-live="polite">
+                      <div className="lead-interaction-loading text-sm text-center py-8 text-[var(--text-muted)]" aria-live="polite">
                         <div className="animate-pulse">Loading interaction data...</div>
                       </div>
                     ) : interaction30Days ? (
@@ -1910,34 +1910,34 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                               </p>
                               <span className="text-xs font-semibold text-blue-600/60 dark:text-blue-400/60 uppercase">Interactions</span>
                             </div>
-                            <p className="lead-interaction-total-label text-[10px] text-gray-500 dark:text-gray-400 mt-1 uppercase tracking-wider font-medium">First 30 days activity</p>
+                            <p className="lead-interaction-total-label text-[10px] text-[var(--text-muted)] mt-1 uppercase tracking-wider font-medium">First 30 days activity</p>
                           </article>
 
                           <div className="grid grid-cols-1 gap-3">
                             {/* Lead In Day */}
-                            <article className="lead-interaction-lead-in p-3 bg-white dark:bg-[#1A1A1A] rounded-lg border border-gray-100 dark:border-gray-800 shadow-sm">
-                              <p className="lead-interaction-label text-[10px] text-gray-500 dark:text-gray-400 mb-1 uppercase tracking-wider font-bold">Contact Created</p>
-                              <p className="lead-interaction-value text-sm font-semibold text-gray-900 dark:text-white">
+                            <article className="lead-interaction-lead-in p-3 bg-[var(--bg-primary)] rounded-lg border border-[var(--border-primary)] shadow-sm">
+                              <p className="lead-interaction-label text-[10px] text-[var(--text-muted)] mb-1 uppercase tracking-wider font-bold">Contact Created</p>
+                              <p className="lead-interaction-value text-sm font-semibold text-[var(--text-primary)]">
                                 {interaction30Days.leadInDay || 'Unknown'}
                               </p>
                             </article>
 
                             {/* Last Touch Day */}
-                            <article className="lead-interaction-last-touch p-3 bg-white dark:bg-[#1A1A1A] rounded-lg border border-gray-100 dark:border-gray-800 shadow-sm">
-                              <p className="lead-interaction-label text-[10px] text-gray-500 dark:text-gray-400 mb-1 uppercase tracking-wider font-bold">Latest Touchpoint</p>
-                              <p className="lead-interaction-value text-sm font-semibold text-gray-900 dark:text-white">
+                            <article className="lead-interaction-last-touch p-3 bg-[var(--bg-primary)] rounded-lg border border-[var(--border-primary)] shadow-sm">
+                              <p className="lead-interaction-label text-[10px] text-[var(--text-muted)] mb-1 uppercase tracking-wider font-bold">Latest Touchpoint</p>
+                              <p className="lead-interaction-value text-sm font-semibold text-[var(--text-primary)]">
                                 {interaction30Days.lastTouchDay || 'No interactions yet'}
                               </p>
                             </article>
                           </div>
 
                           <div className="interaction-legend pt-4">
-                            <p className="text-[10px] text-gray-400 dark:text-gray-500 uppercase tracking-widest font-bold mb-2">Legend</p>
+                            <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-widest font-bold mb-2">Legend</p>
                             <div className="flex items-center gap-2">
                               {[0.08, 0.5, 0.85, 1.0].map((op, i) => (
                                 <div key={i} className="w-3 h-3 rounded-sm" style={{ backgroundColor: 'var(--accent-primary)', opacity: op }}></div>
                               ))}
-                              <span className="text-[10px] text-gray-500 ml-1">Low → High Activity</span>
+                              <span className="text-[10px] text-[var(--text-muted)] ml-1">Low → High Activity</span>
                             </div>
                           </div>
                         </section>
@@ -2007,8 +2007,8 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                             return (
                               <div className="lead-calendar-container flex flex-col gap-1">
                                 {/* Calendar Title */}
-                                <div className="lead-calendar-title mb-4 bg-gray-50 dark:bg-gray-800/50 p-2 rounded-lg flex items-center justify-between">
-                                  <p className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-widest">{startMonth}</p>
+                                <div className="lead-calendar-title mb-4 bg-[var(--bg-secondary)] p-2 rounded-lg flex items-center justify-between">
+                                  <p className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-widest">{startMonth}</p>
                                   <div className="flex gap-1">
                                     <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></div>
                                     <span className="text-[8px] font-bold text-blue-500 uppercase">Live Journey</span>
@@ -2016,9 +2016,9 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                                 </div>
 
                                 {/* Day labels row at top */}
-                                <div className="lead-calendar-header grid grid-cols-7 gap-3 mb-3 border-b border-gray-100 dark:border-gray-800 pb-2" role="row">
+                                <div className="lead-calendar-header grid grid-cols-7 gap-3 mb-3 border-b border-[var(--border-primary)] pb-2" role="row">
                                   {dayNames.map((dayName, index) => (
-                                    <div key={index} className="lead-calendar-day-label text-center text-[10px] text-gray-400 dark:text-gray-500 font-bold" role="columnheader">
+                                    <div key={index} className="lead-calendar-day-label text-center text-[10px] text-[var(--text-muted)] font-bold" role="columnheader">
                                       {dayName}
                                     </div>
                                   ))}
@@ -2084,7 +2084,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                         </section>
                       </div>
                     ) : (
-                      <div className="lead-interaction-empty text-sm text-center py-4 text-gray-500 dark:text-gray-400">
+                      <div className="lead-interaction-empty text-sm text-center py-4 text-[var(--text-muted)]">
                         No interaction data available
                       </div>
                     )}

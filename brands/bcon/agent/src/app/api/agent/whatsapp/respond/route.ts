@@ -1,8 +1,8 @@
 /**
- * POST /api/agent/whatsapp/respond — AI response for WhatsApp
+ * POST /api/agent/whatsapp/respond - AI response for WhatsApp
  *
  * Phase 3 of the Unified Agent Architecture.
- * NEW route — WhatsApp currently has NO AI responses. This enables it.
+ * NEW route - WhatsApp currently has NO AI responses. This enables it.
  *
  * Uses agent-core engine.process() (non-streaming) to generate AI responses
  * with full knowledge base search and cross-channel context awareness.

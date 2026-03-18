@@ -64,7 +64,7 @@ export default function ThemeProvider({
       html.style.setProperty('--text-primary', '#000000');
       html.style.setProperty('--text-secondary', 'rgba(0,0,0,0.6)');
     } else {
-      // 'brand' mode — original behavior
+      // 'brand' mode - original behavior
       const color = config.colors.primary;
       html.setAttribute('data-theme', `${brandId}-electric`);
       html.classList.add('dark');

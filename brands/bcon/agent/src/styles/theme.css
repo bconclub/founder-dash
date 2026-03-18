@@ -92,7 +92,7 @@
   --primary-dark: #0A0A0B;
   --primary-vibrant: #A78BFA;
 
-  /* Backgrounds — neutral, no purple tint */
+  /* Backgrounds - neutral, no purple tint */
   --dark-bg: #0A0A0B;
   --dark-card: rgba(255, 255, 255, 0.04);
   --dark-surface: rgba(255, 255, 255, 0.02);
@@ -100,14 +100,14 @@
   --glass-border: rgba(255, 255, 255, 0.08);
   --glass-shadow: rgba(0, 0, 0, 0.3);
 
-  /* Text — pure whites and grays */
+  /* Text - pure whites and grays */
   --text-primary: #FAFAFA;
   --text-secondary: rgba(250, 250, 250, 0.7);
   --text-tertiary: rgba(250, 250, 250, 0.5);
   --text-muted: rgba(250, 250, 250, 0.35);
   --white: #FAFAFA;
 
-  /* Borders — neutral grays */
+  /* Borders - neutral grays */
   --border-light: rgba(255, 255, 255, 0.06);
   --border-medium: rgba(255, 255, 255, 0.10);
   --border-accent: rgba(255, 255, 255, 0.12);
@@ -115,7 +115,7 @@
   --border-color: rgba(255, 255, 255, 0.08);
   --chat-border-color: rgba(255, 255, 255, 0.12);
 
-  /* Other — semantic colors */
+  /* Other - semantic colors */
   --green-success: #10B981;
   --cyan-accent: #06B6D4;
   --bg-header: rgba(10, 10, 11, 0.9);
@@ -124,7 +124,7 @@
   --bg-hover: rgba(255, 255, 255, 0.06);
   --bg-active: rgba(255, 255, 255, 0.08);
 
-  /* Bubble backgrounds — purple only for user bubbles */
+  /* Bubble backgrounds - purple only for user bubbles */
   --bubble-user-bg: rgba(139, 92, 246, 0.20);
   --bubble-user-border: rgba(139, 92, 246, 0.5);
   --bubble-user-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
@@ -133,7 +133,7 @@
   --bubble-ai-border: rgba(255, 255, 255, 0.08);
   --bubble-ai-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
 
-  /* Buttons — purple for primary actions only */
+  /* Buttons - purple for primary actions only */
   --button-bg: rgba(139, 92, 246, 0.20);
   --button-hover: rgba(139, 92, 246, 0.30);
   --button-active: rgba(139, 92, 246, 0.40);

@@ -85,14 +85,14 @@ export default function BookingsCalendar({ view = 'full' }: BookingsCalendarProp
         headers: { 'Content-Type': 'application/json' },
       })
 
-      // Safely parse response — read as text first to avoid JSON.parse crash
+      // Safely parse response - read as text first to avoid JSON.parse crash
       const text = await response.text()
       let data: any
       try {
         data = JSON.parse(text)
       } catch {
         console.error('Calendar sync returned non-JSON:', text.substring(0, 200))
-        throw new Error('Calendar sync failed — unexpected server response')
+        throw new Error('Calendar sync failed - unexpected server response')
       }
 
       if (!response.ok) {

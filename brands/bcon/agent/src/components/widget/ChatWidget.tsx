@@ -39,7 +39,7 @@ interface ChatWidgetProps {
   apiUrl?: string;
   widgetStyle?: 'searchbar' | 'bubble';
   autoOpen?: boolean;
-  /** Render chat inline (no fixed positioning) — used for dashboard preview */
+  /** Render chat inline (no fixed positioning) - used for dashboard preview */
   inline?: boolean;
 }
 
@@ -1767,7 +1767,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', autoOpen = false
               return;
             }
           }
-          // No conversations found — show welcome
+          // No conversations found - show welcome
           addAIMessage(getWelcomeMessage(brand));
           hasShownWelcomeRef.current = true;
         } catch (err) {
@@ -1780,7 +1780,7 @@ export function ChatWidget({ apiUrl, widgetStyle = 'searchbar', autoOpen = false
       return;
     }
 
-    // No session yet or nothing to restore — show welcome
+    // No session yet or nothing to restore - show welcome
     if (conversationsToRestoreRef.current.length === 0) {
       addAIMessage(getWelcomeMessage(brand));
       hasShownWelcomeRef.current = true;

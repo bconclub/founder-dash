@@ -208,7 +208,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   }
 
   const handleSidebarItemClick = () => {
-    // No-op — sidebar stays open/closed via manual toggle only
+    // No-op - sidebar stays open/closed via manual toggle only
   }
 
   // AUTHENTICATION DISABLED - Logout function disabled
@@ -531,7 +531,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             borderColor: 'var(--border-primary)',
           }}
         >
-          {/* Theme toggle row — always visible */}
+          {/* Theme toggle row - always visible */}
           {!isCollapsed && (
             <div className="flex items-center gap-1 px-3 pt-2 pb-1">
               {([

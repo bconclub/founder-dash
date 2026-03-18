@@ -1,5 +1,5 @@
 /**
- * services/leadManager.ts — Lead creation, deduplication, and profile updates
+ * services/leadManager.ts - Lead creation, deduplication, and profile updates
  *
  * Extracted from: web-agent/src/lib/chatSessions.ts
  *   - normalizePhone()       (lines 105-158)
@@ -227,7 +227,7 @@ export async function ensureOrUpdateLead(
       .single();
 
     if (createError) {
-      // Duplicate — fetch existing
+      // Duplicate - fetch existing
       if (createError.code === '23505' || createError.message?.includes('duplicate')) {
         let dup: any = null;
         const { data: d1 } = await client

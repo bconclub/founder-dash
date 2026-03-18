@@ -20,7 +20,7 @@ export const bconConfig: BrandConfig = {
     },
   },
   colors: {
-    // Primary — purple only for interactive elements
+    // Primary - purple only for interactive elements
     primary: '#8B5CF6',
     primaryLight: '#E0D4FC',
     primaryDark: '#0A0A0B',
@@ -31,7 +31,7 @@ export const bconConfig: BrandConfig = {
     gradientMid: '#8B5CF6',
     gradientEnd: '#A78BFA',
 
-    // Backgrounds — pure blacks/dark grays, no purple tint
+    // Backgrounds - pure blacks/dark grays, no purple tint
     darkBg: '#0A0A0B',
     darkCard: 'rgba(255, 255, 255, 0.04)',
     darkSurface: 'rgba(255, 255, 255, 0.02)',
@@ -39,21 +39,21 @@ export const bconConfig: BrandConfig = {
     glassBorder: 'rgba(255, 255, 255, 0.08)',
     glassShadow: 'rgba(0, 0, 0, 0.3)',
 
-    // Text — pure whites and grays
+    // Text - pure whites and grays
     textPrimary: '#FAFAFA',
     textSecondary: 'rgba(250, 250, 250, 0.7)',
     textTertiary: 'rgba(250, 250, 250, 0.5)',
     textMuted: 'rgba(250, 250, 250, 0.35)',
     white: '#FAFAFA',
 
-    // Borders — neutral grays
+    // Borders - neutral grays
     borderLight: 'rgba(255, 255, 255, 0.06)',
     borderMedium: 'rgba(255, 255, 255, 0.10)',
     borderAccent: 'rgba(255, 255, 255, 0.12)',
     borderGlow: 'rgba(255, 255, 255, 0.08)',
     borderColor: 'rgba(255, 255, 255, 0.08)',
 
-    // Accents — semantic only
+    // Accents - semantic only
     greenSuccess: '#10B981',
     cyanAccent: '#06B6D4',
     orangeAccent: '#F59E0B',
@@ -66,7 +66,7 @@ export const bconConfig: BrandConfig = {
     bgHover: 'rgba(255, 255, 255, 0.06)',
     bgActive: 'rgba(255, 255, 255, 0.08)',
 
-    // Chat Bubbles — purple only for user bubbles
+    // Chat Bubbles - purple only for user bubbles
     bubbleUserBg: 'rgba(139, 92, 246, 0.20)',
     bubbleUserBorder: 'rgba(139, 92, 246, 0.5)',
     bubbleUserShadow: '0 4px 16px rgba(0, 0, 0, 0.3)',
@@ -74,7 +74,7 @@ export const bconConfig: BrandConfig = {
     bubbleAiBorder: 'rgba(255, 255, 255, 0.08)',
     bubbleAiShadow: '0 4px 16px rgba(0, 0, 0, 0.2)',
 
-    // Buttons — purple for primary action only
+    // Buttons - purple for primary action only
     buttonBg: 'rgba(139, 92, 246, 0.20)',
     buttonHover: 'rgba(139, 92, 246, 0.30)',
     buttonActive: 'rgba(139, 92, 246, 0.40)',

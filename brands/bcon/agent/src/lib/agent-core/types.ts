@@ -1,5 +1,5 @@
 /**
- * Unified PROXe Agent — Core Types
+ * Unified PROXe Agent - Core Types
  * Channel-agnostic interfaces for the AI engine
  */
 

@@ -45,7 +45,7 @@ const ChannelIcon = ({ channel, size = 16, active = false }: { channel: string; 
 
 const ALL_CHANNELS = ['web', 'whatsapp'];
 
-// Score Ring — circular progress indicator with score inside
+// Score Ring - circular progress indicator with score inside
 const ScoreRing = ({ score, size = 28 }: { score: number | null; size?: number }) => {
   const s = score ?? 0;
   const color = s >= 70 ? '#22c55e' : s >= 40 ? '#f59e0b' : s >= 20 ? '#3b82f6' : '#ef4444';
@@ -1457,7 +1457,7 @@ export default function InboxPage() {
             </div>
           ) : (
           <>
-          {/* 1. Header — Avatar, Name, Company, City + Channel */}
+          {/* 1. Header - Avatar, Name, Company, City + Channel */}
           {(() => {
             const ctx = leadDetails.unified_context?.bcon || leadDetails.unified_context?.windchasers || {}
             const city = ctx.city || ctx.location || ''
@@ -1553,7 +1553,7 @@ export default function InboxPage() {
             </div>
           )}
 
-          {/* 3. Quick Action Buttons — Call, WhatsApp, Email */}
+          {/* 3. Quick Action Buttons - Call, WhatsApp, Email */}
           <div className="px-4 py-3 border-b flex gap-2" style={{ borderColor: 'var(--border-primary)' }}>
             <a
               href={leadDetails.phone ? `tel:${leadDetails.phone}` : undefined}
@@ -1595,7 +1595,7 @@ export default function InboxPage() {
             </a>
           </div>
 
-          {/* 4. Business Info — label: value pairs */}
+          {/* 4. Business Info - label: value pairs */}
           {(() => {
             const ctx = leadDetails.unified_context?.bcon || leadDetails.unified_context?.windchasers || {}
             const fields: { label: string; value: string | undefined }[] = [
@@ -1679,7 +1679,7 @@ export default function InboxPage() {
             )
           })()}
 
-          {/* 6. View Full Details — prominent button */}
+          {/* 6. View Full Details - prominent button */}
           <div className="px-4 py-3 mt-auto">
             <button
               onClick={() => openLeadModal(selectedLeadId)}

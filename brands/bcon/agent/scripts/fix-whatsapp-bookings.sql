@@ -43,7 +43,7 @@ CREATE POLICY "Allow all users to update whatsapp_sessions"
   WITH CHECK (true);
 
 -- ═══════════════════════════════════════════════════════════════════════════════
--- Step 3: Rebuild unified_leads view — pull bookings from BOTH channels
+-- Step 3: Rebuild unified_leads view - pull bookings from BOTH channels
 -- ═══════════════════════════════════════════════════════════════════════════════
 
 DROP VIEW IF EXISTS unified_leads;
@@ -138,7 +138,7 @@ GRANT SELECT ON unified_leads TO authenticated;
 GRANT SELECT ON unified_leads TO anon;
 
 -- ═══════════════════════════════════════════════════════════════════════════════
--- Step 4: Backfill — try to recover booking data from unified_context JSON
+-- Step 4: Backfill - try to recover booking data from unified_context JSON
 --         (May be empty if storeBooking never reached the all_leads update)
 -- ═══════════════════════════════════════════════════════════════════════════════
 

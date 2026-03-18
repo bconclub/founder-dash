@@ -17,7 +17,7 @@ const SAMPLE_SEQUENCES = [
   {
     id: '1',
     name: 'Post-Booking Reminder',
-    description: '30 min before a booked call — WhatsApp + Email reminder',
+    description: '30 min before a booked call - WhatsApp + Email reminder',
     status: 'active' as const,
     steps: 3,
     enrolled: 0,
@@ -26,7 +26,7 @@ const SAMPLE_SEQUENCES = [
   {
     id: '2',
     name: 'New Lead Nurture',
-    description: 'Welcome sequence for new web leads — 3 touchpoints over 7 days',
+    description: 'Welcome sequence for new web leads - 3 touchpoints over 7 days',
     status: 'draft' as const,
     steps: 5,
     enrolled: 0,
@@ -195,7 +195,7 @@ export default function SequencesPage() {
         }}
       >
         <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-          Sequence builder coming soon — create automated follow-up flows with WhatsApp, email, delays, and conditional logic.
+          Sequence builder coming soon - create automated follow-up flows with WhatsApp, email, delays, and conditional logic.
         </p>
       </div>
     </div>

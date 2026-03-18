@@ -22,7 +22,7 @@
 }
 
 .dark {
-  /* Dark mode theme variables — overridden by ThemeProvider from brand config */
+  /* Dark mode theme variables - overridden by ThemeProvider from brand config */
   --bg-primary: #0A0A0A;
   --bg-secondary: #0A0A0A;
   --bg-tertiary: rgba(255, 255, 255, 0.02);

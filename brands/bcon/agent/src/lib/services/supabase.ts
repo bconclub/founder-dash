@@ -1,5 +1,5 @@
 /**
- * services/supabase.ts — Service-role Supabase client for server-side operations
+ * services/supabase.ts - Service-role Supabase client for server-side operations
  *
  * Brand-agnostic: resolves env vars using NEXT_PUBLIC_BRAND to find the
  * correct Supabase project for each brand deployment.

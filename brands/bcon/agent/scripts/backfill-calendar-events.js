@@ -174,7 +174,7 @@ function getSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) {
-    console.warn('⚠️  Missing Supabase env vars — skipping DB lookups');
+    console.warn('⚠️  Missing Supabase env vars - skipping DB lookups');
     return null;
   }
   return createClient(url, key);

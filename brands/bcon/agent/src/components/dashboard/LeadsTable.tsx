@@ -457,7 +457,7 @@ export default function LeadsTable({
     a.click()
   }
 
-  // Filter select style — compact Vercel-like
+  // Filter select style - compact Vercel-like
   const filterClass = "px-2.5 py-1 text-xs border rounded-md appearance-none cursor-pointer"
   const filterStyle: CSSProperties = {
     borderColor: 'var(--border-primary)',
@@ -735,7 +735,7 @@ export default function LeadsTable({
                     onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)' }}
                     onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
                   >
-                    {/* LEAD — 2 lines: Name + Brand · City */}
+                    {/* LEAD - 2 lines: Name + Brand · City */}
                     <td className="px-3 py-2">
                       <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)', wordBreak: 'break-word' }}>
                         {displayName}
@@ -747,7 +747,7 @@ export default function LeadsTable({
                       )}
                     </td>
 
-                    {/* CONTACT — 2 lines: Phone + Email */}
+                    {/* CONTACT - 2 lines: Phone + Email */}
                     <td className="px-3 py-2">
                       {lead.phone && (
                         <a href={`tel:${lead.phone}`} className="text-sm block hover:underline" style={{ color: 'var(--text-primary)' }} onClick={(e) => e.stopPropagation()}>
@@ -761,7 +761,7 @@ export default function LeadsTable({
                       )}
                     </td>
 
-                    {/* SOURCE — small badge */}
+                    {/* SOURCE - small badge */}
                     <td className="px-3 py-2">
                       <span
                         className="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold uppercase"
@@ -771,7 +771,7 @@ export default function LeadsTable({
                       </span>
                     </td>
 
-                    {/* SCORE — colored pill */}
+                    {/* SCORE - colored pill */}
                     <td className="px-3 py-2 text-center">
                       {score != null ? (
                         <span
@@ -785,7 +785,7 @@ export default function LeadsTable({
                       )}
                     </td>
 
-                    {/* STAGE — badge */}
+                    {/* STAGE - badge */}
                     <td className="px-3 py-2">
                       <span
                         className="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide"
@@ -800,7 +800,7 @@ export default function LeadsTable({
                       {timeAgo(lastActivity)}
                     </td>
 
-                    {/* BOOKING — green if booked, empty if not */}
+                    {/* BOOKING - green if booked, empty if not */}
                     <td className="px-3 py-2 text-xs">
                       {bookingDate ? (
                         <Link

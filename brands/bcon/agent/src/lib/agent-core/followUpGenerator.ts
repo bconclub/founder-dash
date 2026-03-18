@@ -1,5 +1,5 @@
 /**
- * Follow-Up Button Generator — Claude-powered contextual buttons
+ * Follow-Up Button Generator - Claude-powered contextual buttons
  * Brand-aware: uses brand config for button pools and Claude prompt context
  */
 
@@ -48,10 +48,10 @@ AVAILABLE BUTTON TYPES:
     bookingAware: ['See Case Studies', 'How It Works', 'Get a Proposal'],
     claudeContext: `BCON AI business solutions chatbot.
 BCON helps businesses understand and implement AI solutions:
-- AI in Business — Custom AI automation, chatbots, workflow optimization
-- Brand Marketing — AI-powered campaigns, content strategy
-- Business Apps — Custom web apps, dashboards, SaaS products
-- PROXe Platform — AI-powered business operating system
+- AI in Business - Custom AI automation, chatbots, workflow optimization
+- Brand Marketing - AI-powered campaigns, content strategy
+- Business Apps - Custom web apps, dashboards, SaaS products
+- PROXe Platform - AI-powered business operating system
 
 AVAILABLE BUTTON TYPES:
 - Information: "Learn More", "See Case Studies", "How It Works"
@@ -69,10 +69,10 @@ AVAILABLE BUTTON TYPES:
     bookingAware: ['See Features', 'Compare Plans', 'Deploy PROXe'],
     claudeContext: `PROXe AI-powered business platform chatbot.
 PROXe is an AI-powered business operating system:
-- Web PROXe — AI chat widget for websites
-- WhatsApp PROXe — WhatsApp AI agent
-- Voice PROXe — Voice AI agent
-- Social PROXe — Social media AI agent
+- Web PROXe - AI chat widget for websites
+- WhatsApp PROXe - WhatsApp AI agent
+- Voice PROXe - Voice AI agent
+- Social PROXe - Social media AI agent
 
 AVAILABLE BUTTON TYPES:
 - Information: "Learn More", "See Features", "Compare Plans"
@@ -251,7 +251,7 @@ async function generateContextualButton(
 
 BUTTON RULES:
 - 3-6 words. Title case. No emojis.
-- Be SPECIFIC to the conversation — never generic like "Learn More" or "Explore Solutions" or "Get Started".
+- Be SPECIFIC to the conversation - never generic like "Learn More" or "Explore Solutions" or "Get Started".
 - Match what they actually talked about.
 - NEVER repeat what was just explained.
 

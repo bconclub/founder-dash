@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic'
 
 /**
  * Widget-only page for embedding and dashboard preview.
- * Renders ChatWidget with transparent background — widget handles
+ * Renders ChatWidget with transparent background - widget handles
  * its own positioning (bubble bottom-right, fixed within iframe).
  */
 export default function WidgetPage() {

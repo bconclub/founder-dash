@@ -1,5 +1,5 @@
 /**
- * Prompt Builder — Channel-aware, brand-aware prompt construction
+ * Prompt Builder - Channel-aware, brand-aware prompt construction
  * Merged from: web-agent/lib/promptBuilder.ts + dashboard/integrations/whatsapp/system-prompt
  */
 
@@ -191,13 +191,13 @@ WEB CHAT RULES (MUST FOLLOW)
 This conversation is on the web chat widget. You MUST:
 - Responses can be 2-4 sentences (slightly longer than WhatsApp).
 - You can use **bold** for emphasis sparingly.
-- Collect name and email early in conversation — web visitors don't have phone numbers by default.
+- Collect name and email early in conversation - web visitors don't have phone numbers by default.
 - Ask "What's your name?" naturally in the first few messages.
 - Ask "What's the best email to reach you?" before booking.
 - Same probing rules as WhatsApp: minimum 3 qualifying questions before suggesting a call.
 - Same booking flow: check_availability → book_consultation.
 - After booking: "You're booked! Check your email for the calendar invite."
-- You have the same booking tools as WhatsApp — use them the same way.
+- You have the same booking tools as WhatsApp - use them the same way.
 =================================================================================`;
   }
 

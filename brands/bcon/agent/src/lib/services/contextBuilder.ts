@@ -1,5 +1,5 @@
 /**
- * services/contextBuilder.ts — Cross-channel context assembly
+ * services/contextBuilder.ts - Cross-channel context assembly
  *
  * Extracted from:
  *   - web-agent/src/lib/chatSessions.ts: updateWindchasersProfile() (1685-1835)

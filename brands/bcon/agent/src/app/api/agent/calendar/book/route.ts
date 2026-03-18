@@ -1,5 +1,5 @@
 /**
- * POST /api/agent/calendar/book — Create a booking + Google Calendar event
+ * POST /api/agent/calendar/book - Create a booking + Google Calendar event
  *
  * Phase 3 of the Unified Agent Architecture.
  * Moved from web-agent/api/calendar/book/route.ts.
@@ -123,7 +123,7 @@ export async function POST(request: NextRequest) {
         );
       } catch (storeError) {
         console.error('[agent/calendar/book] Failed to save booking to DB:', storeError);
-        // Don't fail — calendar event was created successfully
+        // Don't fail - calendar event was created successfully
       }
     }
 

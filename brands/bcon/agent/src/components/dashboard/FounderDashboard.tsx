@@ -772,7 +772,7 @@ export default function FounderDashboard() {
                     }
                   }
                   
-                  // 3. STAGE CHANGES — color-coded by target stage
+                  // 3. STAGE CHANGES - color-coded by target stage
                   if (textLower.includes('entered') && textLower.includes('stage') || textLower.includes('moved from') || type === 'stage_change') {
                     // Determine color based on the NEW stage
                     const stageColorMap: Record<string, { color: string; icon: any }> = {

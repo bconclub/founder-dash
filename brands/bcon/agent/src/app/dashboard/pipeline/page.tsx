@@ -84,7 +84,7 @@ function chevronClip(position: 'first' | 'middle' | 'last'): string {
 
 // --- Score dot ---
 function ScoreDot({ score }: { score: number | null }) {
-  if (score === null || score === undefined) return <span style={{ color: '#525252', fontSize: 11 }}>—</span>
+  if (score === null || score === undefined) return <span style={{ color: '#525252', fontSize: 11 }}>-</span>
   const color = score >= 60 ? '#34d399' : score >= 30 ? '#fbbf24' : '#f87171'
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>

@@ -1,9 +1,9 @@
 -- ═══════════════════════════════════════════════════════════════════════════════
--- BCON — Backfill WhatsApp Bookings
+-- BCON - Backfill WhatsApp Bookings
 --
 -- Run this in Supabase SQL Editor.
--- Step 1: DRY RUN — shows what it found (SELECT only)
--- Step 2: APPLY — uncomment the UPDATE block at the bottom to write
+-- Step 1: DRY RUN - shows what it found (SELECT only)
+-- Step 2: APPLY - uncomment the UPDATE block at the bottom to write
 -- ═══════════════════════════════════════════════════════════════════════════════
 
 -- ─── Step 1: Find all WhatsApp booking confirmations in conversations ────────
@@ -96,7 +96,7 @@ ORDER BY message_sent_at DESC;
 
 
 -- ═══════════════════════════════════════════════════════════════════════════════
--- Step 2: APPLY — Uncomment the block below AFTER reviewing Step 1 results
+-- Step 2: APPLY - Uncomment the block below AFTER reviewing Step 1 results
 -- ═══════════════════════════════════════════════════════════════════════════════
 
 /*

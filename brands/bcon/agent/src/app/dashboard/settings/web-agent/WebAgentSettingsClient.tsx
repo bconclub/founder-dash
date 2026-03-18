@@ -84,7 +84,7 @@ export default function WebAgentSettingsClient() {
         flex: 1,
         minHeight: 0,
       }}>
-        {/* LEFT — Configuration */}
+        {/* LEFT - Configuration */}
         <div style={{
           flex: '0 0 40%',
           maxWidth: '40%',
@@ -196,7 +196,7 @@ export default function WebAgentSettingsClient() {
           </div>
         </div>
 
-        {/* RIGHT — Widget preview, centered, actual size */}
+        {/* RIGHT - Widget preview, centered, actual size */}
         <div style={{
           flex: '1 1 60%',
           minWidth: 0,

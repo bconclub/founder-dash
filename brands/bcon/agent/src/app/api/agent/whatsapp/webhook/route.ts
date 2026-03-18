@@ -1,5 +1,5 @@
 /**
- * POST /api/agent/whatsapp/webhook — Incoming WhatsApp messages
+ * POST /api/agent/whatsapp/webhook - Incoming WhatsApp messages
  *
  * Phase 3 of the Unified Agent Architecture.
  * Refactored from dashboard/api/integrations/whatsapp/route.ts.
@@ -105,7 +105,7 @@ export async function POST(request: NextRequest) {
       .maybeSingle();
 
     if (existingSession?.id) {
-      // Update existing session — auto-increment message_count
+      // Update existing session - auto-increment message_count
       const { data: currentSession } = await supabase
         .from('whatsapp_sessions')
         .select('message_count')
@@ -133,7 +133,7 @@ export async function POST(request: NextRequest) {
         })
         .eq('id', existingSession.id);
     } else {
-      // Create new session — start with message_count = 1 (this IS a message)
+      // Create new session - start with message_count = 1 (this IS a message)
       await supabase
         .from('whatsapp_sessions')
         .insert({

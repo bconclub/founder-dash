@@ -1,5 +1,5 @@
 /**
- * Intent Extractor — Keyword-based intent classification
+ * Intent Extractor - Keyword-based intent classification
  * Extracted from web-agent/api/chat/route.ts (lines 437-489)
  */
 

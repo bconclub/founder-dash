@@ -1,5 +1,5 @@
 /**
- * POST /api/agent/web/chat — SSE streaming chat route
+ * POST /api/agent/web/chat - SSE streaming chat route
  *
  * Phase 3 of the Unified Agent Architecture.
  * Replaces web-agent's 1500-line monolithic /api/chat route.

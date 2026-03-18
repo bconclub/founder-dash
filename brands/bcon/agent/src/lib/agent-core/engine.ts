@@ -1,5 +1,5 @@
 /**
- * Unified PROXe Agent Engine — Channel-agnostic orchestrator
+ * Unified PROXe Agent Engine - Channel-agnostic orchestrator
  * Wires together: knowledge search, prompt builder, Claude client, intent extraction, follow-ups, summarizer
  */
 
@@ -47,14 +47,14 @@ export async function process(
   // 4. Build prompt (brand-aware)
   // If existing booking found, include it as context but still allow rescheduling
   const finalMessage = existingBookingMessage
-    ? `[EXISTING BOOKING INFO: ${existingBookingMessage} — If the customer provides a new date/time, they want to reschedule. Cancel old and book new immediately. Do NOT ask "should I cancel?" repeatedly — if they give a time, that IS the confirmation.]\n\nUser's message: ${input.message}`
+    ? `[EXISTING BOOKING INFO: ${existingBookingMessage} - If the customer provides a new date/time, they want to reschedule. Cancel old and book new immediately. Do NOT ask "should I cancel?" repeatedly - if they give a time, that IS the confirmation.]\n\nUser's message: ${input.message}`
     : input.message;
 
   // Build admin notes context
   let crossChannelContext = '';
   if (input.adminNotes && input.adminNotes.length > 0) {
     const recentNotes = input.adminNotes.slice(-10);
-    crossChannelContext += 'ADMIN NOTES (from team — use these to guide your approach):\n';
+    crossChannelContext += 'ADMIN NOTES (from team - use these to guide your approach):\n';
     crossChannelContext += recentNotes.map(n => `- ${n.text}`).join('\n');
   }
 
@@ -79,7 +79,7 @@ export async function process(
 
   try {
     if (input.channel === 'whatsapp') {
-      // WhatsApp always gets tool-enabled response (even with existing booking — for rescheduling)
+      // WhatsApp always gets tool-enabled response (even with existing booking - for rescheduling)
       const { tools, toolHandlers } = buildBookingTools(input, supabase);
       rawResponse = await generateResponseWithTools(systemPrompt, userPrompt, {
         tools,
@@ -113,7 +113,7 @@ export async function process(
       // Flag this lead for human follow-up
       await flagForHumanFollowup(supabase, input, 'AI generation failed after retry');
 
-      // Return a warm, human-sounding fallback — NEVER expose technical errors
+      // Return a warm, human-sounding fallback - NEVER expose technical errors
       rawResponse = "Hey! Let me connect you with the team directly. They'll reach out to you shortly.";
     }
   }
@@ -125,7 +125,7 @@ export async function process(
 
   const cleanedResponse = cleanResponse(rawResponse, input.channel);
 
-  // 7. Schedule flow tasks (non-blocking — fires after response is ready)
+  // 7. Schedule flow tasks (non-blocking - fires after response is ready)
   scheduleFlowTasks(supabase, input, cleanedResponse).catch(err => {
     console.error('[Engine] Flow task scheduling failed:', err?.message);
   });
@@ -189,7 +189,7 @@ export async function* processStream(
     let crossChannelContext = '';
     if (input.adminNotes && input.adminNotes.length > 0) {
       const recentNotes = input.adminNotes.slice(-10);
-      crossChannelContext += 'ADMIN NOTES (from team — use these to guide your approach):\n';
+      crossChannelContext += 'ADMIN NOTES (from team - use these to guide your approach):\n';
       crossChannelContext += recentNotes.map(n => `- ${n.text}`).join('\n');
     }
 
@@ -206,7 +206,7 @@ export async function* processStream(
       crossChannelContext: crossChannelContext || undefined,
     });
 
-    // 5. Generate response with tools (same as WhatsApp — enables booking flow)
+    // 5. Generate response with tools (same as WhatsApp - enables booking flow)
     const { tools, toolHandlers } = buildBookingTools(input, supabase);
     let rawResponse: string;
 
@@ -251,7 +251,7 @@ export async function* processStream(
     yield { type: 'followUps', followUps };
     yield { type: 'done' };
 
-    // Schedule flow tasks (non-blocking — fires after response sent to client)
+    // Schedule flow tasks (non-blocking - fires after response sent to client)
     scheduleFlowTasks(supabase, input, cleanedResponse).catch(err => {
       console.error('[Engine] Flow task scheduling failed:', err?.message);
     });
@@ -446,7 +446,7 @@ function buildBookingTools(
     },
     {
       name: 'update_lead_profile',
-      description: 'Save lead profile details whenever the user shares personal or business information. Call IMMEDIATELY when the user mentions their name, email, city, company/brand, or business type. Can be called multiple times as new details emerge. Only include fields explicitly shared — never guess.',
+      description: 'Save lead profile details whenever the user shares personal or business information. Call IMMEDIATELY when the user mentions their name, email, city, company/brand, or business type. Can be called multiple times as new details emerge. Only include fields explicitly shared - never guess.',
       input_schema: {
         type: 'object',
         properties: {
@@ -484,7 +484,7 @@ function buildBookingTools(
     check_availability: async (toolInput: Record<string, any>) => {
       const { date } = toolInput;
 
-      // Validate date is not in the past (compare YYYY-MM-DD strings — timezone-safe)
+      // Validate date is not in the past (compare YYYY-MM-DD strings - timezone-safe)
       const todayIST = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
       if (date < todayIST) {
         return JSON.stringify({
@@ -492,7 +492,7 @@ function buildBookingTools(
         });
       }
 
-      // No Sunday bookings — use Date.UTC to avoid IST/UTC day-of-week mismatch
+      // No Sunday bookings - use Date.UTC to avoid IST/UTC day-of-week mismatch
       const [year, month, day] = date.split('-').map(Number);
       const dayOfWeek = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
       if (dayOfWeek === 0) {
@@ -657,7 +657,7 @@ function buildBookingTools(
             }
           }
 
-          // Cancel any pending/queued nurture tasks — lead already booked
+          // Cancel any pending/queued nurture tasks - lead already booked
           if (taskLeadId) {
             const nurureTypesToCancel = [
               'push_to_book',
@@ -684,7 +684,7 @@ function buildBookingTools(
         console.error('[Engine] Booking flow task creation failed:', flowErr?.message);
       }
 
-      // NOTE: No separate WhatsApp confirmation — Claude's response IS the only message
+      // NOTE: No separate WhatsApp confirmation - Claude's response IS the only message
 
       return JSON.stringify({
         success: true,
@@ -694,7 +694,7 @@ function buildBookingTools(
         title: bookingTitle,
         google_event_created: !!calendarResult,
         meet_link: calendarResult?.meetLink || null,
-        message: `Booking confirmed for ${bookingName} on ${date} at ${time}. STOP — do NOT call any more tools. Send ONE confirmation message to the user and end your turn.`,
+        message: `Booking confirmed for ${bookingName} on ${date} at ${time}. STOP - do NOT call any more tools. Send ONE confirmation message to the user and end your turn.`,
       });
     },
 
@@ -894,8 +894,8 @@ async function createFlowTask(
  * Analyze conversation state after every AI response and schedule flow tasks.
  * Called non-blocking from process() and processStream().
  *
- * Flow A: nudge_waiting — AI asked a question, lead hasn't responded (2h timer)
- * Flow D: push_to_book — 5+ messages exchanged, no booking yet (4h timer)
+ * Flow A: nudge_waiting - AI asked a question, lead hasn't responded (2h timer)
+ * Flow D: push_to_book - 5+ messages exchanged, no booking yet (4h timer)
  * Flows B/C (booking reminders) are created in the book_consultation tool handler.
  */
 async function scheduleFlowTasks(
@@ -919,7 +919,7 @@ async function scheduleFlowTasks(
 
   const leadId = lead.id;
   const leadName = lead.customer_name || input.userProfile.name || 'Lead';
-  // Always use the phone from the lead record — never from session metadata or input
+  // Always use the phone from the lead record - never from session metadata or input
   const leadPhone = lead.customer_phone_normalized || normalizedPhone;
 
   // Flow A: If AI response ends with a question, schedule a nudge
@@ -930,7 +930,7 @@ async function scheduleFlowTasks(
       leadPhone,
       leadName,
       scheduledAt: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
-      taskDescription: `Nudge: waiting for reply on ${input.channel} — "${aiResponse.substring(0, 80)}..."`,
+      taskDescription: `Nudge: waiting for reply on ${input.channel} - "${aiResponse.substring(0, 80)}..."`,
       metadata: {
         last_question: aiResponse.substring(0, 200),
         channel: input.channel,
@@ -940,7 +940,7 @@ async function scheduleFlowTasks(
     });
   }
 
-  // Flow D: 5+ messages but no booking — nudge toward booking
+  // Flow D: 5+ messages but no booking - nudge toward booking
   if (input.messageCount >= 5) {
     const sessionTable = input.channel === 'web' ? 'web_sessions' : 'whatsapp_sessions';
     const { data: session } = await supabase

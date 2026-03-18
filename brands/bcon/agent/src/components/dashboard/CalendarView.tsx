@@ -28,7 +28,7 @@ interface CalendarViewProps {
   headerRight?: React.ReactNode
 }
 
-// Business hours only — 8 AM to 6 PM
+// Business hours only - 8 AM to 6 PM
 const HOURS = Array.from({ length: 11 }, (_, i) => i + 8) // 8,9,10,...,18
 const DAY_LABELS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
 
@@ -242,7 +242,7 @@ export default function CalendarView({ bookings, onDateSelect, headerRight }: Ca
 
   return (
     <div className="flex gap-0 h-[calc(100vh-64px)]">
-      {/* Left Sidebar — Mini Calendar */}
+      {/* Left Sidebar - Mini Calendar */}
       <div className="hidden lg:flex flex-col w-[180px] flex-shrink-0 px-3 py-2 border-r" style={{ borderColor: 'var(--border-primary)' }}>
         {/* Mini calendar month nav */}
         <div className="flex items-center justify-between mb-2">
@@ -347,14 +347,14 @@ export default function CalendarView({ bookings, onDateSelect, headerRight }: Ca
               </button>
             ))}
           </div>
-          {/* Right side — sync button etc. */}
+          {/* Right side - sync button etc. */}
           {headerRight && <div className="ml-auto">{headerRight}</div>}
         </div>
 
         {viewMode === 'week' ? (
-          /* ===== WEEK VIEW — Google Calendar Style ===== */
+          /* ===== WEEK VIEW - Google Calendar Style ===== */
           <div className="flex-1 overflow-hidden flex flex-col">
-            {/* Day header row — fixed */}
+            {/* Day header row - fixed */}
             <div className="flex border-b" style={{ borderColor: 'var(--border-primary)' }}>
               {/* Timezone label in corner */}
               <div className="w-[48px] flex-shrink-0 flex items-end justify-center pb-0.5">

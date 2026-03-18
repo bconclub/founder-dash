@@ -94,7 +94,7 @@ export async function GET(request: NextRequest) {
       if (seq && step != null) {
         return {
           ...t,
-          sequence_label: `Step ${step} of ${totalSteps} — ${SEQUENCE_LABELS[seq] || seq}`,
+          sequence_label: `Step ${step} of ${totalSteps} - ${SEQUENCE_LABELS[seq] || seq}`,
         }
       }
       return t

@@ -204,7 +204,7 @@ wss.on('connection', (ws, req) => {
           }
         }
 
-        // Send cached greeting instantly — context loads in background after
+        // Send cached greeting instantly - context loads in background after
         if (greetingAudioChunks && ws.readyState === 1) {
           isSpeaking = true;
           await sendChunkedAudio(ws, greetingAudioChunks);

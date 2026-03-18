@@ -96,7 +96,7 @@ export default function UrlInput({ onSubmit }: UrlInputProps) {
         {/* Optional Title */}
         <div>
           <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>
-            Title (optional — auto-generated from URL if blank)
+            Title (optional - auto-generated from URL if blank)
           </label>
           <input
             type="text"

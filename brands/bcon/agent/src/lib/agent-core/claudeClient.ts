@@ -1,5 +1,5 @@
 /**
- * Claude API Client — Streaming + Sync modes
+ * Claude API Client - Streaming + Sync modes
  * Extracted from web-agent/api/chat/route.ts
  */
 
@@ -256,7 +256,7 @@ export async function generateResponseWithTools(
       continue;
     }
 
-    // Unexpected stop_reason — return whatever text we have
+    // Unexpected stop_reason - return whatever text we have
     return responseText;
   }
 

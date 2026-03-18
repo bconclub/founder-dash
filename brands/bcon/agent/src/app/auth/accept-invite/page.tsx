@@ -294,7 +294,7 @@ function AcceptInviteForm() {
 }
 
 export default function AcceptInvitePage() {
-  // Use a simple loading state — brand colors applied by inner component
+  // Use a simple loading state - brand colors applied by inner component
   return (
     <Suspense fallback={
       <div className="min-h-screen flex items-center justify-center bg-gray-900">

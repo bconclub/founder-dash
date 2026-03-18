@@ -1,5 +1,5 @@
 /**
- * PM2 Ecosystem Configuration — BCON
+ * PM2 Ecosystem Configuration - BCON
  *
  * Usage:
  *   pm2 start ecosystem.config.js

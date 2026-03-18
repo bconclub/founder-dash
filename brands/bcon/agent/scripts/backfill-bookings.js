@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * backfill-bookings.js — Recover 7 missed WhatsApp bookings
+ * backfill-bookings.js - Recover 7 missed WhatsApp bookings
  *
  * Creates Google Calendar events (with Meet links), updates DB,
  * and sends WhatsApp confirmations for future-date bookings.
@@ -256,7 +256,7 @@ async function sendWhatsAppMessage(to, message) {
   const accessToken = process.env.META_WHATSAPP_ACCESS_TOKEN;
 
   if (!phoneNumberId || !accessToken) {
-    console.error('  ⚠️  Missing META_WHATSAPP env vars — skipping WhatsApp send');
+    console.error('  ⚠️  Missing META_WHATSAPP env vars - skipping WhatsApp send');
     return false;
   }
 
@@ -391,17 +391,17 @@ async function processBooking(booking, index) {
   // 2. Check whatsapp_session
   const session = await fetchWhatsAppSession(booking.leadId);
   if (!session) {
-    console.log(`  ⚠️  No whatsapp_session found — skipping`);
+    console.log(`  ⚠️  No whatsapp_session found - skipping`);
     return { success: false, reason: 'no session' };
   }
 
   if (session.booking_date) {
-    console.log(`  ⏭️  Already has booking (${session.booking_date} ${session.booking_time}) — skipping`);
+    console.log(`  ⏭️  Already has booking (${session.booking_date} ${session.booking_time}) - skipping`);
     return { success: false, reason: 'already booked' };
   }
 
   if (DRY_RUN) {
-    console.log(`  🔍 DRY RUN — would create calendar event + update DB`);
+    console.log(`  🔍 DRY RUN - would create calendar event + update DB`);
     return { success: true, dryRun: true };
   }
 
@@ -428,9 +428,9 @@ async function processBooking(booking, index) {
     const sent = await sendWhatsAppMessage(booking.phone, message);
     console.log(sent ? `  ✅ WhatsApp sent` : `  ⚠️  WhatsApp failed`);
   } else if (!future) {
-    console.log(`  ⏭️  Past date — skipping WhatsApp`);
+    console.log(`  ⏭️  Past date - skipping WhatsApp`);
   } else if (!booking.phone) {
-    console.log(`  ⚠️  No phone — skipping WhatsApp`);
+    console.log(`  ⚠️  No phone - skipping WhatsApp`);
   }
 
   // 5. Update whatsapp_sessions
@@ -459,7 +459,7 @@ async function processBooking(booking, index) {
 
 async function main() {
   console.log('═══════════════════════════════════════════════════════════');
-  console.log('  BCON — Backfill 7 Missed WhatsApp Bookings');
+  console.log('  BCON - Backfill 7 Missed WhatsApp Bookings');
   console.log(`  Mode: ${DRY_RUN ? '🔍 DRY RUN' : '⚡ APPLYING'}`);
   console.log('═══════════════════════════════════════════════════════════');
 

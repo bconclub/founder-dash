@@ -3,7 +3,7 @@
  * GET /api/cron/booking-reminders
  *
  * Sends WhatsApp reminders for upcoming bookings:
- *   - 24h before: "Quick reminder — your call is tomorrow at [Time]"
+ *   - 24h before: "Quick reminder - your call is tomorrow at [Time]"
  *   - 1h before:  "Your BCON call starts in 1 hour"
  *   - 30m before: "Your BCON call starts in 30 minutes"
  *

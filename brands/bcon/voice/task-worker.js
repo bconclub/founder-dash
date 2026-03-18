@@ -1,5 +1,5 @@
 /**
- * PROXe Autonomous Task Worker — Sequence Engine
+ * PROXe Autonomous Task Worker - Sequence Engine
  *
  * PM2 runs this every 5 minutes via cron_restart.
  * Processes flow tasks created by engine.ts (nudge, booking reminders, push-to-book)
@@ -240,7 +240,7 @@ async function processPendingTasks() {
 
   for (const task of tasks) {
     try {
-      // Quiet hours: 9 PM – 9 AM IST — reschedule to 9 AM IST next morning
+      // Quiet hours: 9 PM – 9 AM IST - reschedule to 9 AM IST next morning
       const nowIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
       const hourIST = nowIST.getHours();
       if (hourIST >= 21 || hourIST < 9) {
@@ -253,7 +253,7 @@ async function processPendingTasks() {
         await supabase.from('agent_tasks').update({
           scheduled_at: scheduledUtc.toISOString(),
         }).eq('id', task.id);
-        console.log(`[ProcessTasks] Quiet hours — rescheduled to 9 AM IST: ${task.task_type} for ${task.lead_name}`);
+        console.log(`[ProcessTasks] Quiet hours - rescheduled to 9 AM IST: ${task.task_type} for ${task.lead_name}`);
         continue;
       }
 
@@ -264,9 +264,9 @@ async function processPendingTasks() {
         await supabase.from('agent_tasks').update({
           status: 'completed',
           completed_at: new Date().toISOString(),
-          error_message: result.reason || 'Skipped — condition no longer applies',
+          error_message: result.reason || 'Skipped - condition no longer applies',
         }).eq('id', task.id);
-        console.log(`[ProcessTasks] Skipped: ${task.task_type} for ${task.lead_name} — ${result.reason}`);
+        console.log(`[ProcessTasks] Skipped: ${task.task_type} for ${task.lead_name} - ${result.reason}`);
         continue;
       }
 
@@ -299,12 +299,12 @@ async function processPendingTasks() {
 }
 
 // ============================================
-// TASK EXECUTION — Route by type
+// TASK EXECUTION - Route by type
 // ============================================
 async function executeTask(task) {
   let phone = task.lead_phone?.replace(/\D/g, '');
 
-  // Always re-resolve phone from the lead record — task.lead_phone can be stale
+  // Always re-resolve phone from the lead record - task.lead_phone can be stale
   // (e.g. inherited from a parent task, or lead record was merged/overwritten)
   if (task.lead_id) {
     const { data: freshLead } = await supabase
@@ -316,7 +316,7 @@ async function executeTask(task) {
     if (freshLead?.customer_phone_normalized) {
       const freshPhone = freshLead.customer_phone_normalized.replace(/\D/g, '');
       if (freshPhone && freshPhone !== phone) {
-        console.warn(`[executeTask] Phone mismatch for ${task.lead_name}: task=${phone} lead=${freshPhone} — using lead phone`);
+        console.warn(`[executeTask] Phone mismatch for ${task.lead_name}: task=${phone} lead=${freshPhone} - using lead phone`);
         phone = freshPhone;
       }
     }
@@ -336,7 +336,7 @@ async function executeTask(task) {
       return await executeNudgeWaiting(task, waPhone);
     case 'booking_reminder_24h':
       return await executeSendMessage(task, waPhone,
-        `Hey ${task.lead_name}! Just a reminder — you have a call with BCON Club tomorrow at ${task.metadata?.booking_time}. Looking forward to it!`);
+        `Hey ${task.lead_name}! Just a reminder, you have a call with BCON Club tomorrow at ${task.metadata?.booking_time}. Looking forward to it!`);
     case 'booking_reminder_1h':
       return await executeSendMessage(task, waPhone,
         `Just a heads up ${task.lead_name}, your call is in about an hour at ${task.metadata?.booking_time}. Talk soon!`);
@@ -347,7 +347,7 @@ async function executeTask(task) {
       return await executePostBookingFollowup(task, waPhone);
     case 'missed_call_followup':
       return await executeSendMessage(task, waPhone,
-        `Hey ${task.lead_name}! We tried reaching you for your scheduled call but couldn't connect. No worries — when's a good time to reschedule?`);
+        `Hey ${task.lead_name}! We tried reaching you for your scheduled call but couldn't connect. No worries. When's a good time to reschedule?`);
     case 'push_to_book':
       return await executePushToBook(task, waPhone);
 
@@ -375,7 +375,7 @@ async function executeTask(task) {
     }
     case 'follow_up_24h':
       return await executeSendMessage(task, waPhone,
-        `Hey ${task.lead_name}! Just checking in — did you get a chance to think about what we discussed? Happy to answer any questions about setting up AI for your business.`);
+        `Hey ${task.lead_name}! Just checking in. Did you get a chance to think about what we discussed? Happy to answer any questions about setting up AI for your business.`);
     case 'follow_up_day1':
       return await executeSequenceStep(task, waPhone,
         `${task.lead_name}, following up on our call. Let me know if you have any questions.`);
@@ -391,7 +391,7 @@ async function executeTask(task) {
           `${task.lead_name}, looks like the timing might not be right. No worries. Whenever you're ready, just reply here and we'll pick it up.`);
       }
       return await executeSendMessage(task, waPhone,
-        `Hi ${task.lead_name}! It's been a while since we connected. We've been building some exciting AI solutions for businesses like yours. Would love to catch up — what's a good time this week?`);
+        `Hi ${task.lead_name}! It's been a while since we connected. We've been building some exciting AI solutions for businesses like yours. Would love to catch up. What's a good time this week?`);
     case 'post_booking_confirmation':
       return await executeSendMessage(task, waPhone,
         `Great news ${task.lead_name}! Your call with BCON Club is confirmed for ${task.metadata?.booking_date} at ${task.metadata?.booking_time}. We'll discuss how to set up an AI system for your business. See you then!`);
@@ -431,13 +431,13 @@ async function executeNudgeWaiting(task, waPhone) {
   let message;
 
   if (lastQuestion.includes('time') || lastQuestion.includes('when') || lastQuestion.includes('day')) {
-    message = `Hey ${task.lead_name}, just circling back — did you figure out a good time?`;
+    message = `Hey ${task.lead_name}, just circling back. Did you figure out a good time?`;
   } else if (lastQuestion.includes('business') || lastQuestion.includes('do')) {
-    message = `Hey ${task.lead_name}! Still curious about your business — would love to hear more when you get a sec.`;
+    message = `Hey ${task.lead_name}! Still curious about your business. Would love to hear more when you get a sec.`;
   } else if (lastQuestion.includes('help') || lastQuestion.includes('need')) {
-    message = `Hey ${task.lead_name}, just following up — let me know how I can help!`;
+    message = `Hey ${task.lead_name}, just following up. Let me know how I can help!`;
   } else {
-    message = `Hey ${task.lead_name}, just following up on our chat — let me know if you have any questions!`;
+    message = `Hey ${task.lead_name}, just following up on our chat. Let me know if you have any questions!`;
   }
 
   return await executeSendMessage(task, waPhone, message);
@@ -445,7 +445,7 @@ async function executeNudgeWaiting(task, waPhone) {
 
 /**
  * Human callback: admin scheduled a follow-up from a note.
- * Check if lead responded since task was created — if so, skip.
+ * Check if lead responded since task was created - if so, skip.
  */
 async function executeHumanCallback(task, waPhone) {
   if (task.lead_id) {
@@ -468,15 +468,15 @@ async function executeHumanCallback(task, waPhone) {
 
 /**
  * First outreach: new inbound lead from Facebook/Google/website/form.
- * Always uses template since these leads have never messaged us — no 24h window.
+ * Always uses template since these leads have never messaged us - no 24h window.
  * After sending, schedules a nudge_waiting task 2 hours later.
  */
 async function executeFirstOutreach(task, waPhone) {
-  // Telegram approval gate — check before sending template to lead
+  // Telegram approval gate - check before sending template to lead
   const gateResult = await approvalGate(task, waPhone, `[First outreach template to ${task.lead_name}]`, true);
   if (gateResult?.awaiting_approval) return gateResult;
 
-  // Always send template directly — new leads have no 24h window
+  // Always send template directly - new leads have no 24h window
   const templateName = 'bcon_proxe_first_outreach';
   await sendWhatsAppTemplate(waPhone, {
     ...task,
@@ -498,7 +498,7 @@ async function executeFirstOutreach(task, waPhone) {
   }
 
   // Schedule nudge_waiting 2 hours later
-  // Use waPhone (already re-resolved by executeTask) — don't inherit potentially stale task.lead_phone
+  // Use waPhone (already re-resolved by executeTask) - don't inherit potentially stale task.lead_phone
   const resolvedPhone = waPhone.replace(/\D/g, '').slice(-10);
   const { error } = await supabase.from('agent_tasks').insert({
     task_type: 'nudge_waiting',
@@ -558,16 +558,16 @@ async function executeSequenceStep(task, waPhone, message) {
       .limit(1);
 
     if (recentMsg && recentMsg.length > 0) {
-      // Lead responded — cancel all remaining sequence tasks
+      // Lead responded - cancel all remaining sequence tasks
       if (sequence) await cancelSequenceTasks(task.lead_id, sequence);
-      return { skipped: true, reason: `Lead responded — cancelled ${sequence} sequence` };
+      return { skipped: true, reason: `Lead responded - cancelled ${sequence} sequence` };
     }
   }
 
   // Send the message
   const result = await executeSendMessage(task, waPhone, message);
 
-  // Schedule next step based on current task type — pass resolved phone so child tasks get the correct number
+  // Schedule next step based on current task type - pass resolved phone so child tasks get the correct number
   const phone10 = waPhone.replace(/\D/g, '').slice(-10);
   if (task.task_type === 'follow_up_day1') {
     await scheduleNextSequenceStep(task, 'follow_up_day3', 2, 2 * 24 * 60 * 60 * 1000, sequence, phone10);
@@ -581,10 +581,10 @@ async function executeSequenceStep(task, waPhone, message) {
     }
     await scheduleNextSequenceStep(task, 're_engage', 4, 2 * 24 * 60 * 60 * 1000, sequence, phone10);
   } else if (task.task_type === 're_engage' && step === 4) {
-    // Final step — mark as Closed Lost
+    // Final step - mark as Closed Lost
     if (task.lead_id) {
       await supabase.from('all_leads').update({ lead_stage: 'Closed Lost', stage_override: true }).eq('id', task.lead_id);
-      console.log(`[Sequence] Lead ${task.lead_name} marked as Closed Lost — sequence complete`);
+      console.log(`[Sequence] Lead ${task.lead_name} marked as Closed Lost - sequence complete`);
     }
   }
 
@@ -628,7 +628,7 @@ async function cancelSequenceTasks(leadId, sequence) {
     await supabase.from('agent_tasks').update({
       status: 'cancelled',
       completed_at: new Date().toISOString(),
-      error_message: 'Lead responded — sequence cancelled',
+      error_message: 'Lead responded - sequence cancelled',
     }).eq('id', t.id);
   }
   console.log(`[Sequence] Cancelled ${tasks.length} remaining ${sequence} tasks for lead ${leadId}`);
@@ -655,7 +655,7 @@ async function executePushToBook(task, waPhone) {
   }
 
   return await executeSendMessage(task, waPhone,
-    `Hey ${task.lead_name}! We had a great chat earlier. Would love to set up a quick AI Brand Audit for your business — basically we map out exactly where AI plugs in for you. When works this week?`);
+    `Hey ${task.lead_name}! We had a great chat earlier. Would love to set up a quick AI Brand Audit for your business. Basically we map out exactly where AI plugs in for you. When works this week?`);
 }
 
 // ============================================
@@ -696,7 +696,7 @@ async function answerCallbackQuery(callbackQueryId, text) {
 }
 
 /**
- * Telegram approval gate — runs before any message is sent to a lead.
+ * Telegram approval gate - runs before any message is sent to a lead.
  *
  * 'approve' mode: sends preview to Telegram, blocks the send, returns awaiting_approval.
  * 'notify' mode: sends heads-up to Telegram, lets the send proceed.
@@ -733,7 +733,7 @@ async function approvalGate(task, waPhone, message, isTemplate) {
     return { awaiting_approval: true, message_preview: msgPreview };
   }
 
-  // 'notify' mode — send heads-up to Telegram, don't block
+  // 'notify' mode - send heads-up to Telegram, don't block
   const body =
     `<b>PROXE TASK FIRING</b>\n\n` +
     `Lead: ${task.lead_name} (${phone10})\n` +
@@ -949,7 +949,7 @@ async function handleTelegramReject(taskId, chatId) {
 async function executeSendMessage(task, waPhone, message) {
   const within24h = task.lead_id ? await isWithin24hWindow(task.lead_id) : true;
 
-  // Telegram approval gate — check before sending anything to the lead
+  // Telegram approval gate - check before sending anything to the lead
   const gateResult = await approvalGate(task, waPhone, message, !within24h);
   if (gateResult?.awaiting_approval) return gateResult;
 
@@ -997,7 +997,7 @@ async function isWithin24hWindow(leadId) {
 }
 
 // ============================================
-// WHATSAPP SEND — Free-form (Meta Cloud API v21.0)
+// WHATSAPP SEND - Free-form (Meta Cloud API v21.0)
 // ============================================
 async function sendWhatsApp(phone, message) {
   const url = `https://graph.facebook.com/v21.0/${WA_PHONE_ID}/messages`;
@@ -1031,7 +1031,7 @@ async function sendWhatsApp(phone, message) {
 }
 
 // ============================================
-// WHATSAPP SEND — Template (outside 24h window)
+// WHATSAPP SEND - Template (outside 24h window)
 // Routes to the correct template per task type.
 // ============================================
 async function sendWhatsAppTemplate(phone, task) {

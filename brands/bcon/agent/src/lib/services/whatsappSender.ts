@@ -1,12 +1,12 @@
 /**
- * services/whatsappSender.ts — Shared WhatsApp message sending helpers
+ * services/whatsappSender.ts - Shared WhatsApp message sending helpers
  *
  * Extracted so both the booking flow (engine.ts) and cron reminders
  * can send WhatsApp messages via the Meta Cloud API.
  *
  * Supports:
  *   - Free-form text messages (within 24h window)
- *   - Template messages (outside 24h window — reminders, re-engagement)
+ *   - Template messages (outside 24h window - reminders, re-engagement)
  *   - Auto-fallback: try text first, retry with template if 24h error
  */
 
@@ -87,8 +87,8 @@ export async function sendWhatsAppText(
  * Send a template message via Meta Cloud API.
  * Works outside the 24-hour window (requires approved templates).
  *
- * @param templateName — The approved template name in Meta (e.g. "booking_confirmation")
- * @param components — Template variable components
+ * @param templateName - The approved template name in Meta (e.g. "booking_confirmation")
+ * @param components - Template variable components
  */
 export async function sendWhatsAppTemplate(
   to: string,
@@ -200,7 +200,7 @@ export async function sendBookingConfirmation(
 }
 
 /**
- * Send a booking reminder message (always uses template — outside 24h window).
+ * Send a booking reminder message (always uses template - outside 24h window).
  *
  * Template: booking_reminder
  *   {{1}} = name, {{2}} = call title, {{3}} = date/time display
@@ -221,7 +221,7 @@ export async function sendBookingReminder(
                      `today, starts in 30 minutes`;
 
   const message24h =
-    `Hey ${name}! Quick reminder — your ${title} with BCON is tomorrow at ${timeDisplay} IST.\n\n` +
+    `Hey ${name}! Quick reminder, your ${title} with BCON is tomorrow at ${timeDisplay} IST.\n\n` +
     (meetLink ? `📍 ${meetLink}\n\n` : '') +
     `See you there!`;
 
@@ -235,7 +235,7 @@ export async function sendBookingReminder(
     (meetLink ? `📍 Join here: ${meetLink}\n\n` : '') +
     `See you soon!`;
 
-  // Reminders are always outside 24h window — use template
+  // Reminders are always outside 24h window - use template
   // Template vars: {{1}}=name, {{2}}=title, {{3}}=dateTime + URL button for meet link
   const reminderComponents: Array<any> = [
     {
@@ -248,7 +248,7 @@ export async function sendBookingReminder(
     },
   ];
   // booking_reminder button 0 = "Join Meeting" (URL: meet.google.com/{{1}})
-  // Always include button param — Meta requires it even if no real link
+  // Always include button param - Meta requires it even if no real link
   reminderComponents.push({
     type: 'button',
     sub_type: 'url',

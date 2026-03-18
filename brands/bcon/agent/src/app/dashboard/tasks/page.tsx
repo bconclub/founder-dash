@@ -83,7 +83,7 @@ function channelIcon(metadata: Record<string, unknown>) {
 /** Parse raw error JSON into a short human-readable message */
 function cleanErrorMessage(raw: string | null): string {
   if (!raw) return 'Unknown error'
-  if (raw.includes('132001') || raw.includes('template name')) return 'Template not found — needs setup in Meta'
+  if (raw.includes('132001') || raw.includes('template name')) return 'Template not found - needs setup in Meta'
   if (raw.includes('131047') || raw.includes('Re-engagement')) return '24h window expired'
   if (raw.includes('24h_window')) return '24h window expired'
   if (raw.includes('No phone')) return 'No phone number on lead'
@@ -358,7 +358,7 @@ export default function TasksPage() {
 
       {/* Main Area */}
       <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-        {/* Left — Activity Timeline */}
+        {/* Left - Activity Timeline */}
         <div style={{ flex: '3 1 400px', minWidth: 0 }}>
           {/* Filter Tabs */}
           <div style={{ display: 'flex', gap: 4, marginBottom: 12 }}>
@@ -436,7 +436,7 @@ export default function TasksPage() {
           </div>
         </div>
 
-        {/* Right — Queue */}
+        {/* Right - Queue */}
         <div style={{ flex: '2 1 280px', minWidth: 0 }}>
           {/* Firing Soon */}
           <div style={{ color: 'var(--text-primary)', fontWeight: 600, fontSize: 14, marginBottom: 12 }}>

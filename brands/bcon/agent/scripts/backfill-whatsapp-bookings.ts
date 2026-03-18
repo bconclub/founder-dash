@@ -230,7 +230,7 @@ async function findBookings(): Promise<FoundBooking[]> {
     // Skip if already backfilled
     if (existingSession?.booking_date) {
       console.log(
-        `  ⏭️  ${lead?.customer_name || msg.lead_id} — already has booking (${existingSession.booking_date} ${existingSession.booking_time}), skipping`,
+        `  ⏭️  ${lead?.customer_name || msg.lead_id} - already has booking (${existingSession.booking_date} ${existingSession.booking_time}), skipping`,
       );
       continue;
     }
@@ -311,7 +311,7 @@ async function applyBooking(booking: FoundBooking): Promise<boolean> {
 
 async function main() {
   console.log('═══════════════════════════════════════════════════════════════');
-  console.log('  BCON — WhatsApp Booking Backfill Script');
+  console.log('  BCON - WhatsApp Booking Backfill Script');
   console.log(`  Mode: ${DRY_RUN ? '🔍 DRY RUN (preview only)' : '⚡ APPLYING CHANGES'}`);
   console.log('═══════════════════════════════════════════════════════════════\n');
 
@@ -340,12 +340,12 @@ async function main() {
 
   const unparsed = bookings.filter(b => !b.parsedDate || !b.parsedTime);
   if (unparsed.length > 0) {
-    console.log(`⚠️  ${unparsed.length} booking(s) have unparsed date/time — review manually above.`);
+    console.log(`⚠️  ${unparsed.length} booking(s) have unparsed date/time - review manually above.`);
   }
 
   if (DRY_RUN) {
     console.log('───────────────────────────────────────────────────────────────');
-    console.log('🔍 DRY RUN — no changes made.');
+    console.log('🔍 DRY RUN - no changes made.');
     console.log('   Run with --apply to write these bookings to the database:');
     console.log('   npx tsx scripts/backfill-whatsapp-bookings.ts --apply');
     return;
@@ -361,20 +361,20 @@ async function main() {
 
   for (const b of bookings) {
     if (!b.parsedDate || !b.parsedTime) {
-      console.log(`  ⏭️  ${b.leadName || b.leadId} — skipped (could not parse date/time)`);
+      console.log(`  ⏭️  ${b.leadName || b.leadId} - skipped (could not parse date/time)`);
       skipped++;
       continue;
     }
 
     if (!b.whatsappSessionId) {
-      console.log(`  ⏭️  ${b.leadName || b.leadId} — skipped (no whatsapp_session to update)`);
+      console.log(`  ⏭️  ${b.leadName || b.leadId} - skipped (no whatsapp_session to update)`);
       skipped++;
       continue;
     }
 
     const ok = await applyBooking(b);
     if (ok) {
-      console.log(`  ✅ ${b.leadName || b.leadId} — ${b.parsedDate} at ${b.parsedTime}`);
+      console.log(`  ✅ ${b.leadName || b.leadId} - ${b.parsedDate} at ${b.parsedTime}`);
       success++;
     } else {
       failed++;

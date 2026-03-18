@@ -394,7 +394,7 @@ export function RadialProgress({
           </span>
         </div>
       </div>
-      {/* Label below circle — hidden when empty */}
+      {/* Label below circle - hidden when empty */}
       {label && <p className="text-xs font-medium mt-2" style={{ color: 'var(--text-secondary)' }}>{label}</p>}
     </div>
   )
