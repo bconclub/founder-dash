@@ -354,11 +354,12 @@ export async function GET(request: NextRequest) {
 
     try {
       // Strategy 1: Use pre-calculated input_to_output_gap_ms from conversations (already fetched)
+      // Only use the last 10 agent messages (most recent) to reflect current system performance
       const conversationsForResponse = messages.filter((msg: any) =>
         (msg.channel === 'web' || msg.channel === 'whatsapp') &&
         msg.sender === 'agent' &&
         msg.metadata?.input_to_output_gap_ms != null
-      )
+      ).slice(-10)
 
       if (conversationsForResponse.length > 0) {
         let totalGapMs = 0
@@ -381,38 +382,32 @@ export async function GET(request: NextRequest) {
       }
 
       // Strategy 2 (fallback): Calculate from consecutive customer→agent timestamps
+      // Use only last 10 messages overall to reflect current performance
       if (avgResponseTimeMs === 0 && messages && messages.length > 0) {
         let totalGapMs2 = 0
         let pairCount = 0
 
-        // Group messages by lead_id, then find customer→agent pairs
-        const messagesByLead: Record<string, any[]> = {}
-        messages.forEach((msg: any) => {
-          if (!msg.lead_id) return
-          if (!messagesByLead[msg.lead_id]) messagesByLead[msg.lead_id] = []
-          messagesByLead[msg.lead_id].push(msg)
-        })
+        // Take the last 20 messages (enough to find ~10 customer→agent pairs)
+        const recentMessages = messages.slice(-20)
 
-        Object.values(messagesByLead).forEach((leadMessages: any[]) => {
-          // Messages are already sorted by created_at ascending
-          for (let i = 0; i < leadMessages.length - 1; i++) {
-            const current = leadMessages[i]
-            const next = leadMessages[i + 1]
+        for (let i = 0; i < recentMessages.length - 1; i++) {
+          const current = recentMessages[i]
+          const next = recentMessages[i + 1]
 
-            // Find customer→agent pairs
-            if (current.sender === 'customer' && next.sender === 'agent') {
-              const customerTime = new Date(current.created_at).getTime()
-              const agentTime = new Date(next.created_at).getTime()
-              const gapMs = agentTime - customerTime
+          // Find customer→agent pairs
+          if (current.sender === 'customer' && next.sender === 'agent') {
+            const customerTime = new Date(current.created_at).getTime()
+            const agentTime = new Date(next.created_at).getTime()
+            const gapMs = agentTime - customerTime
 
-              // Only count reasonable response times (between 100ms and 300000ms / 5 minutes)
-              if (gapMs > 100 && gapMs < 300000) {
-                totalGapMs2 += gapMs
-                pairCount++
-              }
+            // Only count reasonable response times (between 100ms and 300000ms / 5 minutes)
+            if (gapMs > 100 && gapMs < 300000) {
+              totalGapMs2 += gapMs
+              pairCount++
+              if (pairCount >= 10) break
             }
           }
-        })
+        }
 
         if (pairCount > 0) {
           avgResponseTimeMs = totalGapMs2 / pairCount

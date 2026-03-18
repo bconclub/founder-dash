@@ -597,32 +597,38 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
           : 0
 
         // Calculate average response time from metadata.response_time_ms
+        // Use only last 5 agent messages to reflect current performance
         let totalResponseTime = 0
         let responseCount = 0
 
-        // First, try to use metadata.response_time_ms
-        messages.forEach((msg: any) => {
-          if (msg.sender === 'agent' && msg.metadata?.response_time_ms) {
-            const responseTimeMs = typeof msg.metadata.response_time_ms === 'number'
-              ? msg.metadata.response_time_ms
-              : parseInt(msg.metadata.response_time_ms, 10)
-            if (!isNaN(responseTimeMs) && responseTimeMs > 0) {
-              totalResponseTime += responseTimeMs
-              responseCount++
-            }
+        // First, try to use metadata.response_time_ms (last 5 only)
+        const agentMsgsWithTime = messages.filter((msg: any) =>
+          msg.sender === 'agent' && msg.metadata?.response_time_ms
+        ).slice(-5)
+
+        agentMsgsWithTime.forEach((msg: any) => {
+          const responseTimeMs = typeof msg.metadata.response_time_ms === 'number'
+            ? msg.metadata.response_time_ms
+            : parseInt(msg.metadata.response_time_ms, 10)
+          if (!isNaN(responseTimeMs) && responseTimeMs > 0) {
+            totalResponseTime += responseTimeMs
+            responseCount++
           }
         })
 
         // Fallback to timestamp calculation if no metadata.response_time_ms
+        // Use last 10 messages to find up to 5 customer→agent pairs
         if (responseCount === 0) {
-          for (let i = 0; i < messages.length - 1; i++) {
-            const msg1 = messages[i] as any
-            const msg2 = messages[i + 1] as any
+          const recentMessages = messages.slice(-10)
+          for (let i = 0; i < recentMessages.length - 1; i++) {
+            const msg1 = recentMessages[i] as any
+            const msg2 = recentMessages[i + 1] as any
             if (msg1.sender === 'customer' && msg2.sender === 'agent') {
               const timeDiff = new Date(msg2.created_at).getTime() - new Date(msg1.created_at).getTime()
               if (timeDiff > 0) {
                 totalResponseTime += timeDiff
                 responseCount++
+                if (responseCount >= 5) break
               }
             }
           }
