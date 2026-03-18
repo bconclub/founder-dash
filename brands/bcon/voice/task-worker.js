@@ -427,11 +427,30 @@ async function executeHumanCallback(task, waPhone) {
 
 /**
  * First outreach: new inbound lead from Facebook/Google/website/form.
- * Send intro message, then schedule a nudge 2 hours later.
+ * Always uses template since these leads have never messaged us — no 24h window.
+ * After sending, schedules a nudge_waiting task 2 hours later.
  */
 async function executeFirstOutreach(task, waPhone) {
-  const result = await executeSendMessage(task, waPhone,
-    `Hey ${task.lead_name}, thanks for reaching out! We help businesses grow faster with smarter systems. What's the biggest challenge in your business right now?`);
+  // Always send template directly — new leads have no 24h window
+  const templateName = 'bcon_proxe_first_outreach';
+  await sendWhatsAppTemplate(waPhone, {
+    ...task,
+    task_type: 'first_outreach',
+  });
+
+  // Log to conversations
+  if (task.lead_id) {
+    await supabase.from('conversations').insert({
+      lead_id: task.lead_id,
+      channel: 'whatsapp',
+      sender: 'agent',
+      content: `[Template: ${templateName}] First outreach to ${task.lead_name}`,
+      message_type: 'text',
+      metadata: { task_type: task.task_type, task_id: task.id, autonomous: true, template: templateName }
+    }).then(({ error }) => {
+      if (error) console.error('[FirstOutreach] Conversation log error:', error.message);
+    });
+  }
 
   // Schedule nudge_waiting 2 hours later
   const { error } = await supabase.from('agent_tasks').insert({
@@ -456,7 +475,7 @@ async function executeFirstOutreach(task, waPhone) {
   if (error) console.error(`[FirstOutreach] Failed to create nudge:`, error.message);
   else console.log(`[FirstOutreach] Nudge scheduled for ${task.lead_name} in 2h`);
 
-  return result;
+  return null;
 }
 
 /**
@@ -720,7 +739,17 @@ async function sendWhatsAppTemplate(phone, task) {
         ]
       }
     ];
-  } else if (taskType === 'first_outreach' || taskType.startsWith('follow_up_day') || taskType === 'post_call_followup') {
+  } else if (taskType === 'first_outreach') {
+    templateName = 'bcon_proxe_first_outreach';
+    components = [
+      {
+        type: 'body',
+        parameters: [
+          { type: 'text', text: leadName },
+        ]
+      }
+    ];
+  } else if (taskType.startsWith('follow_up_day') || taskType === 'post_call_followup') {
     templateName = 'bcon_proxe_followup';
     components = [
       {
