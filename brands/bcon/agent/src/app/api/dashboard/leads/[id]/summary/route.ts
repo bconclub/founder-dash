@@ -69,8 +69,14 @@ export async function GET(
     const webSummary = lead.unified_context?.web?.conversation_summary
     const whatsappSummary = lead.unified_context?.whatsapp?.conversation_summary
 
-    // Priority 1: Use unified_summary if it exists (unless forced refresh)
-    if (unifiedSummary && !forceRefresh) {
+    // Check if cached summary is stale: new activity since last generation
+    const summaryGeneratedAt = lead.unified_context?.unified_summary_generated_at
+    const lastInteractionAt = lead.last_interaction_at
+    const summaryIsStale = unifiedSummary && summaryGeneratedAt && lastInteractionAt &&
+      new Date(lastInteractionAt).getTime() > new Date(summaryGeneratedAt).getTime()
+
+    // Priority 1: Use unified_summary if it exists, is not stale, and not forced refresh
+    if (unifiedSummary && !forceRefresh && !summaryIsStale) {
       console.log('Using unified_summary from unified_context for lead:', leadId)
 
       // Still need to fetch activities and stage history for attribution
@@ -400,7 +406,8 @@ ${fullConversationContext ? `CONVERSATION (${allConversationMessages.length} mes
               try {
                 const newUnifiedContext = {
                   ...(lead.unified_context || {}),
-                  unified_summary: unifiedSummary
+                  unified_summary: unifiedSummary,
+                  unified_summary_generated_at: new Date().toISOString()
                 };
                 await supabase
                   .from('all_leads')
@@ -726,7 +733,8 @@ ${conversationContext || 'No messages yet'}`
             try {
               const newUnifiedContext = {
                 ...(lead.unified_context || {}),
-                unified_summary: aiSummary
+                unified_summary: aiSummary,
+                unified_summary_generated_at: new Date().toISOString()
               };
               await supabase
                 .from('all_leads')
