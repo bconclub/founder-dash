@@ -211,12 +211,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     // No-op — sidebar stays open/closed via manual toggle only
   }
 
-  const cycleTheme = () => {
-    const order: ThemeMode[] = ['bw-dark', 'bw-light', 'brand']
-    const idx = order.indexOf(theme)
-    setTheme(order[(idx + 1) % order.length])
-  }
-
   // AUTHENTICATION DISABLED - Logout function disabled
   const handleLogout = async () => {
     // const supabase = createClient()
@@ -530,13 +524,42 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           </div>
         </nav>
 
-        {/* Footer Section: User + Menu + Version in one compact strip */}
+        {/* Footer Section: Theme toggle + Menu + Version */}
         <div
           className="dashboard-layout-sidebar-footer flex-shrink-0 border-t flex flex-col"
           style={{
             borderColor: 'var(--border-primary)',
           }}
         >
+          {/* Theme toggle row — always visible */}
+          {!isCollapsed && (
+            <div className="flex items-center gap-1 px-3 pt-2 pb-1">
+              {([
+                { mode: 'bw-dark' as ThemeMode, label: 'Dark', icon: <MdDarkMode size={12} /> },
+                { mode: 'bw-light' as ThemeMode, label: 'Light', icon: <MdLightMode size={12} /> },
+                { mode: 'brand' as ThemeMode, label: 'Brand', icon: <MdPalette size={12} /> },
+              ]).map(({ mode, label, icon }) => (
+                <button
+                  key={mode}
+                  onClick={() => setTheme(mode)}
+                  className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium transition-all duration-150 ${
+                    theme === mode
+                      ? 'border'
+                      : 'opacity-50 hover:opacity-80'
+                  }`}
+                  style={{
+                    color: 'var(--text-primary)',
+                    borderColor: theme === mode ? 'var(--text-primary)' : 'transparent',
+                    backgroundColor: theme === mode ? 'var(--bg-hover)' : 'transparent',
+                  }}
+                >
+                  {icon}
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+
           {/* Compact footer row: three-dot menu + version */}
           <div
             className="dashboard-layout-footer-row flex items-center"
@@ -582,41 +605,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                     minWidth: '180px',
                   }}
                 >
-                  <button
-                    onClick={() => {
-                      setMoreOptionsOpen(false)
-                      cycleTheme()
-                    }}
-                    className="dashboard-layout-more-options-item flex items-center w-full text-left px-4 py-2 text-sm transition-colors duration-200"
-                    style={{
-                      color: 'var(--text-primary)',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = 'transparent'
-                    }}
-                  >
-                    {theme === 'bw-dark' && (
-                      <>
-                        <MdDarkMode size={18} style={{ marginRight: '12px' }} />
-                        Dark
-                      </>
-                    )}
-                    {theme === 'bw-light' && (
-                      <>
-                        <MdLightMode size={18} style={{ marginRight: '12px' }} />
-                        Light
-                      </>
-                    )}
-                    {theme === 'brand' && (
-                      <>
-                        <MdPalette size={18} style={{ marginRight: '12px' }} />
-                        Brand
-                      </>
-                    )}
-                  </button>
                   <Link
                     href="/status"
                     onClick={() => {
@@ -648,7 +636,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               className="dashboard-layout-version-badge px-1 py-px rounded text-[9px] font-medium"
               style={{
                 backgroundColor: 'var(--accent-primary)',
-                color: 'white',
+                color: theme === 'bw-light' ? '#ffffff' : '#000000',
               }}
               title={buildDate ? `v${buildVersion} - Build: ${buildDate}` : `v${buildVersion}`}
               suppressHydrationWarning

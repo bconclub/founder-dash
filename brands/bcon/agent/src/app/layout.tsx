@@ -25,7 +25,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" suppressHydrationWarning data-brand="bcon" data-theme="bcon-electric">
+    <html lang="en" suppressHydrationWarning data-brand="bcon" data-theme="bw-dark">
       <body className={`${inter.className} ${inter.variable}`} suppressHydrationWarning>
         <Script
           id="theme-init"
@@ -34,13 +34,20 @@ export default function RootLayout({
             __html: `
               (function() {
                 try {
-                  var theme = localStorage.getItem('theme');
-                  if (theme === 'light') {
-                    document.documentElement.classList.add('light');
-                    document.documentElement.classList.remove('dark');
+                  var t = localStorage.getItem('proxe-theme') || 'bw-dark';
+                  var el = document.documentElement;
+                  if (t === 'bw-light') {
+                    el.setAttribute('data-theme', 'bw-light');
+                    el.classList.add('light');
+                    el.classList.remove('dark');
+                  } else if (t === 'brand') {
+                    el.setAttribute('data-theme', 'bcon-electric');
+                    el.classList.add('dark');
+                    el.classList.remove('light');
                   } else {
-                    document.documentElement.classList.add('dark');
-                    document.documentElement.classList.remove('light');
+                    el.setAttribute('data-theme', 'bw-dark');
+                    el.classList.add('dark');
+                    el.classList.remove('light');
                   }
                 } catch (e) {
                   document.documentElement.classList.add('dark');
