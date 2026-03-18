@@ -281,7 +281,26 @@ async function processPendingTasks() {
 // TASK EXECUTION — Route by type
 // ============================================
 async function executeTask(task) {
-  const phone = task.lead_phone?.replace(/\D/g, '');
+  let phone = task.lead_phone?.replace(/\D/g, '');
+
+  // Always re-resolve phone from the lead record — task.lead_phone can be stale
+  // (e.g. inherited from a parent task, or lead record was merged/overwritten)
+  if (task.lead_id) {
+    const { data: freshLead } = await supabase
+      .from('all_leads')
+      .select('customer_phone_normalized')
+      .eq('id', task.lead_id)
+      .maybeSingle();
+
+    if (freshLead?.customer_phone_normalized) {
+      const freshPhone = freshLead.customer_phone_normalized.replace(/\D/g, '');
+      if (freshPhone && freshPhone !== phone) {
+        console.warn(`[executeTask] Phone mismatch for ${task.lead_name}: task=${phone} lead=${freshPhone} — using lead phone`);
+        phone = freshPhone;
+      }
+    }
+  }
+
   if (!phone) throw new Error('No phone number');
 
   const waPhone = phone.length === 10 ? `91${phone}` : phone;
@@ -454,11 +473,13 @@ async function executeFirstOutreach(task, waPhone) {
   }
 
   // Schedule nudge_waiting 2 hours later
+  // Use waPhone (already re-resolved by executeTask) — don't inherit potentially stale task.lead_phone
+  const resolvedPhone = waPhone.replace(/\D/g, '').slice(-10);
   const { error } = await supabase.from('agent_tasks').insert({
     task_type: 'nudge_waiting',
     task_description: `Nudge: waiting for reply after first outreach to ${task.lead_name}`,
     lead_id: task.lead_id || null,
-    lead_phone: task.lead_phone,
+    lead_phone: resolvedPhone,
     lead_name: task.lead_name,
     status: 'pending',
     scheduled_at: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
@@ -488,7 +509,8 @@ async function executePostBookingFollowup(task, waPhone) {
     `Hey ${task.lead_name}! How did the call go? Anything else you need from us?`);
   // If this is a post_call sequence step 0, schedule next step
   if (task.metadata?.sequence === 'post_call') {
-    await scheduleNextSequenceStep(task, 'follow_up_day1', 1, 24 * 60 * 60 * 1000, 'post_call');
+    const phone10 = waPhone.replace(/\D/g, '').slice(-10);
+    await scheduleNextSequenceStep(task, 'follow_up_day1', 1, 24 * 60 * 60 * 1000, 'post_call', phone10);
   }
   return result;
 }
@@ -520,18 +542,19 @@ async function executeSequenceStep(task, waPhone, message) {
   // Send the message
   const result = await executeSendMessage(task, waPhone, message);
 
-  // Schedule next step based on current task type
+  // Schedule next step based on current task type — pass resolved phone so child tasks get the correct number
+  const phone10 = waPhone.replace(/\D/g, '').slice(-10);
   if (task.task_type === 'follow_up_day1') {
-    await scheduleNextSequenceStep(task, 'follow_up_day3', 2, 2 * 24 * 60 * 60 * 1000, sequence);
+    await scheduleNextSequenceStep(task, 'follow_up_day3', 2, 2 * 24 * 60 * 60 * 1000, sequence, phone10);
   } else if (task.task_type === 'follow_up_day3') {
-    await scheduleNextSequenceStep(task, 'follow_up_day5', 3, 2 * 24 * 60 * 60 * 1000, sequence);
+    await scheduleNextSequenceStep(task, 'follow_up_day5', 3, 2 * 24 * 60 * 60 * 1000, sequence, phone10);
   } else if (task.task_type === 'follow_up_day5') {
     // Escalate: mark lead as Cold
     if (task.lead_id) {
       await supabase.from('all_leads').update({ lead_stage: 'Cold' }).eq('id', task.lead_id);
       console.log(`[Sequence] Lead ${task.lead_name} marked as Cold`);
     }
-    await scheduleNextSequenceStep(task, 're_engage', 4, 2 * 24 * 60 * 60 * 1000, sequence);
+    await scheduleNextSequenceStep(task, 're_engage', 4, 2 * 24 * 60 * 60 * 1000, sequence, phone10);
   } else if (task.task_type === 're_engage' && step === 4) {
     // Final step — mark as Closed Lost
     if (task.lead_id) {
@@ -546,12 +569,13 @@ async function executeSequenceStep(task, waPhone, message) {
 /**
  * Schedule the next step in a sequence.
  */
-async function scheduleNextSequenceStep(task, nextType, nextStep, delayMs, sequence) {
+async function scheduleNextSequenceStep(task, nextType, nextStep, delayMs, sequence, resolvedPhone) {
+  const phone = resolvedPhone || task.lead_phone;
   const { error } = await supabase.from('agent_tasks').insert({
     task_type: nextType,
     task_description: `Sequence step ${nextStep}/4: ${nextType} for ${task.lead_name}`,
     lead_id: task.lead_id || null,
-    lead_phone: task.lead_phone,
+    lead_phone: phone,
     lead_name: task.lead_name,
     status: 'pending',
     scheduled_at: new Date(Date.now() + delayMs).toISOString(),

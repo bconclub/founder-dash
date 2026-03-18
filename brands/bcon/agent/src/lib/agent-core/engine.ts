@@ -927,7 +927,9 @@ async function scheduleFlowTasks(
 
   const leadId = lead.id;
   const leadName = lead.customer_name || input.userProfile.name || 'Lead';
-  const leadPhone = lead.customer_phone_normalized || normalizedPhone;
+  // Always use the actual input phone — it's the ground truth from the conversation.
+  // lead.customer_phone_normalized can diverge if the lead record was merged/overwritten.
+  const leadPhone = normalizedPhone;
 
   // Flow A: If AI response ends with a question, schedule a nudge
   if (aiResponse.includes('?')) {
