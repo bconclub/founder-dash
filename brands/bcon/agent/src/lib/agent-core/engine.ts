@@ -655,6 +655,29 @@ function buildBookingTools(
               });
             }
           }
+
+          // Cancel any pending/queued nurture tasks — lead already booked
+          if (taskLeadId) {
+            const nurureTypesToCancel = [
+              'push_to_book',
+              'nudge_waiting',
+              'follow_up_day1',
+              'follow_up_day3',
+              'follow_up_day5',
+            ];
+            const { error: cancelErr, count: cancelledCount } = await supabase
+              .from('agent_tasks')
+              .update({ status: 'cancelled', completed_at: new Date().toISOString() })
+              .eq('lead_id', taskLeadId)
+              .in('task_type', nurureTypesToCancel)
+              .in('status', ['pending', 'queued']);
+
+            if (cancelErr) {
+              console.error('[Engine] Failed to cancel nurture tasks:', cancelErr.message);
+            } else if (cancelledCount) {
+              console.log(`[Engine] Cancelled ${cancelledCount} nurture tasks for ${bookingName} (lead booked)`);
+            }
+          }
         }
       } catch (flowErr: any) {
         console.error('[Engine] Booking flow task creation failed:', flowErr?.message);
