@@ -1042,7 +1042,7 @@ export default function InboxPage() {
                 className="px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider transition-all"
                 style={{
                   background: channelFilter === ch ? 'var(--accent-primary)' : 'transparent',
-                  color: channelFilter === ch ? 'white' : 'var(--text-secondary)',
+                  color: channelFilter === ch ? 'var(--text-button, #fff)' : 'var(--text-secondary)',
                 }}
               >
                 {ch}
@@ -1063,7 +1063,7 @@ export default function InboxPage() {
               <button
                 onClick={() => fetchConversations()}
                 className="mt-1 px-3 py-1 text-[10px] rounded"
-                style={{ background: 'var(--accent-primary)', color: 'white' }}
+                style={{ background: 'var(--accent-primary)', color: 'var(--text-button, #fff)' }}
               >
                 Refresh
               </button>
@@ -1107,10 +1107,10 @@ export default function InboxPage() {
                       {/* Line 1: Score Ring + Name + Timestamp + Open */}
                       <div className="flex items-center gap-2.5">
                         <ScoreRing score={conv.lead_score} size={28} />
-                        <span className="text-sm font-semibold truncate flex-1" style={{ color: 'white' }}>
+                        <span className="text-sm font-semibold truncate flex-1" style={{ color: 'var(--text-primary)' }}>
                           {conv.lead_name || conv.lead_phone || 'Unknown'}
                         </span>
-                        <span className="text-xs flex-shrink-0" style={{ color: '#6b7280' }}>
+                        <span className="text-xs flex-shrink-0" style={{ color: 'var(--text-muted)' }}>
                           {timeAgo(conv.last_message_at)}
                         </span>
                         <button
@@ -1124,7 +1124,7 @@ export default function InboxPage() {
                       </div>
 
                       {/* Line 2: Brand · Location · Source */}
-                      <div className="text-xs truncate mt-1 flex items-center gap-1" style={{ color: '#9ca3af', paddingLeft: '38px' }}>
+                      <div className="text-xs truncate mt-1 flex items-center gap-1" style={{ color: 'var(--text-muted)', paddingLeft: '38px' }}>
                         {[conv.brand_name, conv.city].filter(Boolean).join(' · ')}
                         {(conv.brand_name || conv.city) && conv.channels.length > 0 && (
                           <span className="mx-0.5" style={{ opacity: 0.4 }}>·</span>
@@ -1175,7 +1175,7 @@ export default function InboxPage() {
                       setSelectedChannel('');
                     }
                   }}
-                  className="cursor-pointer transition-colors duration-150 border-b relative hover:bg-gray-50 dark:hover:bg-white/5"
+                  className="cursor-pointer transition-colors duration-150 border-b relative hover:bg-[var(--bg-hover)]"
                   style={{
                     borderColor: 'var(--border-primary)',
                   }}
@@ -1186,20 +1186,20 @@ export default function InboxPage() {
                       <span className="text-[12px] font-semibold truncate flex-1" style={{ color: 'var(--text-primary)' }}>
                         {conv.lead_name || conv.lead_phone || 'Unknown'}
                       </span>
-                      <span className="text-[9px] flex-shrink-0 ml-2" style={{ color: '#6b7280' }}>
+                      <span className="text-[9px] flex-shrink-0 ml-2" style={{ color: 'var(--text-muted)' }}>
                         {timeAgo(conv.last_message_at)}
                       </span>
                     </div>
                     {/* Line 2: Last message preview + EVENT badge */}
                     <div className="flex items-center gap-1.5 mt-0.5">
-                      <p className="text-[11px] truncate flex-1" style={{ color: '#6b7280' }}>
+                      <p className="text-[11px] truncate flex-1" style={{ color: 'var(--text-muted)' }}>
                         {conv.last_message || '\u00A0'}
                       </p>
                       {conv.booking_status && (
                         <span className="text-[8px] font-bold uppercase px-1.5 py-0.5 rounded-full whitespace-nowrap flex-shrink-0"
                           style={{
-                            background: 'rgba(96, 165, 250, 0.15)',
-                            color: '#60a5fa',
+                            background: 'var(--accent-subtle)',
+                            color: 'var(--accent-primary)',
                           }}>
                           EVENT
                         </span>
@@ -1356,7 +1356,7 @@ export default function InboxPage() {
                     >
                       <div
                         className={`max-w-[80%] rounded-xl px-3 py-2 shadow-sm border ${isCustomer
-                          ? 'bg-white dark:bg-[#1A1A2E] border-gray-200 dark:border-[#1E1E2E]'
+                          ? 'bg-[var(--bg-secondary)] border-[var(--border-primary)]'
                           : ''}`}
                         style={{
                           background: !isCustomer ? 'var(--accent-subtle)' : undefined,
@@ -1437,7 +1437,7 @@ export default function InboxPage() {
                   }}
                   title="Send Message"
                 >
-                  <MdSend size={18} color="white" />
+                  <MdSend size={18} style={{ color: 'var(--text-button, #fff)' }} />
                 </button>
               </div>
             </div>
@@ -1476,7 +1476,7 @@ export default function InboxPage() {
               <div className="p-4 pt-5 border-b flex flex-col items-center text-center" style={{ borderColor: 'var(--border-primary)' }}>
                 <div
                   className="w-16 h-16 rounded-full flex items-center justify-center text-xl font-bold mb-3"
-                  style={{ background: avatarBg, color: 'white' }}
+                  style={{ background: avatarBg, color: '#fff' }}
                 >
                   {initials}
                 </div>
@@ -1658,7 +1658,7 @@ export default function InboxPage() {
                     )}
                     {ml && (
                       <a href={ml} target="_blank" rel="noopener noreferrer"
-                        className="text-[10px] mt-1.5 pl-5 inline-block hover:underline" style={{ color: '#60a5fa' }}>
+                        className="text-[10px] mt-1.5 pl-5 inline-block hover:underline" style={{ color: 'var(--accent-primary)' }}>
                         Join Meeting →
                       </a>
                     )}
@@ -1684,7 +1684,7 @@ export default function InboxPage() {
             <button
               onClick={() => openLeadModal(selectedLeadId)}
               className="w-full text-xs font-semibold py-2.5 rounded-lg transition-opacity flex items-center justify-center gap-1.5 hover:opacity-90"
-              style={{ background: 'var(--accent-primary)', color: 'white' }}
+              style={{ background: 'var(--accent-primary)', color: 'var(--text-button, #fff)' }}
             >
               <MdOpenInNew size={14} /> View Full Details
             </button>
