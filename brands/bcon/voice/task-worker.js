@@ -14,6 +14,8 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SER
 const WA_TOKEN = process.env.META_WHATSAPP_ACCESS_TOKEN;
 const WA_PHONE_ID = process.env.META_WHATSAPP_PHONE_NUMBER_ID;
 const WA_TEMPLATE_NAME = process.env.WA_TEMPLATE_NAME || 'bcon_followup';
+const ADMIN_NOTIFY_PHONE = process.env.ADMIN_NOTIFY_PHONE || null;
+const APPROVAL_MODE = process.env.APPROVAL_MODE || 'notify'; // 'notify' or 'approve'
 
 async function main() {
   console.log(`[TaskWorker] Run started at ${new Date().toISOString()}`);
@@ -259,6 +261,16 @@ async function processPendingTasks() {
         continue;
       }
 
+      // If approval mode blocked the send, park the task
+      if (result && result.awaiting_approval) {
+        await supabase.from('agent_tasks').update({
+          status: 'awaiting_approval',
+          error_message: result.message_preview || null,
+        }).eq('id', task.id);
+        console.log(`[ProcessTasks] Awaiting approval: ${task.task_type} for ${task.lead_name}`);
+        continue;
+      }
+
       await supabase.from('agent_tasks').update({
         status: 'completed',
         completed_at: new Date().toISOString(),
@@ -451,6 +463,10 @@ async function executeHumanCallback(task, waPhone) {
  * After sending, schedules a nudge_waiting task 2 hours later.
  */
 async function executeFirstOutreach(task, waPhone) {
+  // Admin approval gate — check before sending template to lead
+  const gateResult = await notifyAdmin(task, waPhone, `[First outreach template to ${task.lead_name}]`, true);
+  if (gateResult?.awaiting_approval) return gateResult;
+
   // Always send template directly — new leads have no 24h window
   const templateName = 'bcon_proxe_first_outreach';
   await sendWhatsAppTemplate(waPhone, {
@@ -634,15 +650,55 @@ async function executePushToBook(task, waPhone) {
 }
 
 // ============================================
-// MESSAGE SENDING (with 24h window check)
+// MESSAGE SENDING (with 24h window check + admin approval gate)
 // ============================================
+
+/**
+ * Send admin notification about a task firing.
+ * In 'notify' mode: sends heads-up, then message goes to lead normally.
+ * In 'approve' mode: sends preview only, message is held until approved.
+ */
+async function notifyAdmin(task, waPhone, message, isTemplate) {
+  if (!ADMIN_NOTIFY_PHONE) return null;
+
+  const phone10 = waPhone.replace(/\D/g, '').slice(-10);
+  const msgPreview = isTemplate
+    ? `[Template to ${task.lead_name}]`
+    : message;
+
+  if (APPROVAL_MODE === 'approve') {
+    const body = `PROXE NEEDS APPROVAL\nLead: ${task.lead_name} (${phone10})\nType: ${task.task_type}\nMessage: ${msgPreview}\nReply YES to approve`;
+    try {
+      await sendWhatsApp(ADMIN_NOTIFY_PHONE, body);
+      console.log(`[AdminGate] Approval request sent for ${task.task_type} → ${task.lead_name}`);
+    } catch (err) {
+      console.error(`[AdminGate] Failed to send approval request:`, err.message);
+    }
+    return { awaiting_approval: true, message_preview: msgPreview };
+  }
+
+  // 'notify' mode — send heads-up, don't block
+  const body = `PROXE TASK FIRING\nLead: ${task.lead_name} (${phone10})\nType: ${task.task_type}\nMessage: ${msgPreview}\nStatus: SENT`;
+  try {
+    await sendWhatsApp(ADMIN_NOTIFY_PHONE, body);
+  } catch (err) {
+    // Don't block the actual send if admin notify fails
+    console.error(`[AdminGate] Failed to notify admin:`, err.message);
+  }
+  return null;
+}
 
 /**
  * Send a message via WhatsApp. Checks 24h window first.
  * Falls back to template message if outside window.
+ * Runs through admin approval gate before sending.
  */
 async function executeSendMessage(task, waPhone, message) {
   const within24h = task.lead_id ? await isWithin24hWindow(task.lead_id) : true;
+
+  // Admin approval gate — check before sending anything to the lead
+  const gateResult = await notifyAdmin(task, waPhone, message, !within24h);
+  if (gateResult?.awaiting_approval) return gateResult;
 
   if (within24h) {
     await sendWhatsApp(waPhone, message);
