@@ -1469,6 +1469,7 @@ export default function InboxPage() {
               'High Intent': '#f59e0b',
               'Qualified': '#a855f7',
               'Engaged': '#6b7280',
+              'In Sequence': '#8b5cf6',
             }
             const avatarBg = stageAvatarColors[leadDetails.lead_stage] || 'var(--accent-primary)'
             const channelLabel = selectedChannel === 'whatsapp' ? 'WhatsApp' : selectedChannel === 'web' ? 'Web' : selectedChannel === 'voice' ? 'Voice' : selectedChannel || ''
@@ -1476,7 +1477,7 @@ export default function InboxPage() {
               <div className="p-4 pt-5 border-b flex flex-col items-center text-center" style={{ borderColor: 'var(--border-primary)' }}>
                 <div
                   className="w-16 h-16 rounded-full flex items-center justify-center text-xl font-bold mb-3"
-                  style={{ background: avatarBg, color: '#fff' }}
+                  style={{ background: avatarBg, color: 'var(--text-button, #fff)' }}
                 >
                   {initials}
                 </div>
