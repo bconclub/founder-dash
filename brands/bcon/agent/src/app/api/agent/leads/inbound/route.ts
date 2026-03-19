@@ -21,8 +21,65 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const body = await request.json()
-    const { name, phone, email, source, campaign, notes, brand, city, brand_name, urgency, custom_fields } = body
+    // Parse request body - handle JSON, form-urlencoded, and malformed payloads
+    let body: Record<string, any>
+    const rawBody = await request.text()
+
+    const contentType = request.headers.get('content-type') || ''
+    if (contentType.includes('application/x-www-form-urlencoded')) {
+      // Pabbly sometimes sends form-urlencoded instead of JSON
+      const params = new URLSearchParams(rawBody)
+      body = Object.fromEntries(params.entries())
+      // form-urlencoded custom_fields arrives as a string - try to parse it
+      if (typeof body.custom_fields === 'string') {
+        try { body.custom_fields = JSON.parse(body.custom_fields) } catch { /* leave as string */ }
+      }
+    } else {
+      try {
+        body = JSON.parse(rawBody)
+      } catch (parseErr: any) {
+        console.error('[inbound] JSON parse failed. Raw body:', rawBody)
+        // Try to extract fields from malformed JSON/text
+        const extract = (key: string) => {
+          const m = rawBody.match(new RegExp(`"${key}"\\s*:\\s*"([^"]*)"`, 'i'))
+          return m ? m[1] : undefined
+        }
+        body = {
+          name: extract('name'),
+          phone: extract('phone'),
+          email: extract('email'),
+          source: extract('source'),
+          campaign: extract('campaign'),
+          brand: extract('brand'),
+          city: extract('city'),
+          brand_name: extract('brand_name'),
+          urgency: extract('urgency'),
+          // notes intentionally omitted - most likely the field that broke parsing
+        }
+        if (!body.phone) {
+          return NextResponse.json(
+            { error: `Invalid request body: ${parseErr.message}` },
+            { status: 400 }
+          )
+        }
+      }
+    }
+
+    const { name, phone, email, source, campaign, brand, city, brand_name, urgency, custom_fields } = body
+
+    // Sanitize notes - trim, collapse newlines to spaces, strip non-printable chars
+    let notes: string | null = null
+    try {
+      if (body.notes != null) {
+        notes = String(body.notes)
+          .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '') // strip non-printable (keep \n \r \t)
+          .replace(/[\r\n]+/g, ' ')                             // newlines → single space
+          .trim() || null
+      }
+    } catch {
+      // notes malformed - proceed without it
+      notes = null
+    }
 
     if (!phone) {
       return NextResponse.json({ error: 'phone is required' }, { status: 400 })
@@ -61,7 +118,7 @@ export async function POST(request: NextRequest) {
       .maybeSingle()
 
     if (existing) {
-      // Update existing — don't overwrite name if already set
+      // Update existing - don't overwrite name if already set
       const updates: Record<string, any> = {
         last_interaction_at: now,
         last_touchpoint: leadSource,
@@ -97,7 +154,7 @@ export async function POST(request: NextRequest) {
         .single()
 
       if (createErr) {
-        // Duplicate race condition — fetch existing
+        // Duplicate race condition - fetch existing
         if (createErr.code === '23505' || createErr.message?.includes('duplicate')) {
           const { data: dup } = await supabase
             .from('all_leads')
