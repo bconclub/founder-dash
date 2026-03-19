@@ -706,7 +706,10 @@ function resolveLeadContext(task, lead) {
     task.metadata?.service_interest || task.metadata?.business_type ||
     task.metadata?.campaign || 'business growth';
   const painPoint =
-    task.metadata?.pain_point || formData.pain_point || serviceInterest;
+    ctx.pain_point ||
+    task.metadata?.pain_point ||
+    serviceInterest ||
+    'growing your business';
   return { serviceInterest, painPoint };
 }
 

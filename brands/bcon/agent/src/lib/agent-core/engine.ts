@@ -9,7 +9,7 @@ import { searchKnowledgeBase } from './knowledgeSearch';
 import { buildPrompt } from './promptBuilder';
 import { generateResponse, generateResponseWithTools, isConfigured, getErrorMessage } from './claudeClient';
 import type { ToolDefinition, ToolHandler } from './claudeClient';
-import { extractIntent, isBookingIntent } from './intentExtractor';
+import { extractIntent, isBookingIntent, extractPainPoint } from './intentExtractor';
 import { generateFollowUps } from './followUpGenerator';
 import { generateSummary } from './summarizer';
 import {
@@ -976,7 +976,7 @@ async function scheduleFlowTasks(
 
   const { data: lead } = await supabase
     .from('all_leads')
-    .select('id, customer_name, customer_phone_normalized')
+    .select('id, customer_name, customer_phone_normalized, unified_context')
     .eq('customer_phone_normalized', normalizedPhone)
     .maybeSingle();
 
@@ -986,6 +986,31 @@ async function scheduleFlowTasks(
   const leadName = lead.customer_name || input.userProfile.name || 'Lead';
   // Always use the phone from the lead record - never from session metadata or input
   const leadPhone = lead.customer_phone_normalized || normalizedPhone;
+
+  // Pain point extraction from customer message
+  const painMatch = extractPainPoint(input.message);
+  if (painMatch) {
+    const existingPainPoint = lead.unified_context?.pain_point;
+    const existingSpecificity = lead.unified_context?.pain_point_specificity || 0;
+    // Only overwrite if new match is more specific (or no existing)
+    if (!existingPainPoint || painMatch.specificity >= existingSpecificity) {
+      const ctx = lead.unified_context || {};
+      supabase
+        .from('all_leads')
+        .update({
+          unified_context: {
+            ...ctx,
+            pain_point: painMatch.painPoint,
+            pain_point_specificity: painMatch.specificity,
+          },
+        })
+        .eq('id', leadId)
+        .then(({ error: ppErr }) => {
+          if (ppErr) console.error('[Engine] Failed to update pain_point:', ppErr.message);
+          else console.log(`[Engine] Pain point for ${leadName}: "${painMatch.painPoint}" (specificity: ${painMatch.specificity})`);
+        });
+    }
+  }
 
   // Flow A: If AI response ends with a question, schedule a nudge
   if (aiResponse.includes('?')) {
