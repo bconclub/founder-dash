@@ -7,7 +7,7 @@ ALTER TABLE all_leads DROP CONSTRAINT IF EXISTS all_leads_last_touchpoint_check;
 
 -- Re-add with expanded values
 ALTER TABLE all_leads ADD CONSTRAINT all_leads_first_touchpoint_check
-  CHECK (first_touchpoint IN ('web', 'whatsapp', 'voice', 'social', 'facebook', 'google', 'form', 'manual', 'pabbly', 'ads', 'referral', 'organic'));
+  CHECK (first_touchpoint IN ('web', 'whatsapp', 'voice', 'social', 'facebook', 'google', 'form', 'manual', 'pabbly', 'ads', 'referral', 'organic', 'meta_forms'));
 
 ALTER TABLE all_leads ADD CONSTRAINT all_leads_last_touchpoint_check
-  CHECK (last_touchpoint IN ('web', 'whatsapp', 'voice', 'social', 'facebook', 'google', 'form', 'manual', 'pabbly', 'ads', 'referral', 'organic'));
+  CHECK (last_touchpoint IN ('web', 'whatsapp', 'voice', 'social', 'facebook', 'google', 'form', 'manual', 'pabbly', 'ads', 'referral', 'organic', 'meta_forms'));

@@ -63,7 +63,7 @@ const ScoreRing = ({ score, size = 28 }: { score: number | null; size?: number }
         style={{ transition: 'stroke-dasharray 0.3s ease' }}
       />
       <text x={size / 2} y={size / 2} textAnchor="middle" dominantBaseline="central"
-        fill="white" fontSize="10" fontWeight="bold">{s}</text>
+        fill="var(--text-primary)" fontSize="10" fontWeight="bold">{s}</text>
     </svg>
   );
 };
@@ -86,6 +86,8 @@ interface Conversation {
   booking_date: string | null
   booking_time: string | null
   next_touchpoint: string | null
+  form_data: Record<string, any> | null
+  first_touchpoint: string | null
 }
 
 interface Message {
@@ -492,7 +494,7 @@ export default function InboxPage() {
 
       const { data: leadsData, error: leadsError } = await supabase
         .from('all_leads')
-        .select('id, customer_name, email, phone, unified_context, booking_date, booking_time, lead_stage, lead_score')
+        .select('id, customer_name, email, phone, unified_context, booking_date, booking_time, lead_stage, lead_score, first_touchpoint')
         .in('id', leadIds)
 
       if (leadsError) {
@@ -606,6 +608,8 @@ export default function InboxPage() {
           booking_date: lead?.booking_date ?? null,
           booking_time: lead?.booking_time ?? null,
           next_touchpoint: nextTouchpoint,
+          form_data: uc?.form_data || null,
+          first_touchpoint: (lead as any)?.first_touchpoint || null,
         }
 
         console.log('Adding conversation:', {
@@ -1041,8 +1045,8 @@ export default function InboxPage() {
                 onClick={() => setChannelFilter(ch)}
                 className="px-2.5 py-1 rounded text-[10px] font-bold uppercase tracking-wider transition-all"
                 style={{
-                  background: channelFilter === ch ? 'var(--accent-primary)' : 'transparent',
-                  color: channelFilter === ch ? 'var(--text-button, #fff)' : 'var(--text-secondary)',
+                  background: channelFilter === ch ? 'var(--button-bg, #fff)' : 'transparent',
+                  color: channelFilter === ch ? 'var(--text-button, #000)' : 'var(--text-muted)',
                 }}
               >
                 {ch}
@@ -1063,7 +1067,7 @@ export default function InboxPage() {
               <button
                 onClick={() => fetchConversations()}
                 className="mt-1 px-3 py-1 text-[10px] rounded"
-                style={{ background: 'var(--accent-primary)', color: 'var(--text-button, #fff)' }}
+                style={{ background: 'var(--button-bg, #fff)', color: 'var(--text-button, #000)' }}
               >
                 Refresh
               </button>
@@ -1401,7 +1405,7 @@ export default function InboxPage() {
                   className="p-1.5 rounded-lg transition-colors flex-shrink-0"
                   style={{
                     background: isGenerating ? 'var(--accent-primary)' : 'transparent',
-                    color: isGenerating ? 'white' : 'var(--text-secondary)',
+                    color: isGenerating ? 'var(--text-button, #000)' : 'var(--text-secondary)',
                     opacity: messages.length === 0 ? 0.3 : 1,
                   }}
                   title="Generate AI Response"
@@ -1432,12 +1436,12 @@ export default function InboxPage() {
                   disabled={!replyText.trim() || isSending}
                   className="p-1.5 rounded-lg transition-opacity flex-shrink-0"
                   style={{
-                    background: 'var(--accent-primary)',
+                    background: 'var(--button-bg, #fff)',
                     opacity: !replyText.trim() || isSending ? 0.4 : 1,
                   }}
                   title="Send Message"
                 >
-                  <MdSend size={18} style={{ color: 'var(--text-button, #fff)' }} />
+                  <MdSend size={18} style={{ color: 'var(--text-button, #000)' }} />
                 </button>
               </div>
             </div>
@@ -1477,7 +1481,7 @@ export default function InboxPage() {
               <div className="p-4 pt-5 border-b flex flex-col items-center text-center" style={{ borderColor: 'var(--border-primary)' }}>
                 <div
                   className="w-16 h-16 rounded-full flex items-center justify-center text-xl font-bold mb-3"
-                  style={{ background: avatarBg, color: 'var(--text-button, #fff)' }}
+                  style={{ background: avatarBg, color: 'var(--text-button, #000)' }}
                 >
                   {initials}
                 </div>
@@ -1685,7 +1689,7 @@ export default function InboxPage() {
             <button
               onClick={() => openLeadModal(selectedLeadId)}
               className="w-full text-xs font-semibold py-2.5 rounded-lg transition-opacity flex items-center justify-center gap-1.5 hover:opacity-90"
-              style={{ background: 'var(--accent-primary)', color: 'var(--text-button, #fff)' }}
+              style={{ background: 'var(--button-bg, #fff)', color: 'var(--text-button, #000)' }}
             >
               <MdOpenInNew size={14} /> View Full Details
             </button>

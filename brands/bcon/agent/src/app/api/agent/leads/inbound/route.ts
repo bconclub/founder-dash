@@ -91,12 +91,15 @@ export async function POST(request: NextRequest) {
     }
 
     // Map inbound source to an allowed touchpoint value
-    // Constraint: web, whatsapp, voice, social, facebook, google, pabbly, manual, form
+    // Constraint: web, whatsapp, voice, social, facebook, google, form, manual, pabbly, ads, referral, organic, meta_forms
     const sourceToTouchpoint: Record<string, string> = {
-      facebook: 'facebook',
-      'facebook forms': 'facebook',
-      'facebook form': 'facebook',
-      fb: 'facebook',
+      facebook: 'meta_forms',
+      'facebook forms': 'meta_forms',
+      'facebook form': 'meta_forms',
+      meta_forms: 'meta_forms',
+      meta: 'meta_forms',
+      fb: 'meta_forms',
+      'fb forms': 'meta_forms',
       google: 'google',
       'google ads': 'google',
       website: 'web',
@@ -107,9 +110,12 @@ export async function POST(request: NextRequest) {
       whatsapp: 'whatsapp',
       voice: 'voice',
       social: 'social',
+      ads: 'ads',
+      referral: 'referral',
+      organic: 'organic',
     }
     const normalizedSource = (source || '').toString().trim().toLowerCase()
-    const leadSource = sourceToTouchpoint[normalizedSource] || 'manual'
+    const leadSource = normalizedSource ? (sourceToTouchpoint[normalizedSource] || normalizedSource) : 'manual'
     const leadBrand = brand || process.env.NEXT_PUBLIC_BRAND || 'bcon'
 
     const supabase = getServiceClient() || getClient()
@@ -177,6 +183,11 @@ export async function POST(request: NextRequest) {
       // Merge inbound context into unified_context
       if (Object.keys(inboundContext).length > 0) {
         const existingCtx = existing.unified_context || {}
+        // Track lead_sources array (ordered path: meta_forms → whatsapp etc.)
+        const existingSources: string[] = existingCtx.lead_sources || []
+        if (!existingSources.includes(leadSource)) {
+          inboundContext.lead_sources = [...existingSources, leadSource]
+        }
         updates.unified_context = { ...existingCtx, ...inboundContext }
       }
 
@@ -196,7 +207,7 @@ export async function POST(request: NextRequest) {
           last_touchpoint: leadSource,
           last_interaction_at: now,
           lead_stage: 'New',
-          ...(Object.keys(inboundContext).length > 0 ? { unified_context: inboundContext } : {}),
+          ...(Object.keys(inboundContext).length > 0 ? { unified_context: { ...inboundContext, lead_sources: [leadSource] } } : { unified_context: { lead_sources: [leadSource] } }),
         })
         .select('id')
         .single()

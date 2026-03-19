@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { formatDateTime, formatDate } from '@/lib/utils'
 import { createClient } from '../../lib/supabase/client'
 import { format } from 'date-fns'
-import { MdLanguage, MdChat, MdPhone, MdShare, MdAutoAwesome, MdOpenInNew, MdHistory, MdCall, MdEvent, MdMessage, MdNote, MdEdit, MdTrendingUp, MdTrendingDown, MdRemove, MdCheckCircle, MdSchedule, MdPsychology, MdFlashOn, MdBarChart, MdEmail, MdChevronRight, MdSmartToy, MdPerson, MdRefresh, MdHelpOutline, MdInfo, MdCheck, MdClose, MdPayments, MdReportProblem, MdSchool, MdHistoryEdu, MdFlightTakeoff, MdAccountBalanceWallet, MdPersonOutline, MdOutlineInsights, MdMic, MdAdd, MdMoreHoriz } from 'react-icons/md'
+import { MdLanguage, MdChat, MdPhone, MdShare, MdAutoAwesome, MdOpenInNew, MdHistory, MdCall, MdEvent, MdMessage, MdNote, MdEdit, MdTrendingUp, MdTrendingDown, MdRemove, MdCheckCircle, MdSchedule, MdPsychology, MdFlashOn, MdBarChart, MdEmail, MdChevronRight, MdSmartToy, MdPerson, MdRefresh, MdHelpOutline, MdInfo, MdCheck, MdClose, MdPayments, MdReportProblem, MdSchool, MdHistoryEdu, MdFlightTakeoff, MdAccountBalanceWallet, MdPersonOutline, MdOutlineInsights, MdMic, MdAdd, MdMoreHoriz, MdDynamicForm } from 'react-icons/md'
 import { FaWhatsapp } from 'react-icons/fa'
 import { useRouter } from 'next/navigation'
 import LeadStageSelector from './LeadStageSelector'
@@ -88,7 +88,7 @@ function renderSummary(text: string) {
   );
 }
 
-const ALL_CHANNELS = ['web', 'whatsapp', 'voice', 'social'];
+const ALL_CHANNELS = ['web', 'whatsapp', 'voice', 'social', 'meta_forms'];
 
 const ChannelIcon = ({ channel, size = 16, active = false }: { channel: string; size?: number; active?: boolean }) => {
   const style = {
@@ -164,6 +164,12 @@ const CHANNEL_CONFIG = {
     icon: MdShare,
     color: '#EC4899',
     emoji: '📱'
+  },
+  meta_forms: {
+    name: 'Meta Forms',
+    icon: MdDynamicForm,
+    color: '#1877F2',
+    emoji: '📋'
   }
 }
 
@@ -208,12 +214,14 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
     web: { count: number; firstDate: string | null; lastDate: string | null }
     whatsapp: { count: number; firstDate: string | null; lastDate: string | null }
     voice: { count: number; firstDate: string | null; lastDate: string | null }
+    meta_forms: { count: number; firstDate: string | null; lastDate: string | null }
     social: { count: number; firstDate: string | null; lastDate: string | null }
   }>({
     web: { count: 0, firstDate: null, lastDate: null },
     whatsapp: { count: 0, firstDate: null, lastDate: null },
     voice: { count: 0, firstDate: null, lastDate: null },
     social: { count: 0, firstDate: null, lastDate: null },
+    meta_forms: { count: 0, firstDate: null, lastDate: null },
   })
   const [quickStats, setQuickStats] = useState<{
     totalMessages: number
@@ -550,6 +558,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
           whatsapp: { count: 0, firstDate: null, lastDate: null },
           voice: { count: 0, firstDate: null, lastDate: null },
           social: { count: 0, firstDate: null, lastDate: null },
+          meta_forms: { count: 0, firstDate: null, lastDate: null },
         }
 
         messages.forEach((msg: any) => {
@@ -1004,10 +1013,38 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
       firstDate: string | null
       lastDate: string | null
     }> = []
+    // Add meta_forms as first step if first_touchpoint is meta_forms (even with 0 conversation messages)
+    const ft = currentLead.first_touchpoint
+    const leadSources: string[] = currentLead.unified_context?.lead_sources || []
+    if (ft === 'meta_forms' || leadSources.includes('meta_forms')) {
+      const config = CHANNEL_CONFIG.meta_forms
+      channels.push({
+        ...config,
+        key: 'meta_forms',
+        count: channelData.meta_forms.count || 1,
+        firstDate: channelData.meta_forms.firstDate || currentLead.created_at || currentLead.timestamp,
+        lastDate: channelData.meta_forms.lastDate || currentLead.created_at || currentLead.timestamp,
+      })
+    }
     if (channelData.web.count > 0) channels.push({ ...CHANNEL_CONFIG.web, key: 'web', ...channelData.web })
     if (channelData.whatsapp.count > 0) channels.push({ ...CHANNEL_CONFIG.whatsapp, key: 'whatsapp', ...channelData.whatsapp })
     if (channelData.voice.count > 0) channels.push({ ...CHANNEL_CONFIG.voice, key: 'voice', ...channelData.voice })
     if (channelData.social.count > 0) channels.push({ ...CHANNEL_CONFIG.social, key: 'social', ...channelData.social })
+
+    // If lead_sources array exists, sort by that order; otherwise sort by firstDate
+    if (leadSources.length > 0) {
+      return channels.sort((a, b) => {
+        const aIdx = leadSources.indexOf(a.key)
+        const bIdx = leadSources.indexOf(b.key)
+        // Items in lead_sources come first in order; others sort by firstDate
+        if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx
+        if (aIdx !== -1) return -1
+        if (bIdx !== -1) return 1
+        const aDate = a.firstDate ? new Date(a.firstDate).getTime() : 0
+        const bDate = b.firstDate ? new Date(b.firstDate).getTime() : 0
+        return aDate - bDate
+      })
+    }
     return channels.sort((a, b) => {
       const aDate = a.firstDate ? new Date(a.firstDate).getTime() : 0
       const bDate = b.firstDate ? new Date(b.firstDate).getTime() : 0
