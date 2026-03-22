@@ -246,13 +246,13 @@ export default function CalendarView({ bookings, onDateSelect, headerRight }: Ca
       <div className="hidden lg:flex flex-col w-[180px] flex-shrink-0 px-3 py-2 border-r" style={{ borderColor: 'var(--border-primary)' }}>
         {/* Mini calendar month nav */}
         <div className="flex items-center justify-between mb-2">
-          <button onClick={() => setCurrentDate(subMonths(currentDate, 1))} className="p-0.5 rounded hover:bg-gray-100 dark:hover:bg-[#333]">
+          <button onClick={() => setCurrentDate(subMonths(currentDate, 1))} className="p-0.5 rounded hover:bg-[var(--bg-hover)]">
             <MdChevronLeft size={16} style={{ color: 'var(--text-secondary)' }} />
           </button>
           <span className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>
             {format(currentDate, 'MMM yyyy')}
           </span>
-          <button onClick={() => setCurrentDate(addMonths(currentDate, 1))} className="p-0.5 rounded hover:bg-gray-100 dark:hover:bg-[#333]">
+          <button onClick={() => setCurrentDate(addMonths(currentDate, 1))} className="p-0.5 rounded hover:bg-[var(--bg-hover)]">
             <MdChevronRight size={16} style={{ color: 'var(--text-secondary)' }} />
           </button>
         </div>
@@ -276,17 +276,17 @@ export default function CalendarView({ bookings, onDateSelect, headerRight }: Ca
               <button
                 key={idx}
                 onClick={() => handleDateClick(day)}
-                className="relative aspect-square flex items-center justify-center text-[10px] rounded-full hover:bg-gray-100 dark:hover:bg-[#333]"
+                className="relative aspect-square flex items-center justify-center text-[10px] rounded-full hover:bg-[var(--bg-hover)]"
                 style={{
                   color: !isCurrentMonth ? 'var(--text-secondary)' : isSelected ? '#fff' : isToday ? 'var(--accent-primary)' : 'var(--text-primary)',
-                  backgroundColor: isSelected ? 'var(--accent-primary)' : isToday ? 'var(--accent-subtle)' : 'transparent',
+                  backgroundColor: isSelected ? 'var(--button-bg)' : isToday ? 'var(--accent-subtle)' : 'transparent',
                   fontWeight: isToday || isSelected ? 600 : 400,
                   opacity: !isCurrentMonth ? 0.4 : 1,
                 }}
               >
                 {format(day, 'd')}
                 {hasBookings && !isSelected && (
-                  <span className="absolute bottom-0 w-1 h-1 rounded-full" style={{ backgroundColor: 'var(--accent-primary)' }} />
+                  <span className="absolute bottom-0 w-1 h-1 rounded-full" style={{ backgroundColor: 'var(--button-bg)' }} />
                 )}
               </button>
             )
@@ -301,8 +301,8 @@ export default function CalendarView({ bookings, onDateSelect, headerRight }: Ca
               onClick={() => setViewMode(mode)}
               className="flex-1 py-1 text-[10px] font-medium rounded transition-colors capitalize"
               style={{
-                backgroundColor: viewMode === mode ? 'var(--accent-primary)' : 'transparent',
-                color: viewMode === mode ? '#fff' : 'var(--text-secondary)',
+                backgroundColor: viewMode === mode ? 'var(--button-bg)' : 'transparent',
+                color: viewMode === mode ? 'var(--text-button)' : 'var(--text-secondary)',
               }}
             >
               {mode}
@@ -322,10 +322,10 @@ export default function CalendarView({ bookings, onDateSelect, headerRight }: Ca
           >
             Today
           </button>
-          <button onClick={() => navigateDate('prev')} className="p-0.5 rounded-full hover:bg-gray-100 dark:hover:bg-[#333]">
+          <button onClick={() => navigateDate('prev')} className="p-0.5 rounded-full hover:bg-[var(--bg-hover)]">
             <MdChevronLeft size={20} style={{ color: 'var(--text-secondary)' }} />
           </button>
-          <button onClick={() => navigateDate('next')} className="p-0.5 rounded-full hover:bg-gray-100 dark:hover:bg-[#333]">
+          <button onClick={() => navigateDate('next')} className="p-0.5 rounded-full hover:bg-[var(--bg-hover)]">
             <MdChevronRight size={20} style={{ color: 'var(--text-secondary)' }} />
           </button>
           <h2 className="text-sm font-medium ml-1" style={{ color: 'var(--text-primary)' }}>
@@ -339,8 +339,8 @@ export default function CalendarView({ bookings, onDateSelect, headerRight }: Ca
                 onClick={() => setViewMode(mode)}
                 className="px-2 py-0.5 text-[10px] font-medium rounded capitalize"
                 style={{
-                  backgroundColor: viewMode === mode ? 'var(--accent-primary)' : 'transparent',
-                  color: viewMode === mode ? '#fff' : 'var(--text-secondary)',
+                  backgroundColor: viewMode === mode ? 'var(--button-bg)' : 'transparent',
+                  color: viewMode === mode ? 'var(--text-button)' : 'var(--text-secondary)',
                 }}
               >
                 {mode}
@@ -376,7 +376,7 @@ export default function CalendarView({ bookings, onDateSelect, headerRight }: Ca
                       className="text-lg font-normal leading-tight mx-auto flex items-center justify-center"
                       style={{
                         color: isToday ? '#fff' : 'var(--text-primary)',
-                        backgroundColor: isToday ? 'var(--accent-primary)' : 'transparent',
+                        backgroundColor: isToday ? 'var(--button-bg)' : 'transparent',
                         borderRadius: '50%',
                         width: '30px',
                         height: '30px',
@@ -436,14 +436,14 @@ export default function CalendarView({ bookings, onDateSelect, headerRight }: Ca
                         <div
                           key={booking.id}
                           onClick={(e) => handleBookingModalOpen(booking, e)}
-                          className="absolute rounded px-1.5 py-0.5 text-white cursor-pointer hover:brightness-110 hover:shadow-md transition-all z-10 overflow-hidden"
+                          className="absolute rounded px-1.5 py-0.5 text-[var(--text-button)] cursor-pointer hover:brightness-110 hover:shadow-md transition-all z-10 overflow-hidden"
                           style={{
                             top: `${top}px`,
                             height: `${height - 2}px`,
                             left: total > 1 ? `${leftPct}%` : '2px',
                             right: total > 1 ? undefined : '2px',
                             width: total > 1 ? `calc(${widthPct}% - 4px)` : undefined,
-                            backgroundColor: 'var(--accent-primary)',
+                            backgroundColor: 'var(--button-bg)',
                             fontSize: '10px',
                             lineHeight: '1.3',
                           }}
@@ -491,7 +491,7 @@ export default function CalendarView({ bookings, onDateSelect, headerRight }: Ca
                       className="text-[11px] font-medium mb-0.5 w-5 h-5 flex items-center justify-center rounded-full"
                       style={{
                         color: isToday ? '#fff' : 'var(--text-primary)',
-                        backgroundColor: isToday ? 'var(--accent-primary)' : 'transparent',
+                        backgroundColor: isToday ? 'var(--button-bg)' : 'transparent',
                       }}
                     >
                       {format(day, 'd')}
@@ -501,8 +501,8 @@ export default function CalendarView({ bookings, onDateSelect, headerRight }: Ca
                         <div
                           key={booking.id}
                           onClick={(e) => handleBookingModalOpen(booking, e)}
-                          className="text-[10px] leading-tight px-1 py-px rounded text-white truncate cursor-pointer hover:brightness-110"
-                          style={{ backgroundColor: 'var(--accent-primary)' }}
+                          className="text-[10px] leading-tight px-1 py-px rounded text-[var(--text-button)] truncate cursor-pointer hover:brightness-110"
+                          style={{ backgroundColor: 'var(--button-bg)' }}
                         >
                           {booking.booking_time?.substring(0, 5)} {booking.name || 'Unnamed'}
                         </div>
@@ -539,13 +539,13 @@ export default function CalendarView({ bookings, onDateSelect, headerRight }: Ca
                 <div className="flex items-center gap-1">
                   <button
                     onClick={() => setShowNoteInput(!showNoteInput)}
-                    className="p-1.5 rounded-lg hover:bg-gray-200 dark:hover:bg-[#333] transition-colors"
+                    className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] transition-colors"
                     title="Add context note"
                     style={{ color: showNoteInput ? 'var(--accent-primary)' : 'var(--text-secondary)' }}
                   >
                     <MdAdd size={20} />
                   </button>
-                  <button onClick={() => setIsModalOpen(false)} className="p-1 rounded hover:bg-gray-200 dark:hover:bg-[#333]">
+                  <button onClick={() => setIsModalOpen(false)} className="p-1 rounded hover:bg-[var(--bg-hover)]">
                     <MdClose size={20} style={{ color: 'var(--text-secondary)' }} />
                   </button>
                 </div>
@@ -562,7 +562,7 @@ export default function CalendarView({ bookings, onDateSelect, headerRight }: Ca
                   <MdAccessTime size={16} style={{ color: 'var(--accent-primary)' }} />
                   <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{selectedBooking.booking_time}</span>
                 </div>
-                <span className="ml-auto px-2 py-0.5 text-[10px] font-semibold rounded-full text-white" style={{ backgroundColor: 'var(--accent-primary)' }}>
+                <span className="ml-auto px-2 py-0.5 text-[10px] font-semibold rounded-full text-[var(--text-button)]" style={{ backgroundColor: 'var(--button-bg)' }}>
                   {selectedBooking.source || selectedBooking.first_touchpoint || 'web'}
                 </span>
               </div>
@@ -593,8 +593,8 @@ export default function CalendarView({ bookings, onDateSelect, headerRight }: Ca
                           onClick={() => setNoteType(type.value)}
                           className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium transition-colors"
                           style={{
-                            backgroundColor: isActive ? 'var(--accent-primary)' : 'transparent',
-                            color: isActive ? '#fff' : 'var(--text-secondary)',
+                            backgroundColor: isActive ? 'var(--button-bg)' : 'transparent',
+                            color: isActive ? 'var(--text-button)' : 'var(--text-secondary)',
                           }}
                         >
                           <Icon size={12} />
@@ -617,8 +617,8 @@ export default function CalendarView({ bookings, onDateSelect, headerRight }: Ca
                     <button
                       onClick={handleSaveNote}
                       disabled={savingNote || !noteText.trim()}
-                      className="px-2.5 py-1.5 rounded text-white text-xs font-medium disabled:opacity-40 hover:brightness-110 transition-all"
-                      style={{ backgroundColor: 'var(--accent-primary)' }}
+                      className="px-2.5 py-1.5 rounded text-[var(--text-button)] text-xs font-medium disabled:opacity-40 hover:brightness-110 transition-all"
+                      style={{ backgroundColor: 'var(--button-bg)' }}
                     >
                       {savingNote ? '...' : <MdSend size={14} />}
                     </button>
@@ -658,8 +658,8 @@ export default function CalendarView({ bookings, onDateSelect, headerRight }: Ca
 
               <button
                 onClick={handleViewClientDetails}
-                className="w-full py-2.5 text-sm font-medium text-white rounded-lg hover:brightness-110 transition-all"
-                style={{ backgroundColor: 'var(--accent-primary)' }}
+                className="w-full py-2.5 text-sm font-medium text-[var(--text-button)] rounded-lg hover:brightness-110 transition-all"
+                style={{ backgroundColor: 'var(--button-bg)' }}
               >
                 View Client Details
               </button>

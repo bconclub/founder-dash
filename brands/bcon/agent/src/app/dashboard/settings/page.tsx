@@ -215,7 +215,7 @@ export default function SettingsPage() {
                   className={`p-6 rounded-lg border-2 transition-all text-left ${
                     widgetStyle === 'searchbar'
                       ? 'border-current'
-                      : 'border-transparent hover:border-gray-300 dark:hover:border-gray-600'
+                      : 'border-transparent hover:border-[var(--border-primary)]'
                   }`}
                   style={{
                     background: 'var(--bg-tertiary)',
@@ -243,10 +243,10 @@ export default function SettingsPage() {
                     {widgetStyle === 'searchbar' && (
                       <div
                         className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center"
-                        style={{ background: 'var(--accent-primary)' }}
+                        style={{ background: 'var(--button-bg)' }}
                       >
                         <svg
-                          className="w-4 h-4 text-white"
+                          className="w-4 h-4 text-[var(--text-button)]"
                           fill="none"
                           stroke="currentColor"
                           viewBox="0 0 24 24"
@@ -261,7 +261,7 @@ export default function SettingsPage() {
                       </div>
                     )}
                   </div>
-                  
+
                   {/* Visual Preview */}
                   <div
                     className="mt-4 p-4 rounded border"
@@ -309,7 +309,7 @@ export default function SettingsPage() {
                   className={`p-6 rounded-lg border-2 transition-all text-left ${
                     widgetStyle === 'bubble'
                       ? 'border-current'
-                      : 'border-transparent hover:border-gray-300 dark:hover:border-gray-600'
+                      : 'border-transparent hover:border-[var(--border-primary)]'
                   }`}
                   style={{
                     background: 'var(--bg-tertiary)',
@@ -337,10 +337,10 @@ export default function SettingsPage() {
                     {widgetStyle === 'bubble' && (
                       <div
                         className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center"
-                        style={{ background: 'var(--accent-primary)' }}
+                        style={{ background: 'var(--button-bg)' }}
                       >
                         <svg
-                          className="w-4 h-4 text-white"
+                          className="w-4 h-4 text-[var(--text-button)]"
                           fill="none"
                           stroke="currentColor"
                           viewBox="0 0 24 24"
@@ -355,7 +355,7 @@ export default function SettingsPage() {
                       </div>
                     )}
                   </div>
-                  
+
                   {/* Visual Preview */}
                   <div
                     className="mt-4 p-4 rounded border relative"
@@ -368,10 +368,10 @@ export default function SettingsPage() {
                     <div className="absolute bottom-2 right-2">
                       <div
                         className="w-14 h-14 rounded-full flex items-center justify-center shadow-lg"
-                        style={{ background: 'var(--accent-primary)' }}
+                        style={{ background: 'var(--button-bg)' }}
                       >
                         <svg
-                          className="w-7 h-7 text-white"
+                          className="w-7 h-7 text-[var(--text-button)]"
                           fill="none"
                           stroke="currentColor"
                           viewBox="0 0 24 24"
@@ -429,8 +429,8 @@ export default function SettingsPage() {
             <div className="flex flex-wrap gap-4">
               {/* Button Preview */}
               <button
-                className="px-4 py-2 rounded-lg font-medium text-white"
-                style={{ background: 'var(--accent-primary)' }}
+                className="px-4 py-2 rounded-lg font-medium text-[var(--text-button)]"
+                style={{ background: 'var(--button-bg)' }}
               >
                 Primary Button
               </button>

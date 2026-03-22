@@ -86,7 +86,7 @@ export default function VoiceAgentTab() {
             onClick={copyNumber}
             className="flex items-center gap-2 rounded-lg px-5 py-2 text-sm font-semibold transition-all"
             style={{
-              backgroundColor: copied ? 'var(--accent-primary)' : 'var(--bg-tertiary)',
+              backgroundColor: copied ? 'var(--button-bg)' : 'var(--bg-tertiary)',
               color: copied ? 'var(--text-button)' : 'var(--text-primary)',
               border: '1px solid var(--border-primary)',
               cursor: 'pointer',
@@ -133,7 +133,7 @@ export default function VoiceAgentTab() {
             disabled={calling}
             className="rounded-lg px-6 py-2.5 text-sm font-semibold transition-opacity hover:opacity-90 disabled:opacity-50"
             style={{
-              backgroundColor: 'var(--accent-primary)',
+              backgroundColor: 'var(--button-bg)',
               color: 'var(--text-button)',
               cursor: calling ? 'not-allowed' : 'pointer',
             }}

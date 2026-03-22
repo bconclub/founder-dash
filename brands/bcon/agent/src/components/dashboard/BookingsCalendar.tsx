@@ -130,9 +130,9 @@ export default function BookingsCalendar({ view = 'full' }: BookingsCalendarProp
           disabled={syncing}
           className={`
             flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium transition-colors
-            ${syncing ? 'bg-gray-400 cursor-not-allowed text-white' : 'text-white hover:opacity-90'}
+            ${syncing ? 'bg-gray-400 cursor-not-allowed text-[var(--text-button)]' : 'text-[var(--text-button)] hover:opacity-90'}
           `}
-          style={!syncing ? { backgroundColor: 'var(--accent-primary)' } : undefined}
+          style={!syncing ? { backgroundColor: 'var(--button-bg)' } : undefined}
         >
           <MdSync className={syncing ? 'animate-spin' : ''} size={14} />
           {syncing ? 'Syncing...' : 'Sync Google Calendar'}
@@ -183,27 +183,27 @@ export default function BookingsCalendar({ view = 'full' }: BookingsCalendarProp
 
   return (
     <div>
-      <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
+      <h3 className="text-lg font-medium text-[var(--text-primary)] mb-4">
           Next 10 Upcoming Bookings
         </h3>
 
       <div className="space-y-4">
         {upcomingBookings.length === 0 ? (
-          <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+          <div className="text-center py-8 text-[var(--text-secondary)]">
             No bookings found
           </div>
         ) : (
           upcomingBookings.map((booking) => (
             <div
               key={booking.id}
-              className="border border-gray-200 dark:border-[#262626] bg-white dark:bg-[#1A1A1A] rounded-lg p-4 hover:shadow-md transition-shadow"
+              className="border border-[var(--border-primary)] bg-[var(--bg-primary)] rounded-lg p-4 hover:shadow-md transition-shadow"
             >
               <div className="flex justify-between items-start">
                 <div>
-                  <h4 className="text-lg font-medium text-gray-900 dark:text-white">
+                  <h4 className="text-lg font-medium text-[var(--text-primary)]">
                     {booking.name || 'Unnamed Lead'}
                   </h4>
-                  <div className="mt-2 space-y-1 text-sm text-gray-600 dark:text-gray-400">
+                  <div className="mt-2 space-y-1 text-sm text-[var(--text-secondary)]">
                     {booking.email && <div>Email: {booking.email}</div>}
                     {booking.phone && <div>Phone: {booking.phone}</div>}
                     <div>

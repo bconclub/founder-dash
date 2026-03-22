@@ -83,7 +83,7 @@ export default function WhatsAppAgentTab() {
             onClick={sendTest}
             className="rounded-lg px-4 py-2 text-sm font-medium hover:opacity-90 transition-opacity"
             style={{
-              backgroundColor: 'var(--accent-primary)',
+              backgroundColor: 'var(--button-bg)',
               color: 'var(--text-button)',
             }}
           >

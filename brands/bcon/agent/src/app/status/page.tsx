@@ -115,15 +115,15 @@ export default function StatusPage() {
 
   const getStatusBadge = (status: string) => {
     if (status === 'ok' || status === 'connected' || status === 'valid' || status === 'active') {
-      return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+      return 'bg-green-100 text-green-800'
     }
     if (status === 'error' || status === 'disconnected' || status === 'invalid' || status === 'unauthorized') {
-      return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+      return 'bg-red-100 text-red-800'
     }
     if (status === 'rate_limited') {
-      return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+      return 'bg-yellow-100 text-yellow-800'
     }
-    return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200'
+    return 'bg-gray-100 text-gray-800'
   }
 
   if (loading && !status) {
@@ -145,8 +145,8 @@ export default function StatusPage() {
     return (
       <DashboardLayout>
         <div className="p-6">
-          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-            <p className="text-red-800 dark:text-red-200">Error: {error}</p>
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <p className="text-red-800">Error: {error}</p>
             <button
               onClick={fetchStatus}
               className="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
@@ -179,8 +179,8 @@ export default function StatusPage() {
             disabled={loading}
             className="px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50"
             style={{
-              background: 'var(--accent-primary)',
-              color: 'white',
+              background: 'var(--button-bg)',
+              color: 'var(--text-button)',
             }}
           >
             {loading ? 'Refreshing...' : 'Refresh'}
@@ -285,8 +285,8 @@ export default function StatusPage() {
                 </div>
               )}
               {status.connectivity.error && (
-                <div className="mt-2 p-2 rounded bg-red-50 dark:bg-red-900/20">
-                  <p className="text-xs text-red-600 dark:text-red-400">{status.connectivity.error}</p>
+                <div className="mt-2 p-2 rounded bg-red-50">
+                  <p className="text-xs text-red-600">{status.connectivity.error}</p>
                 </div>
               )}
             </div>
@@ -311,15 +311,15 @@ export default function StatusPage() {
                 </span>
               </div>
               {status.auth.rateLimitInfo?.isRateLimited && (
-                <div className="mt-2 p-2 rounded bg-yellow-50 dark:bg-yellow-900/20">
-                  <p className="text-xs text-yellow-600 dark:text-yellow-400">
+                <div className="mt-2 p-2 rounded bg-yellow-50">
+                  <p className="text-xs text-yellow-600">
                     Rate Limited{status.auth.rateLimitInfo.retryAfter && ` - Retry after ${status.auth.rateLimitInfo.retryAfter}s`}
                   </p>
                 </div>
               )}
               {status.auth.error && (
-                <div className="mt-2 p-2 rounded bg-red-50 dark:bg-red-900/20">
-                  <p className="text-xs text-red-600 dark:text-red-400">{status.auth.error}</p>
+                <div className="mt-2 p-2 rounded bg-red-50">
+                  <p className="text-xs text-red-600">{status.auth.error}</p>
                 </div>
               )}
             </div>
@@ -349,8 +349,8 @@ export default function StatusPage() {
               <p className="text-sm" style={{ color: 'var(--text-primary)' }}>{status.database.message}</p>
             </div>
             {status.database.error && (
-              <div className="mt-2 p-2 rounded bg-red-50 dark:bg-red-900/20">
-                <p className="text-xs text-red-600 dark:text-red-400">{status.database.error}</p>
+              <div className="mt-2 p-2 rounded bg-red-50">
+                <p className="text-xs text-red-600">{status.database.error}</p>
               </div>
             )}
             {status.database.tablesAccessible && status.database.tablesAccessible.length > 0 && (

@@ -57,8 +57,8 @@ export default function SequencesPage() {
       {/* Header */}
       <div className="flex items-center justify-end">
         <button
-          className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white transition-opacity hover:opacity-85"
-          style={{ backgroundColor: 'var(--primary-color)' }}
+          className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-[var(--text-button)] transition-opacity hover:opacity-85"
+          style={{ backgroundColor: 'var(--button-bg)' }}
           disabled
         >
           <MdAdd size={18} />

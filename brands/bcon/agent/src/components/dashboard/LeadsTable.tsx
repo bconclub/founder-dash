@@ -38,13 +38,13 @@ const STATUS_OPTIONS = [
 
 const getStatusColor = (status: string | null) => {
   const statusColors: Record<string, { bg: string; text: string; style?: CSSProperties }> = {
-    'New Lead': { bg: 'bg-blue-100 dark:bg-blue-900', text: 'text-blue-800 dark:text-blue-200' },
-    'Follow Up': { bg: 'bg-yellow-100 dark:bg-yellow-900', text: 'text-yellow-800 dark:text-yellow-200' },
-    'RNR (No Response)': { bg: 'bg-gray-100 dark:bg-gray-900', text: 'text-gray-800 dark:text-gray-200' },
-    'Interested': { bg: 'bg-green-100 dark:bg-green-900', text: 'text-green-800 dark:text-green-200' },
-    'Wrong Enquiry': { bg: 'bg-red-100 dark:bg-red-900', text: 'text-red-800 dark:text-red-200' },
+    'New Lead': { bg: '', text: '', style: { backgroundColor: 'rgba(59,130,246,0.15)', color: '#60a5fa' } },
+    'Follow Up': { bg: '', text: '', style: { backgroundColor: 'rgba(245,158,11,0.15)', color: '#f59e0b' } },
+    'RNR (No Response)': { bg: '', text: '', style: { backgroundColor: 'rgba(107,114,128,0.15)', color: '#9ca3af' } },
+    'Interested': { bg: '', text: '', style: { backgroundColor: 'rgba(34,197,94,0.15)', color: '#22c55e' } },
+    'Wrong Enquiry': { bg: '', text: '', style: { backgroundColor: 'rgba(239,68,68,0.15)', color: '#ef4444' } },
     'Call Booked': { bg: '', text: '', style: { backgroundColor: 'var(--accent-subtle)', color: 'var(--accent-primary)' } },
-    'Closed': { bg: 'bg-slate-100 dark:bg-slate-900', text: 'text-slate-800 dark:text-slate-200' },
+    'Closed': { bg: '', text: '', style: { backgroundColor: 'rgba(100,116,139,0.15)', color: '#94a3b8' } },
   }
   return statusColors[status || 'New Lead'] || statusColors['New Lead']
 }
@@ -496,7 +496,7 @@ export default function LeadsTable({
           {presetFilter !== 'all' && (
             <Link
               href="/dashboard/leads"
-              className="text-[10px] px-1.5 py-0.5 rounded border hover:bg-gray-100 dark:hover:bg-[#333]"
+              className="text-[10px] px-1.5 py-0.5 rounded border hover:bg-[var(--bg-hover)]"
               style={{ borderColor: 'var(--border-primary)', color: 'var(--text-secondary)' }}
             >
               Clear filter
@@ -516,8 +516,8 @@ export default function LeadsTable({
                 onClick={() => setScoreFilter(opt.value)}
                 className="px-2 py-0.5 text-xs font-medium transition-colors"
                 style={{
-                  backgroundColor: scoreFilter === opt.value ? 'var(--accent-primary)' : 'var(--bg-primary)',
-                  color: scoreFilter === opt.value ? 'white' : 'var(--text-secondary)',
+                  backgroundColor: scoreFilter === opt.value ? 'var(--button-bg)' : 'var(--bg-primary)',
+                  color: scoreFilter === opt.value ? 'var(--text-button)' : 'var(--text-secondary)',
                   borderRight: '1px solid var(--border-primary)',
                 }}
               >
@@ -618,8 +618,8 @@ export default function LeadsTable({
           {showViewAll && (
             <Link
               href="/dashboard/leads"
-              className="px-2.5 py-1 text-xs font-medium rounded-md text-white"
-              style={{ backgroundColor: 'var(--accent-primary)' }}
+              className="px-2.5 py-1 text-xs font-medium rounded-md text-[var(--text-button)]"
+              style={{ backgroundColor: 'var(--button-bg)' }}
             >
               View All
             </Link>
