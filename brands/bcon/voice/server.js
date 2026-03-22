@@ -1,6 +1,6 @@
 require('dotenv').config();
 const express = require('express');
-const { WebSocketServer } = require('ws');
+const { WebSocketServer, WebSocket: WS } = require('ws');
 const http = require('http');
 const axios = require('axios');
 const { createClient } = require('@supabase/supabase-js');
@@ -99,17 +99,185 @@ function normalizePhone(phone) {
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server, path: '/ws' });
 
+// ============================================
+// Deepgram Streaming STT - opens a WebSocket per call
+// ============================================
+function openDeepgramStream(onTranscript, onError) {
+  const dgKey = process.env.DEEPGRAM_API_KEY;
+  if (!dgKey) {
+    onError(new Error('DEEPGRAM_API_KEY not set'));
+    return null;
+  }
+
+  const params = new URLSearchParams({
+    model: 'nova-2',
+    language: 'multi',
+    smart_format: 'true',
+    interim_results: 'true',
+    endpointing: '300',
+    encoding: 'mulaw',
+    sample_rate: '8000',
+    channels: '1',
+  });
+
+  const dgUrl = `wss://api.deepgram.com/v1/listen?${params.toString()}`;
+  const dgWs = new WS(dgUrl, { headers: { Authorization: `Token ${dgKey}` } });
+
+  let connected = false;
+  let firstAudioTime = null;
+
+  dgWs.on('open', () => {
+    connected = true;
+    console.log('[Deepgram] WebSocket connected');
+  });
+
+  dgWs.on('message', (raw) => {
+    try {
+      const msg = JSON.parse(raw.toString());
+      if (msg.type === 'Results' && msg.channel?.alternatives?.[0]) {
+        const alt = msg.channel.alternatives[0];
+        const isFinal = msg.is_final;
+        const speechFinal = msg.speech_final;
+        const transcript = alt.transcript || '';
+        const language = msg.channel?.detected_language || 'en';
+
+        if (isFinal && transcript.trim()) {
+          const sttMs = firstAudioTime ? Date.now() - firstAudioTime : 0;
+          console.log(`[TIMING] STT (Deepgram): ${sttMs}ms [final] "${transcript}"`);
+          firstAudioTime = null; // reset for next utterance
+          onTranscript(transcript, language, sttMs, speechFinal);
+        }
+      }
+    } catch (e) {
+      // ignore parse errors on non-JSON frames
+    }
+  });
+
+  dgWs.on('error', (err) => {
+    console.error('[Deepgram] WebSocket error:', err.message);
+    if (!connected) onError(err);
+  });
+
+  dgWs.on('close', () => {
+    console.log('[Deepgram] WebSocket closed');
+  });
+
+  return {
+    send(audioBuffer) {
+      if (!firstAudioTime) firstAudioTime = Date.now();
+      if (dgWs.readyState === WS.OPEN) {
+        dgWs.send(audioBuffer);
+      }
+    },
+    close() {
+      if (dgWs.readyState === WS.OPEN || dgWs.readyState === WS.CONNECTING) {
+        try { dgWs.close(); } catch (_) {}
+      }
+    },
+    get connected() { return connected; },
+  };
+}
+
 wss.on('connection', (ws, req) => {
   console.log('Vobiz connected - BCON');
 
   let callUUID = null;
-  let audioBuffer = [];
   let isProcessing = false;
-  let silenceTimer = null;
   let isSpeaking = false;
   let aiFailures = 0;
   let conversationHistory = [];
   let callStartTime = null;
+
+  // Deepgram streaming STT state
+  let dgStream = null;
+  let useSarvamFallback = false;
+  let sarvamAudioBuffer = [];
+  let sarvamSilenceTimer = null;
+
+  // Accumulate final transcript segments between speech_final events
+  let pendingTranscript = '';
+  let pendingLanguage = 'en';
+  let pendingStartTime = null;
+
+  /**
+   * Process a complete utterance (transcript ready → Claude → TTS → send)
+   */
+  async function processUtterance(transcript, detectedLanguage, sttMs) {
+    if (isProcessing) return;
+    if (!transcript || !transcript.trim() || transcript.trim().length < 2) {
+      console.log('Empty/short transcript, skipping');
+      return;
+    }
+    isProcessing = true;
+
+    try {
+      const pipelineStart = Date.now() - sttMs; // account for STT time already elapsed
+
+      console.log(`Transcript: "${transcript}" [lang: ${detectedLanguage}]`);
+
+      const claudeStart = Date.now();
+      const response = await getAIResponse(transcript, conversationHistory, detectedLanguage, ws.leadContext);
+      const claudeMs = Date.now() - claudeStart;
+      console.log(`AI Response: "${response}"`);
+
+      // Log both messages to Supabase
+      if (ws.leadId) {
+        try {
+          await supabase.from('conversations').insert({
+            lead_id: ws.leadId,
+            channel: 'voice',
+            sender: 'customer',
+            content: transcript,
+            message_type: 'text',
+            metadata: { language: detectedLanguage, call_uuid: callUUID, stt_provider: useSarvamFallback ? 'sarvam' : 'deepgram' },
+            created_at: new Date().toISOString(),
+          });
+          if (response) {
+            await supabase.from('conversations').insert({
+              lead_id: ws.leadId,
+              channel: 'voice',
+              sender: 'agent',
+              content: response,
+              message_type: 'text',
+              metadata: { call_uuid: callUUID },
+              created_at: new Date().toISOString(),
+            });
+          }
+          console.log('Saved to DB: customer +', transcript.substring(0, 30), '| agent +', (response || '').substring(0, 30));
+        } catch (dbErr) {
+          console.error('Supabase conversation error:', dbErr.message);
+        }
+      }
+
+      const safeResponse = (response && response !== 'null' && response.trim()) ? response : null;
+
+      if (safeResponse === null) {
+        aiFailures++;
+        console.log('AI failure count:', aiFailures);
+        if (aiFailures >= 2) {
+          await speakToVobiz(ws, "Apologies for the inconvenience. Let me connect you with our team. We will call you back within the next few minutes. Thank you for reaching out to Bee-Con Club.", detectedLanguage || 'en-IN');
+          const totalMs = Date.now() - pipelineStart;
+          console.log(`[TIMING] STT: ${sttMs}ms, Claude: ${claudeMs}ms, TTS+Send: ${totalMs - sttMs - claudeMs}ms, Total: ${totalMs}ms (fallback)`);
+          ws.close();
+          return;
+        }
+        await speakToVobiz(ws, "Sorry, I'm having a bit of trouble. Want me to get someone from the team to call you back?", detectedLanguage || 'en-IN');
+        const totalMs = Date.now() - pipelineStart;
+        console.log(`[TIMING] STT: ${sttMs}ms, Claude: ${claudeMs}ms, TTS+Send: ${totalMs - sttMs - claudeMs}ms, Total: ${totalMs}ms (AI fail)`);
+      } else {
+        aiFailures = 0;
+        const ttsStart = Date.now();
+        await speakToVobiz(ws, safeResponse, detectedLanguage || 'en-IN');
+        const ttsSendMs = Date.now() - ttsStart;
+        const totalMs = Date.now() - pipelineStart;
+        console.log(`[TIMING] STT: ${sttMs}ms, Claude: ${claudeMs}ms, TTS+Send: ${ttsSendMs}ms, Total: ${totalMs}ms`);
+      }
+    } catch (err) {
+      console.error('Processing error:', err.message);
+    } finally {
+      isProcessing = false;
+    }
+  }
 
   ws.on('message', async (data) => {
     try {
@@ -215,6 +383,34 @@ wss.on('connection', (ws, req) => {
           await speakToVobiz(ws, "Hi there! Thank you for calling Bee-Con Club. I'm Prox-ee How can I help you today?", 'en-IN');
         }
 
+        // Open Deepgram streaming STT (or fall back to Sarvam)
+        dgStream = openDeepgramStream(
+          // onTranscript callback: called for each is_final segment
+          (transcript, language, sttMs, speechFinal) => {
+            // Accumulate segments until speech_final (end of utterance)
+            if (!pendingStartTime) pendingStartTime = Date.now() - sttMs;
+            pendingTranscript += (pendingTranscript ? ' ' : '') + transcript;
+            pendingLanguage = language;
+
+            if (speechFinal) {
+              // Full utterance complete - process it
+              const fullTranscript = pendingTranscript.trim();
+              const totalSttMs = pendingStartTime ? Date.now() - pendingStartTime : sttMs;
+              pendingTranscript = '';
+              pendingStartTime = null;
+              // Map Deepgram language codes to Sarvam TTS format
+              const ttsLang = pendingLanguage.startsWith('hi') ? 'hi-IN' : 'en-IN';
+              processUtterance(fullTranscript, ttsLang, totalSttMs);
+            }
+          },
+          // onError callback: Deepgram failed to connect, fall back to Sarvam
+          (err) => {
+            console.warn('[Deepgram] Connection failed, falling back to Sarvam STT:', err.message);
+            useSarvamFallback = true;
+            dgStream = null;
+          }
+        );
+
         // Load lead context in background (non-blocking, ready before first real response)
         if (ws.leadId) {
           loadLeadContext(ws.leadId).then(ctx => {
@@ -231,6 +427,14 @@ wss.on('connection', (ws, req) => {
         if (isSpeaking) return;
 
         const chunk = Buffer.from(msg.media.payload, 'base64');
+
+        // ── Deepgram streaming path: pipe raw audio directly ──
+        if (dgStream && dgStream.connected && !useSarvamFallback) {
+          dgStream.send(chunk);
+          return;
+        }
+
+        // ── Sarvam fallback path: buffer + silence detection (original behavior) ──
         const energy = chunk.reduce((sum, b) => {
           const distFrom7F = Math.abs(b - 0x7F);
           const distFromFF = Math.abs(b - 0xFF);
@@ -239,95 +443,20 @@ wss.on('connection', (ws, req) => {
         const isSilence = energy < 5;
 
         if (!isSilence) {
-          audioBuffer.push(chunk);
-          clearTimeout(silenceTimer);
-          silenceTimer = null;
+          sarvamAudioBuffer.push(chunk);
+          clearTimeout(sarvamSilenceTimer);
+          sarvamSilenceTimer = null;
         }
 
-        if (!isProcessing && audioBuffer.length > 0 && !silenceTimer) {
-          silenceTimer = setTimeout(async () => {
-            silenceTimer = null;
-            if (audioBuffer.length > 5) {
-              isProcessing = true;
-              const audio = Buffer.concat(audioBuffer);
-              audioBuffer = [];
+        if (!isProcessing && sarvamAudioBuffer.length > 0 && !sarvamSilenceTimer) {
+          sarvamSilenceTimer = setTimeout(async () => {
+            sarvamSilenceTimer = null;
+            if (sarvamAudioBuffer.length > 5) {
+              const audio = Buffer.concat(sarvamAudioBuffer);
+              sarvamAudioBuffer = [];
 
-              try {
-                const pipelineStart = Date.now();
-
-                const { transcript, language: detectedLanguage, _sttMs } = await sarvamSTT(audio);
-                console.log(`Transcript: "${transcript}" [lang: ${detectedLanguage}]`);
-                console.log('Detected language:', detectedLanguage, '-> TTS language:', detectedLanguage || 'en-IN');
-
-                if (!transcript || !transcript.trim() || transcript.trim().length < 2) {
-                  console.log('Empty/short transcript, skipping');
-                  return;
-                }
-
-                if (transcript?.trim()) {
-                  const claudeStart = Date.now();
-                  const response = await getAIResponse(transcript, conversationHistory, detectedLanguage, ws.leadContext);
-                  const claudeMs = Date.now() - claudeStart;
-                  console.log(`AI Response: "${response}"`);
-
-                  // Log both messages to Supabase
-                  if (ws.leadId) {
-                    try {
-                      await supabase.from('conversations').insert({
-                        lead_id: ws.leadId,
-                        channel: 'voice',
-                        sender: 'customer',
-                        content: transcript,
-                        message_type: 'text',
-                        metadata: { language: detectedLanguage, call_uuid: callUUID },
-                        created_at: new Date().toISOString(),
-                      });
-                      if (response) {
-                        await supabase.from('conversations').insert({
-                          lead_id: ws.leadId,
-                          channel: 'voice',
-                          sender: 'agent',
-                          content: response,
-                          message_type: 'text',
-                          metadata: { call_uuid: callUUID },
-                          created_at: new Date().toISOString(),
-                        });
-                      }
-                      console.log('Saved to DB: customer +', transcript.substring(0, 30), '| agent +', (response || '').substring(0, 30));
-                    } catch (dbErr) {
-                      console.error('Supabase conversation error:', dbErr.message);
-                    }
-                  }
-
-                  const safeResponse = (response && response !== 'null' && response.trim()) ? response : null;
-
-                  if (safeResponse === null) {
-                    aiFailures++;
-                    console.log('AI failure count:', aiFailures);
-                    if (aiFailures >= 2) {
-                      await speakToVobiz(ws, "Apologies for the inconvenience. Let me connect you with our team. We will call you back within the next few minutes. Thank you for reaching out to Bee-Con Club.", detectedLanguage || 'en-IN');
-                      const totalMs = Date.now() - pipelineStart;
-                      console.log(`[TIMING] STT: ${_sttMs || '?'}ms, Claude: ${claudeMs}ms, TTS+Send: ${totalMs - (_sttMs || 0) - claudeMs}ms, Total: ${totalMs}ms (fallback)`);
-                      ws.close();
-                      return;
-                    }
-                    await speakToVobiz(ws, "Sorry, I'm having a bit of trouble. Want me to get someone from the team to call you back?", detectedLanguage || 'en-IN');
-                    const totalMs = Date.now() - pipelineStart;
-                    console.log(`[TIMING] STT: ${_sttMs || '?'}ms, Claude: ${claudeMs}ms, TTS+Send: ${totalMs - (_sttMs || 0) - claudeMs}ms, Total: ${totalMs}ms (AI fail)`);
-                  } else {
-                    aiFailures = 0;
-                    const ttsStart = Date.now();
-                    await speakToVobiz(ws, safeResponse, detectedLanguage || 'en-IN');
-                    const ttsSendMs = Date.now() - ttsStart;
-                    const totalMs = Date.now() - pipelineStart;
-                    console.log(`[TIMING] STT: ${_sttMs || '?'}ms, Claude: ${claudeMs}ms, TTS+Send: ${ttsSendMs}ms, Total: ${totalMs}ms`);
-                  }
-                }
-              } catch (err) {
-                console.error('Processing error:', err.message);
-              } finally {
-                isProcessing = false;
-              }
+              const { transcript, language: detectedLanguage, _sttMs } = await sarvamSTT(audio);
+              processUtterance(transcript, detectedLanguage, _sttMs || 0);
             }
           }, 300);
         }
@@ -335,7 +464,17 @@ wss.on('connection', (ws, req) => {
 
       if (msg.event === 'stop') {
         console.log(`Call ended: ${callUUID}`);
-        clearTimeout(silenceTimer);
+        clearTimeout(sarvamSilenceTimer);
+        if (dgStream) dgStream.close();
+
+        // Process any remaining pending Deepgram transcript
+        if (pendingTranscript.trim()) {
+          const totalSttMs = pendingStartTime ? Date.now() - pendingStartTime : 0;
+          const ttsLang = pendingLanguage.startsWith('hi') ? 'hi-IN' : 'en-IN';
+          await processUtterance(pendingTranscript.trim(), ttsLang, totalSttMs);
+          pendingTranscript = '';
+          pendingStartTime = null;
+        }
 
         // Update voice session with duration
         if (callUUID && ws.callStartTime) {
@@ -360,7 +499,8 @@ wss.on('connection', (ws, req) => {
   });
 
   ws.on('close', async () => {
-    clearTimeout(silenceTimer);
+    clearTimeout(sarvamSilenceTimer);
+    if (dgStream) dgStream.close();
     console.log(`Disconnected: ${callUUID}`);
 
     // Fallback: update voice session if stop event was missed

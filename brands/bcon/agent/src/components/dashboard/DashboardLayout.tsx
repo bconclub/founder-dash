@@ -562,10 +562,10 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
           {/* Compact footer row: three-dot menu + version */}
           <div
-            className="dashboard-layout-footer-row flex items-center"
+            className="dashboard-layout-footer-row flex flex-col items-start gap-1"
             style={{
               padding: isCollapsed ? '6px' : '5px 10px',
-              justifyContent: isCollapsed ? 'center' : 'space-between',
+              alignItems: isCollapsed ? 'center' : 'flex-start',
             }}
           >
             {/* Three-dot menu */}
