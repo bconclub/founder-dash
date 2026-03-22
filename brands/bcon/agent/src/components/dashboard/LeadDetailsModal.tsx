@@ -1358,7 +1358,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                   <article className={`lead-stat-card lead-stat-key-event flex flex-col justify-between h-full p-3 min-h-[80px] rounded-lg border ${(() => {
                     const bd = currentLead.booking_date || currentLead.unified_context?.web?.booking_date || currentLead.unified_context?.web?.booking?.date || currentLead.unified_context?.whatsapp?.booking_date || currentLead.unified_context?.whatsapp?.booking?.date || currentLead.unified_context?.voice?.booking_date || currentLead.unified_context?.voice?.booking?.date || currentLead.unified_context?.social?.booking_date || currentLead.unified_context?.social?.booking?.date;
                     const bt = currentLead.booking_time || currentLead.unified_context?.web?.booking_time || currentLead.unified_context?.web?.booking?.time || currentLead.unified_context?.whatsapp?.booking_time || currentLead.unified_context?.whatsapp?.booking?.time || currentLead.unified_context?.voice?.booking_time || currentLead.unified_context?.voice?.booking?.time || currentLead.unified_context?.social?.booking_time || currentLead.unified_context?.social?.booking?.time;
-                    return bd && bt ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800' : 'bg-[var(--bg-primary)] border-[var(--border-primary)]';
+                    return bd && bt ? 'bg-[var(--bg-secondary)] border-[var(--border-primary)]' : 'bg-[var(--bg-primary)] border-[var(--border-primary)]';
                   })()}`}>
                     <p className="lead-stat-label text-sm text-[var(--text-muted)]">Key Event</p>
                     <div className="lead-stat-content mt-auto">
@@ -1655,7 +1655,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                     aria-labelledby="lead-tab-summary"
                     className="lead-tabpanel-summary space-y-4"
                   >
-                    <article className="lead-summary-card p-3 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20">
+                    <article className="lead-summary-card p-3 rounded-lg border" style={{ borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)' }}>
                       <h3 className="lead-summary-title text-xs font-semibold mb-2 flex items-center justify-between text-[var(--text-primary)]">
                         <div className="flex items-center gap-1.5">
                           <MdAutoAwesome size={14} className="text-blue-500" aria-hidden="true" />
@@ -1664,7 +1664,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                         <button
                           onClick={() => loadUnifiedSummary(true)}
                           disabled={loadingSummary}
-                          className="p-0.5 px-1.5 hover:bg-blue-100 dark:hover:bg-blue-900/40 rounded-full transition-colors flex items-center gap-1 text-[9px] font-bold text-blue-600 dark:text-blue-400 disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="p-0.5 px-1.5 hover:bg-[var(--bg-hover)] rounded-full transition-colors flex items-center gap-1 text-[9px] font-bold disabled:opacity-50 disabled:cursor-not-allowed" style={{ color: 'var(--accent-primary)' }}
                           title="Regenerate summary"
                         >
                           <MdRefresh size={12} className={loadingSummary ? 'animate-spin' : ''} />
@@ -1684,7 +1684,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                             {unifiedSummary ? renderSummary(unifiedSummary) : <p className="text-xs text-[var(--text-muted)]">No summary available. Click Refresh to generate one.</p>}
                           </div>
                           {summaryAttribution && (
-                            <footer className="lead-summary-attribution text-[10px] pt-2 border-t border-blue-200 dark:border-blue-800 text-[var(--text-muted)]">
+                            <footer className="lead-summary-attribution text-[10px] pt-2 border-t border-[var(--border-primary)] text-[var(--text-muted)]">
                               {summaryAttribution}
                             </footer>
                           )}

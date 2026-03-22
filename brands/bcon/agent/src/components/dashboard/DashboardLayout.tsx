@@ -598,6 +598,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                     <MdMonitorHeart size={18} style={{ marginRight: '12px' }} />
                     System Status
                   </Link>
+                  {!isCollapsed && (<>
                   <div style={{ height: '1px', backgroundColor: 'var(--border-primary)', margin: '4px 0' }} />
                   <div className="px-4 py-1.5 text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>Theme</div>
                   {([
@@ -628,6 +629,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                       {theme === mode && <span className="ml-auto text-[10px]" style={{ color: 'var(--accent-primary)' }}>✓</span>}
                     </button>
                   ))}
+                  </>)}
                 </div>
               )}
             </div>
