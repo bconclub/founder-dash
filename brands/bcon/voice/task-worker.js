@@ -248,12 +248,13 @@ async function processPendingTasks() {
         if (hourIST >= 21) nextMorning.setDate(nextMorning.getDate() + 1);
         nextMorning.setHours(9, 0, 0, 0);
         // Convert back to UTC for storage
-        const offsetMs = nextMorning.getTime() - new Date().getTime() + (new Date().getTime() - nowIST.getTime());
         const scheduledUtc = new Date(Date.now() + (nextMorning.getTime() - nowIST.getTime()));
+        const timingReason = `Quiet hours (${hourIST}:00 IST), rescheduled to 9 AM IST`;
         await supabase.from('agent_tasks').update({
           scheduled_at: scheduledUtc.toISOString(),
+          metadata: { ...task.metadata, timing_reason: timingReason },
         }).eq('id', task.id);
-        console.log(`[ProcessTasks] Quiet hours - rescheduled to 9 AM IST: ${task.task_type} for ${task.lead_name}`);
+        console.log(`[ProcessTasks] ${timingReason}: ${task.task_type} for ${task.lead_name}`);
         continue;
       }
 
@@ -409,10 +410,13 @@ async function executeTask(task) {
 // ============================================
 
 /**
- * Nudge waiting: check if lead responded since task was created.
- * If yes → skip. If no → send contextual nudge.
+ * Nudge waiting: smart timing based on read receipts.
+ * - READ but no reply → nudge 30 min after read
+ * - DELIVERED but not read → reschedule to lead's active hour
+ * - NOT DELIVERED → skip WhatsApp, flag for voice call
  */
 async function executeNudgeWaiting(task, waPhone) {
+  // Check if lead responded since task was created
   if (task.lead_id) {
     const { data: recentMsg } = await supabase
       .from('conversations')
@@ -427,6 +431,152 @@ async function executeNudgeWaiting(task, waPhone) {
     }
   }
 
+  // Fetch the last agent message to check read/delivery status
+  let lastAgentMsg = null;
+  if (task.lead_id) {
+    const { data } = await supabase
+      .from('conversations')
+      .select('id, read_at, delivered_at, created_at, metadata')
+      .eq('lead_id', task.lead_id)
+      .eq('channel', 'whatsapp')
+      .eq('sender', 'agent')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    lastAgentMsg = data;
+  }
+
+  // Fetch lead's response patterns for smart scheduling
+  let responsePatterns = null;
+  if (task.lead_id) {
+    const { data: lead } = await supabase
+      .from('all_leads')
+      .select('unified_context')
+      .eq('id', task.lead_id)
+      .maybeSingle();
+    responsePatterns = lead?.unified_context?.response_patterns || null;
+  }
+
+  const readAt = lastAgentMsg?.read_at || lastAgentMsg?.metadata?.read_at;
+  const deliveredAt = lastAgentMsg?.delivered_at || lastAgentMsg?.metadata?.delivered_at;
+
+  if (readAt) {
+    // ── READ but no reply ──
+    const readTime = new Date(readAt).getTime();
+    const thirtyMinAfterRead = readTime + 30 * 60 * 1000;
+    const now = Date.now();
+
+    if (now >= thirtyMinAfterRead) {
+      // 30 min passed since read → send nudge now
+      const timingReason = `Read at ${new Date(readAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}, nudging 30 min after`;
+      await supabase.from('agent_tasks').update({
+        metadata: { ...task.metadata, timing_reason: timingReason },
+      }).eq('id', task.id);
+      console.log(`[SmartNudge] ${timingReason}`);
+
+      return await executeSendNudgeMessage(task, waPhone);
+    } else {
+      // Less than 30 min since read → reschedule to 30 min after read_at
+      const rescheduleAt = new Date(thirtyMinAfterRead).toISOString();
+      const timingReason = `Read at ${new Date(readAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}, rescheduled to 30 min after read`;
+      await supabase.from('agent_tasks').update({
+        scheduled_at: rescheduleAt,
+        metadata: { ...task.metadata, timing_reason: timingReason },
+      }).eq('id', task.id);
+      console.log(`[SmartNudge] ${timingReason} → ${rescheduleAt}`);
+      return { skipped: true, reason: timingReason };
+    }
+  } else if (deliveredAt) {
+    // ── DELIVERED but not read → reschedule to lead's next active hour ──
+    const nextActiveTime = getNextActiveTime(responsePatterns);
+    const timingReason = responsePatterns?.active_hours?.length
+      ? `Not read, rescheduled to lead's active window (${new Date(nextActiveTime).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })})`
+      : `Not read, rescheduled to next default window (${new Date(nextActiveTime).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })})`;
+
+    await supabase.from('agent_tasks').update({
+      scheduled_at: new Date(nextActiveTime).toISOString(),
+      metadata: { ...task.metadata, timing_reason: timingReason },
+    }).eq('id', task.id);
+    console.log(`[SmartNudge] ${timingReason}`);
+    return { skipped: true, reason: timingReason };
+  } else {
+    // ── NOT DELIVERED → phone might be off, flag for voice call ──
+    const timingReason = 'Not delivered, flagged for voice call';
+    await supabase.from('agent_tasks').update({
+      metadata: { ...task.metadata, timing_reason: timingReason },
+    }).eq('id', task.id);
+
+    // Create a try_voice_call task
+    const phone10 = waPhone.replace(/\D/g, '').slice(-10);
+    await supabase.from('agent_tasks').insert({
+      task_type: 'try_voice_call',
+      task_description: `Voice call attempt: WhatsApp not delivered to ${task.lead_name}`,
+      lead_id: task.lead_id || null,
+      lead_phone: phone10,
+      lead_name: task.lead_name,
+      status: 'queued',
+      scheduled_at: new Date().toISOString(),
+      metadata: {
+        source: 'smart_nudge',
+        reason: 'whatsapp_not_delivered',
+        prev_task_id: task.id,
+        timing_reason: timingReason,
+      },
+      created_at: new Date().toISOString(),
+    });
+
+    console.log(`[SmartNudge] ${timingReason} for ${task.lead_name}`);
+    return { skipped: true, reason: timingReason };
+  }
+}
+
+/**
+ * Get the next active time for a lead based on their response patterns.
+ * Falls back to 9 AM or 7 PM IST (whichever is closer).
+ */
+function getNextActiveTime(responsePatterns) {
+  const nowIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+  const hourIST = nowIST.getHours();
+
+  if (responsePatterns?.active_hours?.length) {
+    // Find the next active hour that's in the future
+    const activeHours = responsePatterns.active_hours;
+    for (const h of activeHours) {
+      if (h > hourIST) {
+        const target = new Date(nowIST);
+        target.setHours(h, 0, 0, 0);
+        return target.getTime();
+      }
+    }
+    // All active hours are past today → use first active hour tomorrow
+    const target = new Date(nowIST);
+    target.setDate(target.getDate() + 1);
+    target.setHours(activeHours[0], 0, 0, 0);
+    return target.getTime();
+  }
+
+  // No pattern → next 9 AM or 7 PM, whichever is closer
+  if (hourIST < 9) {
+    const target = new Date(nowIST);
+    target.setHours(9, 0, 0, 0);
+    return target.getTime();
+  } else if (hourIST < 19) {
+    const target = new Date(nowIST);
+    target.setHours(19, 0, 0, 0);
+    return target.getTime();
+  } else {
+    // After 7 PM → next morning 9 AM
+    const target = new Date(nowIST);
+    target.setDate(target.getDate() + 1);
+    target.setHours(9, 0, 0, 0);
+    return target.getTime();
+  }
+}
+
+/**
+ * Build and send the contextual nudge message based on last question.
+ */
+async function executeSendNudgeMessage(task, waPhone) {
   const lastQuestion = (task.metadata?.last_question || '').toLowerCase();
   let message;
 
@@ -593,9 +743,128 @@ async function executeSequenceStep(task, waPhone, message) {
 
 /**
  * Schedule the next step in a sequence.
+ * Uses smart timing: adjusts to lead's preferred_day_parts and read receipts.
  */
 async function scheduleNextSequenceStep(task, nextType, nextStep, delayMs, sequence, resolvedPhone) {
   const phone = resolvedPhone || task.lead_phone;
+
+  // Fetch lead's response patterns and last message read status
+  let responsePatterns = null;
+  let lastMsgReadStatus = null;
+  if (task.lead_id) {
+    const { data: lead } = await supabase
+      .from('all_leads')
+      .select('unified_context')
+      .eq('id', task.lead_id)
+      .maybeSingle();
+    responsePatterns = lead?.unified_context?.response_patterns || null;
+
+    // Check if the last agent message was read
+    const { data: lastMsg } = await supabase
+      .from('conversations')
+      .select('read_at, delivered_at, metadata')
+      .eq('lead_id', task.lead_id)
+      .eq('channel', 'whatsapp')
+      .eq('sender', 'agent')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (lastMsg) {
+      const readAt = lastMsg.read_at || lastMsg.metadata?.read_at;
+      const deliveredAt = lastMsg.delivered_at || lastMsg.metadata?.delivered_at;
+      if (readAt) lastMsgReadStatus = 'read';
+      else if (deliveredAt) lastMsgReadStatus = 'delivered';
+      else lastMsgReadStatus = 'not_delivered';
+    }
+  }
+
+  // Adjust gap based on read receipts
+  let adjustedDelay = delayMs;
+  let timingReason = '';
+
+  if (lastMsgReadStatus === 'read') {
+    // Reading but not replying → shorten gap (interested but needs more nudges)
+    adjustedDelay = Math.round(delayMs * 0.6);
+    timingReason = `Reading but not replying, shortened gap to ${Math.round(adjustedDelay / (60 * 60 * 1000))}h`;
+  } else if (lastMsgReadStatus === 'not_delivered') {
+    // Not even delivered → lengthen gap (don't spam)
+    adjustedDelay = Math.round(delayMs * 1.5);
+    timingReason = `Not delivered, lengthened gap to ${Math.round(adjustedDelay / (60 * 60 * 1000))}h`;
+  } else if (lastMsgReadStatus === 'delivered') {
+    // Delivered but not read → slight increase
+    adjustedDelay = Math.round(delayMs * 1.2);
+    timingReason = `Delivered but not read, gap adjusted to ${Math.round(adjustedDelay / (60 * 60 * 1000))}h`;
+  }
+
+  // Calculate base scheduled time
+  let scheduledAt = new Date(Date.now() + adjustedDelay);
+
+  // Adjust to lead's preferred day part
+  const preferredPart = responsePatterns?.preferred_day_parts;
+  const activeHours = responsePatterns?.active_hours;
+
+  if (preferredPart || activeHours?.length) {
+    let targetHour;
+    if (preferredPart === 'evening') {
+      targetHour = 18; // 6 PM IST
+    } else if (preferredPart === 'morning') {
+      targetHour = 9; // 9 AM IST
+    } else if (preferredPart === 'afternoon') {
+      targetHour = 14; // 2 PM IST
+    } else {
+      targetHour = 10; // default 10 AM IST
+    }
+
+    // Adjust the scheduled time to the preferred hour (IST)
+    const scheduledIST = new Date(scheduledAt.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+    scheduledIST.setHours(targetHour, 0, 0, 0);
+
+    // If that time is in the past (same day), push to next day
+    const nowIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+    if (scheduledIST <= nowIST) {
+      scheduledIST.setDate(scheduledIST.getDate() + 1);
+    }
+
+    // Convert back: calculate the offset from IST to UTC
+    const offsetMs = scheduledIST.getTime() - nowIST.getTime();
+    scheduledAt = new Date(Date.now() + offsetMs);
+
+    const dayPartReason = `Lead usually responds in ${preferredPart || 'unknown'}, scheduled for ${targetHour > 12 ? targetHour - 12 : targetHour} ${targetHour >= 12 ? 'PM' : 'AM'} IST`;
+    timingReason = timingReason ? `${timingReason}; ${dayPartReason}` : dayPartReason;
+  } else if (!timingReason) {
+    // No pattern, use default 10 AM
+    const scheduledIST = new Date(scheduledAt.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+    scheduledIST.setHours(10, 0, 0, 0);
+    const nowIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+    if (scheduledIST <= nowIST) {
+      scheduledIST.setDate(scheduledIST.getDate() + 1);
+    }
+    const offsetMs = scheduledIST.getTime() - nowIST.getTime();
+    scheduledAt = new Date(Date.now() + offsetMs);
+    timingReason = 'No response pattern, using default 10 AM IST';
+  }
+
+  // Never send at a time the lead has never been active (if we have active_hours data)
+  if (activeHours?.length >= 3) {
+    const scheduledIST = new Date(scheduledAt.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+    const scheduledHour = scheduledIST.getHours();
+    if (!activeHours.includes(scheduledHour)) {
+      // Find closest active hour
+      let closestHour = activeHours[0];
+      let minDiff = 24;
+      for (const h of activeHours) {
+        const diff = Math.abs(h - scheduledHour);
+        if (diff < minDiff) { minDiff = diff; closestHour = h; }
+      }
+      scheduledIST.setHours(closestHour, 0, 0, 0);
+      const nowIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+      if (scheduledIST <= nowIST) scheduledIST.setDate(scheduledIST.getDate() + 1);
+      const offsetMs = scheduledIST.getTime() - nowIST.getTime();
+      scheduledAt = new Date(Date.now() + offsetMs);
+      timingReason += `; snapped to nearest active hour (${closestHour}:00)`;
+    }
+  }
+
   const { error } = await supabase.from('agent_tasks').insert({
     task_type: nextType,
     task_description: `Sequence step ${nextStep}/4: ${nextType} for ${task.lead_name}`,
@@ -603,12 +872,19 @@ async function scheduleNextSequenceStep(task, nextType, nextStep, delayMs, seque
     lead_phone: phone,
     lead_name: task.lead_name,
     status: 'pending',
-    scheduled_at: new Date(Date.now() + delayMs).toISOString(),
-    metadata: { ...task.metadata, sequence: sequence || 'post_call', step: nextStep, total_steps: 4, prev_task_id: task.id },
+    scheduled_at: scheduledAt.toISOString(),
+    metadata: {
+      ...task.metadata,
+      sequence: sequence || 'post_call',
+      step: nextStep,
+      total_steps: 4,
+      prev_task_id: task.id,
+      timing_reason: timingReason || undefined,
+    },
     created_at: new Date().toISOString(),
   });
   if (error) console.error(`[Sequence] Failed to create ${nextType}:`, error.message);
-  else console.log(`[Sequence] Created ${nextType} (step ${nextStep}) for ${task.lead_name}`);
+  else console.log(`[Sequence] Created ${nextType} (step ${nextStep}) for ${task.lead_name} at ${scheduledAt.toISOString()} [${timingReason}]`);
 }
 
 /**
@@ -1057,14 +1333,15 @@ async function executeSendMessage(task, waPhone, message) {
   const gateResult = await approvalGate(task, waPhone, message, !within24h);
   if (gateResult?.awaiting_approval) return gateResult;
 
+  let waMessageId = null;
   if (within24h) {
-    await sendWhatsApp(waPhone, message);
+    waMessageId = await sendWhatsApp(waPhone, message);
   } else {
     const templateUsed = await sendWhatsAppTemplate(waPhone, task);
     message = `[Template: ${templateUsed}] Sent to ${task.lead_name}`;
   }
 
-  // Log to conversations
+  // Log to conversations (include wa_message_id for read receipt tracking)
   if (task.lead_id) {
     await supabase.from('conversations').insert({
       lead_id: task.lead_id,
@@ -1072,7 +1349,12 @@ async function executeSendMessage(task, waPhone, message) {
       sender: 'agent',
       content: message,
       message_type: 'text',
-      metadata: { task_type: task.task_type, task_id: task.id, autonomous: true }
+      metadata: {
+        task_type: task.task_type,
+        task_id: task.id,
+        autonomous: true,
+        wa_message_id: waMessageId || undefined,
+      }
     }).then(({ error }) => {
       if (error) console.error('[executeTask] Conversation log error:', error.message);
     });
@@ -1131,7 +1413,10 @@ async function sendWhatsApp(phone, message) {
     throw new Error(`WhatsApp API error: ${res.status} ${errBody}`);
   }
 
-  console.log(`[WhatsApp] Sent to ${phone}: ${message.substring(0, 50)}...`);
+  const data = await res.json();
+  const waMessageId = data?.messages?.[0]?.id || null;
+  console.log(`[WhatsApp] Sent to ${phone}: ${message.substring(0, 50)}... (wamid: ${waMessageId})`);
+  return waMessageId;
 }
 
 // ============================================

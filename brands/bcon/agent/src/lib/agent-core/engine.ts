@@ -956,6 +956,114 @@ async function createFlowTask(
 }
 
 /**
+ * Calculate and store response patterns for a lead.
+ * Looks at all customer messages and the preceding agent messages to compute:
+ * - avg_response_time_seconds (rolling average)
+ * - active_hours (hours when they usually message)
+ * - preferred_day_parts ("morning" / "afternoon" / "evening")
+ * - last_5_response_times (array of last 5 response times in seconds)
+ */
+async function updateResponsePatterns(
+  supabase: SupabaseClient,
+  leadId: string,
+  existingContext: Record<string, any>,
+): Promise<void> {
+  try {
+    // Fetch recent conversation messages (both agent and customer) ordered by time
+    const { data: messages } = await supabase
+      .from('conversations')
+      .select('sender, created_at')
+      .eq('lead_id', leadId)
+      .eq('channel', 'whatsapp')
+      .in('sender', ['agent', 'customer'])
+      .order('created_at', { ascending: true })
+      .limit(100);
+
+    if (!messages || messages.length < 2) return;
+
+    // Calculate response times: time between last agent message and next customer message
+    const responseTimes: number[] = [];
+    const customerHours: number[] = [];
+
+    for (let i = 1; i < messages.length; i++) {
+      const prev = messages[i - 1];
+      const curr = messages[i];
+
+      // Track customer message hours
+      if (curr.sender === 'customer') {
+        const hour = new Date(curr.created_at).getHours();
+        customerHours.push(hour);
+      }
+
+      // Response time = customer message after an agent message
+      if (prev.sender === 'agent' && curr.sender === 'customer') {
+        const agentTime = new Date(prev.created_at).getTime();
+        const customerTime = new Date(curr.created_at).getTime();
+        const diffSeconds = Math.floor((customerTime - agentTime) / 1000);
+        if (diffSeconds > 0 && diffSeconds < 7 * 24 * 3600) {
+          responseTimes.push(diffSeconds);
+        }
+      }
+    }
+
+    // Need at least 1 response time or 3 messages to build a pattern
+    if (responseTimes.length === 0 && customerHours.length < 3) return;
+
+    // Calculate active hours (deduplicated, sorted)
+    const hourCounts: Record<number, number> = {};
+    for (const h of customerHours) {
+      hourCounts[h] = (hourCounts[h] || 0) + 1;
+    }
+    const activeHours = Object.entries(hourCounts)
+      .filter(([_, count]) => count >= 1)
+      .map(([hour]) => parseInt(hour))
+      .sort((a, b) => a - b);
+
+    // Determine preferred day part based on most common hours
+    let morningCount = 0, afternoonCount = 0, eveningCount = 0;
+    for (const h of customerHours) {
+      if (h >= 6 && h < 12) morningCount++;
+      else if (h >= 12 && h < 17) afternoonCount++;
+      else if (h >= 17 && h < 22) eveningCount++;
+    }
+    let preferredDayParts = 'morning';
+    if (afternoonCount >= morningCount && afternoonCount >= eveningCount) preferredDayParts = 'afternoon';
+    if (eveningCount >= morningCount && eveningCount >= afternoonCount) preferredDayParts = 'evening';
+
+    // Last 5 response times
+    const last5 = responseTimes.slice(-5);
+
+    // Average response time
+    const avgResponseTime = responseTimes.length > 0
+      ? Math.round(responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length)
+      : null;
+
+    const responsePatterns: Record<string, any> = {
+      ...(existingContext.response_patterns || {}),
+      avg_response_time_seconds: avgResponseTime,
+      active_hours: activeHours,
+      preferred_day_parts: preferredDayParts,
+      last_5_response_times: last5,
+      updated_at: new Date().toISOString(),
+    };
+
+    await supabase
+      .from('all_leads')
+      .update({
+        unified_context: {
+          ...existingContext,
+          response_patterns: responsePatterns,
+        },
+      })
+      .eq('id', leadId);
+
+    console.log(`[Engine] Response patterns for ${leadId}: avg=${avgResponseTime}s, active_hours=[${activeHours}], preferred=${preferredDayParts}`);
+  } catch (err: any) {
+    console.error('[Engine] Failed to update response patterns:', err?.message);
+  }
+}
+
+/**
  * Analyze conversation state after every AI response and schedule flow tasks.
  * Called non-blocking from process() and processStream().
  *
@@ -986,6 +1094,9 @@ async function scheduleFlowTasks(
   const leadName = lead.customer_name || input.userProfile.name || 'Lead';
   // Always use the phone from the lead record - never from session metadata or input
   const leadPhone = lead.customer_phone_normalized || normalizedPhone;
+
+  // ── Response Pattern Tracking ──────────────────────────────────────────────
+  await updateResponsePatterns(supabase, leadId, lead.unified_context || {});
 
   // Pain point extraction from customer message
   const painMatch = extractPainPoint(input.message);
@@ -1031,6 +1142,7 @@ async function scheduleFlowTasks(
         channel: input.channel,
         session_id: input.sessionId,
         created_by: 'engine',
+        timing_reason: 'Initial 2h nudge timer, will adjust based on read receipts',
       },
     });
   }

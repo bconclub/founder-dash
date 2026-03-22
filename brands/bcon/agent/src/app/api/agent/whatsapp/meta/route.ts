@@ -51,14 +51,14 @@ function isMessageAlreadyProcessed(messageId: string): boolean {
 
 // ─── Meta Graph API helpers ───────────────────────────────────────────────────
 
-/** Send a text reply back to the customer via Meta Graph API */
-async function sendWhatsAppReply(to: string, message: string): Promise<boolean> {
+/** Send a text reply back to the customer via Meta Graph API. Returns the WA message ID on success. */
+async function sendWhatsAppReply(to: string, message: string): Promise<string | null> {
   const phoneNumberId = process.env.META_WHATSAPP_PHONE_NUMBER_ID;
   const accessToken = process.env.META_WHATSAPP_ACCESS_TOKEN;
 
   if (!phoneNumberId || !accessToken) {
     console.error('[meta/webhook] Missing META_WHATSAPP_PHONE_NUMBER_ID or META_WHATSAPP_ACCESS_TOKEN');
-    return false;
+    return null;
   }
 
   try {
@@ -80,13 +80,14 @@ async function sendWhatsAppReply(to: string, message: string): Promise<boolean> 
     if (!res.ok) {
       const err = await res.text();
       console.error('[meta/webhook] Graph API error:', res.status, err);
-      return false;
+      return null;
     }
 
-    return true;
+    const data = await res.json();
+    return data?.messages?.[0]?.id || null;
   } catch (err) {
     console.error('[meta/webhook] Failed to send reply:', err);
-    return false;
+    return null;
   }
 }
 
@@ -150,8 +151,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ status: 'no_value' }, { status: 200 });
     }
 
-    // Skip status updates (delivered, read, etc.)
+    // Handle status updates (delivered, read receipts)
     if (value.statuses && !value.messages) {
+      await handleStatusUpdates(value.statuses);
       return NextResponse.json({ status: 'status_update' }, { status: 200 });
     }
 
@@ -207,6 +209,89 @@ export async function POST(request: NextRequest) {
     console.error('[meta/webhook] Error:', error);
     // Still return 200 to prevent Meta from retrying
     return NextResponse.json({ status: 'error' }, { status: 200 });
+  }
+}
+
+// ─── Read Receipt / Delivery Status Handling ──────────────────────────────────
+
+async function handleStatusUpdates(statuses: any[]): Promise<void> {
+  const supabase = getServiceClient() || getClient();
+  if (!supabase) return;
+
+  for (const status of statuses) {
+    const waMessageId = status.id;
+    const statusType = status.status; // 'delivered', 'read', 'sent', 'failed'
+    const timestamp = status.timestamp;
+    const recipientId = status.recipient_id;
+
+    if (!waMessageId || !statusType) continue;
+    if (statusType !== 'delivered' && statusType !== 'read') continue;
+
+    try {
+      // Find the conversation record by WA message ID stored in metadata
+      const { data: msg } = await supabase
+        .from('conversations')
+        .select('id, lead_id, metadata')
+        .filter('metadata->>wa_message_id', 'eq', waMessageId)
+        .limit(1)
+        .maybeSingle();
+
+      if (!msg) {
+        console.log(`[meta/status] No conversation found for wa_message_id ${waMessageId}`);
+        continue;
+      }
+
+      const statusTime = timestamp
+        ? new Date(parseInt(timestamp) * 1000).toISOString()
+        : new Date().toISOString();
+
+      if (statusType === 'read') {
+        // Update conversation record with read_at
+        await supabase
+          .from('conversations')
+          .update({
+            read_at: statusTime,
+            metadata: { ...msg.metadata, read_at: statusTime },
+          })
+          .eq('id', msg.id);
+
+        // Also update lead's unified_context.last_read_at
+        if (msg.lead_id) {
+          const { data: lead } = await supabase
+            .from('all_leads')
+            .select('unified_context')
+            .eq('id', msg.lead_id)
+            .maybeSingle();
+
+          if (lead) {
+            await supabase
+              .from('all_leads')
+              .update({
+                unified_context: {
+                  ...(lead.unified_context || {}),
+                  last_read_at: new Date().toISOString(),
+                },
+              })
+              .eq('id', msg.lead_id);
+          }
+        }
+
+        console.log(`[meta/status] READ receipt: msg ${msg.id} read at ${statusTime}`);
+      } else if (statusType === 'delivered') {
+        // Update conversation record with delivered_at
+        await supabase
+          .from('conversations')
+          .update({
+            delivered_at: statusTime,
+            metadata: { ...msg.metadata, delivered_at: statusTime },
+          })
+          .eq('id', msg.id);
+
+        console.log(`[meta/status] DELIVERED receipt: msg ${msg.id} at ${statusTime}`);
+      }
+    } catch (err) {
+      console.error(`[meta/status] Error processing ${statusType} for ${waMessageId}:`, err);
+    }
   }
 }
 
@@ -366,7 +451,13 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
       return;
     }
 
-    // 8. Log AI response (with response time for dashboard metrics)
+    // 8. Send reply via Meta Graph API (send first to get WA message ID)
+    const waReplyId = await sendWhatsAppReply(customerPhone, result.response);
+    if (!waReplyId) {
+      console.error('[meta/webhook] Failed to send reply to', customerPhone);
+    }
+
+    // 9. Log AI response (with response time + WA message ID for read receipt tracking)
     await logMessage(
       leadId,
       'whatsapp',
@@ -379,11 +470,12 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
         intent: result.intent,
         source: 'meta_cloud_api',
         input_to_output_gap_ms: responseTimeMs,
+        wa_message_id: waReplyId || undefined,
       },
       supabase,
     );
 
-    // 9. Update lead context
+    // 10. Update lead context
     await supabase
       .from('all_leads')
       .update({
@@ -391,12 +483,6 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
         last_interaction_at: new Date().toISOString(),
       })
       .eq('id', leadId);
-
-    // 10. Send reply via Meta Graph API
-    const sent = await sendWhatsAppReply(customerPhone, result.response);
-    if (!sent) {
-      console.error('[meta/webhook] Failed to send reply to', customerPhone);
-    }
 
     // 11. Link lead_id + phone to whatsapp session
     const normalizedSessionPhone = normalizePhone(customerPhone);
