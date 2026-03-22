@@ -1,10 +1,14 @@
 'use client';
 import { useState } from 'react';
+import { MdContentCopy, MdCheckCircle, MdPhone } from 'react-icons/md';
 
 export default function VoiceAgentTab() {
   const [phone, setPhone] = useState('');
   const [status, setStatus] = useState('');
   const [calling, setCalling] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const voiceNumber = '+918046733388';
 
   async function triggerTestCall() {
     if (!phone) return;
@@ -25,47 +29,119 @@ export default function VoiceAgentTab() {
     }
   }
 
+  function copyNumber() {
+    navigator.clipboard.writeText(voiceNumber);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
   return (
-    <div className="p-6 flex flex-col gap-6 h-full">
+    <div style={{
+      padding: '28px 32px',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '24px',
+      overflowY: 'auto',
+      height: '100%',
+    }}>
       {/* Status */}
-      <div className="flex items-center gap-3 p-4 rounded-xl bg-white/5 border border-white/10">
-        <div className="w-2.5 h-2.5 rounded-full bg-green-400 animate-pulse" />
+      <div className="flex items-center gap-3 p-4 rounded-xl" style={{
+        backgroundColor: 'var(--bg-secondary)',
+        border: '1px solid var(--border-primary)',
+      }}>
+        <div className="w-2.5 h-2.5 rounded-full animate-pulse" style={{ backgroundColor: '#22c55e' }} />
         <div>
-          <p className="text-white font-medium">Voice Agent</p>
-          <p className="text-white/50 text-sm">+918046733388 · voiceproxe.bconclub.com</p>
+          <p className="font-medium text-sm" style={{ color: 'var(--text-primary)' }}>Voice Agent</p>
+          <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{voiceNumber} · voiceproxe.bconclub.com</p>
         </div>
       </div>
 
-      {/* Inbound Info */}
-      <div className="p-4 rounded-xl bg-white/5 border border-white/10 flex flex-col gap-2">
-        <p className="text-white/70 text-sm font-medium">Inbound Calls</p>
-        <p className="text-white text-sm">Customers can call <span className="text-[var(--accent-primary)]">+918046733388</span> and speak directly with the AI agent.</p>
-      </div>
+      {/* Two-column sections */}
+      <div style={{ display: 'flex', gap: '24px' }}>
+        {/* Section 1 — Inbound (Call Us) */}
+        <div style={{
+          flex: 1,
+          backgroundColor: 'var(--bg-secondary)',
+          border: '1px solid var(--border-primary)',
+          borderRadius: '16px',
+          padding: '32px',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          textAlign: 'center',
+          gap: '16px',
+        }}>
+          <MdPhone size={32} style={{ color: 'var(--accent-primary)' }} />
+          <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>Call to Test</h2>
+          <p style={{
+            color: 'var(--text-primary)',
+            fontSize: '28px',
+            fontWeight: 700,
+            letterSpacing: '1px',
+          }}>{voiceNumber}</p>
+          <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+            Call this number to speak with the AI agent
+          </p>
+          <button
+            onClick={copyNumber}
+            className="flex items-center gap-2 rounded-lg px-5 py-2 text-sm font-semibold transition-all"
+            style={{
+              backgroundColor: copied ? 'var(--accent-primary)' : 'var(--bg-tertiary)',
+              color: copied ? 'var(--text-button)' : 'var(--text-primary)',
+              border: '1px solid var(--border-primary)',
+              cursor: 'pointer',
+            }}
+          >
+            {copied ? <MdCheckCircle size={16} /> : <MdContentCopy size={16} />}
+            {copied ? 'Copied!' : 'Copy Number'}
+          </button>
+        </div>
 
-      {/* Test Outbound Call */}
-      <div className="p-4 rounded-xl bg-white/5 border border-white/10 flex flex-col gap-3">
-        <p className="text-white/70 text-sm font-medium">Trigger Test Call</p>
-        <input
-          type="text"
-          placeholder="Your phone number (with country code)"
-          value={phone}
-          onChange={(e) => setPhone(e.target.value)}
-          className="bg-white/10 text-white placeholder-white/30 rounded-lg px-3 py-2 text-sm outline-none border border-white/10"
-        />
-        <button
-          onClick={triggerTestCall}
-          disabled={calling}
-          className="bg-[var(--accent-primary)] text-white rounded-lg px-4 py-2 text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
-        >
-          {calling ? 'Calling...' : 'Call Me'}
-        </button>
-        {status && <p className="text-sm text-white/60">{status}</p>}
-      </div>
-
-      {/* Pipeline Info */}
-      <div className="p-4 rounded-xl bg-white/5 border border-white/10 text-white/50 text-sm flex flex-col gap-1">
-        <p>Pipeline: Vobiz → Sarvam STT → Claude Haiku → Sarvam TTS</p>
-        <p>Server: voiceproxe.bconclub.com:3006</p>
+        {/* Section 2 — Outbound (We Call You) */}
+        <div style={{
+          flex: 1,
+          backgroundColor: 'var(--bg-secondary)',
+          border: '1px solid var(--border-primary)',
+          borderRadius: '16px',
+          padding: '32px',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          textAlign: 'center',
+          gap: '16px',
+        }}>
+          <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>Get a Call</h2>
+          <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+            Enter your number and the AI agent will call you
+          </p>
+          <input
+            type="text"
+            placeholder="Your number (with country code)"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            className="rounded-lg px-4 py-2.5 text-sm outline-none w-full"
+            style={{
+              backgroundColor: 'var(--bg-primary)',
+              color: 'var(--text-primary)',
+              border: '1px solid var(--border-primary)',
+              maxWidth: '300px',
+              textAlign: 'center',
+            }}
+          />
+          <button
+            onClick={triggerTestCall}
+            disabled={calling}
+            className="rounded-lg px-6 py-2.5 text-sm font-semibold transition-opacity hover:opacity-90 disabled:opacity-50"
+            style={{
+              backgroundColor: 'var(--accent-primary)',
+              color: 'var(--text-button)',
+              cursor: calling ? 'not-allowed' : 'pointer',
+            }}
+          >
+            {calling ? 'Calling...' : 'Call Me Now'}
+          </button>
+          {status && <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{status}</p>}
+        </div>
       </div>
     </div>
   );
