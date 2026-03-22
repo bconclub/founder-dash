@@ -524,48 +524,19 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           </div>
         </nav>
 
-        {/* Footer Section: Theme toggle + Menu + Version */}
+        {/* Footer Section: Menu + Version */}
         <div
           className="dashboard-layout-sidebar-footer flex-shrink-0 border-t flex flex-col"
           style={{
             borderColor: 'var(--border-primary)',
           }}
         >
-          {/* Theme toggle row - always visible */}
-          {!isCollapsed && (
-            <div className="flex items-center gap-1 px-3 pt-2 pb-1">
-              {([
-                { mode: 'bw-dark' as ThemeMode, label: 'Dark', icon: <MdDarkMode size={12} /> },
-                { mode: 'bw-light' as ThemeMode, label: 'Light', icon: <MdLightMode size={12} /> },
-                { mode: 'brand' as ThemeMode, label: 'Brand', icon: <MdPalette size={12} /> },
-              ]).map(({ mode, label, icon }) => (
-                <button
-                  key={mode}
-                  onClick={() => setTheme(mode)}
-                  className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium transition-all duration-150 ${
-                    theme === mode
-                      ? 'border'
-                      : 'opacity-50 hover:opacity-80'
-                  }`}
-                  style={{
-                    color: 'var(--text-primary)',
-                    borderColor: theme === mode ? 'var(--text-primary)' : 'transparent',
-                    backgroundColor: theme === mode ? 'var(--bg-hover)' : 'transparent',
-                  }}
-                >
-                  {icon}
-                  {label}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {/* Compact footer row: three-dot menu + version */}
+          {/* Footer row: three-dot menu + version */}
           <div
-            className="dashboard-layout-footer-row flex flex-col items-start gap-1"
+            className="dashboard-layout-footer-row flex flex-row items-center gap-2"
             style={{
               padding: isCollapsed ? '6px' : '5px 10px',
-              alignItems: isCollapsed ? 'center' : 'flex-start',
+              justifyContent: isCollapsed ? 'center' : 'flex-start',
             }}
           >
             {/* Three-dot menu */}
@@ -627,6 +598,36 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                     <MdMonitorHeart size={18} style={{ marginRight: '12px' }} />
                     System Status
                   </Link>
+                  <div style={{ height: '1px', backgroundColor: 'var(--border-primary)', margin: '4px 0' }} />
+                  <div className="px-4 py-1.5 text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>Theme</div>
+                  {([
+                    { mode: 'bw-dark' as ThemeMode, label: 'Dark', icon: <MdDarkMode size={16} /> },
+                    { mode: 'bw-light' as ThemeMode, label: 'Light', icon: <MdLightMode size={16} /> },
+                    { mode: 'brand' as ThemeMode, label: 'Brand', icon: <MdPalette size={16} /> },
+                  ]).map(({ mode, label, icon }) => (
+                    <button
+                      key={mode}
+                      onClick={() => {
+                        setTheme(mode)
+                        setMoreOptionsOpen(false)
+                      }}
+                      className="dashboard-layout-more-options-item flex items-center w-full text-left px-4 py-2 text-sm transition-colors duration-200"
+                      style={{
+                        color: 'var(--text-primary)',
+                        backgroundColor: theme === mode ? 'var(--bg-hover)' : 'transparent',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = theme === mode ? 'var(--bg-hover)' : 'transparent'
+                      }}
+                    >
+                      <span style={{ marginRight: '12px', display: 'flex' }}>{icon}</span>
+                      {label}
+                      {theme === mode && <span className="ml-auto text-[10px]" style={{ color: 'var(--accent-primary)' }}>✓</span>}
+                    </button>
+                  ))}
                 </div>
               )}
             </div>
