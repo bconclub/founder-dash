@@ -253,7 +253,9 @@ wss.on('connection', (ws, req) => {
               audioBuffer = [];
 
               try {
-                const { transcript, language: detectedLanguage } = await sarvamSTT(audio);
+                const pipelineStart = Date.now();
+
+                const { transcript, language: detectedLanguage, _sttMs } = await sarvamSTT(audio);
                 console.log(`Transcript: "${transcript}" [lang: ${detectedLanguage}]`);
                 console.log('Detected language:', detectedLanguage, '-> TTS language:', detectedLanguage || 'en-IN');
 
@@ -263,7 +265,9 @@ wss.on('connection', (ws, req) => {
                 }
 
                 if (transcript?.trim()) {
+                  const claudeStart = Date.now();
                   const response = await getAIResponse(transcript, conversationHistory, detectedLanguage, ws.leadContext);
+                  const claudeMs = Date.now() - claudeStart;
                   console.log(`AI Response: "${response}"`);
 
                   // Log both messages to Supabase
@@ -302,13 +306,21 @@ wss.on('connection', (ws, req) => {
                     console.log('AI failure count:', aiFailures);
                     if (aiFailures >= 2) {
                       await speakToVobiz(ws, "Apologies for the inconvenience. Let me connect you with our team. We will call you back within the next few minutes. Thank you for reaching out to Bee-Con Club.", detectedLanguage || 'en-IN');
+                      const totalMs = Date.now() - pipelineStart;
+                      console.log(`[TIMING] STT: ${_sttMs || '?'}ms, Claude: ${claudeMs}ms, TTS+Send: ${totalMs - (_sttMs || 0) - claudeMs}ms, Total: ${totalMs}ms (fallback)`);
                       ws.close();
                       return;
                     }
                     await speakToVobiz(ws, "Sorry, I'm having a bit of trouble. Want me to get someone from the team to call you back?", detectedLanguage || 'en-IN');
+                    const totalMs = Date.now() - pipelineStart;
+                    console.log(`[TIMING] STT: ${_sttMs || '?'}ms, Claude: ${claudeMs}ms, TTS+Send: ${totalMs - (_sttMs || 0) - claudeMs}ms, Total: ${totalMs}ms (AI fail)`);
                   } else {
                     aiFailures = 0;
+                    const ttsStart = Date.now();
                     await speakToVobiz(ws, safeResponse, detectedLanguage || 'en-IN');
+                    const ttsSendMs = Date.now() - ttsStart;
+                    const totalMs = Date.now() - pipelineStart;
+                    console.log(`[TIMING] STT: ${_sttMs || '?'}ms, Claude: ${claudeMs}ms, TTS+Send: ${ttsSendMs}ms, Total: ${totalMs}ms`);
                   }
                 }
               } catch (err) {
@@ -369,6 +381,7 @@ wss.on('connection', (ws, req) => {
 });
 
 async function sarvamSTT(audioBuffer) {
+  const sttStart = Date.now();
   try {
     function addWavHeader(mulawBuffer) {
       const numChannels = 1;
@@ -419,17 +432,22 @@ async function sarvamSTT(audioBuffer) {
         timeout: 2000,
       }
     );
+    const sttMs = Date.now() - sttStart;
+    console.log(`[TIMING] STT sent → received: ${sttMs}ms`);
     return {
       transcript: response.data?.transcript || '',
       language: response.data?.language_code || 'hi-IN',
+      _sttMs: sttMs,
     };
   } catch (err) {
-    console.error('STT error:', err.response?.data || err.message);
-    return { transcript: '', language: 'hi-IN' };
+    const sttMs = Date.now() - sttStart;
+    console.error(`STT error (${sttMs}ms):`, err.response?.data || err.message);
+    return { transcript: '', language: 'hi-IN', _sttMs: sttMs };
   }
 }
 
 async function sarvamTTS(text, language = 'en-IN') {
+  const ttsStart = Date.now();
   try {
     const response = await axios.post(
       'https://api.sarvam.ai/text-to-speech',
@@ -448,22 +466,29 @@ async function sarvamTTS(text, language = 'en-IN') {
         },
       }
     );
+    const ttsMs = Date.now() - ttsStart;
     const audio = response.data?.audios?.[0] || null;
-    console.log('TTS audio length:', audio?.length || 0);
-    console.log('TTS audio prefix:', audio?.substring(0, 30));
+    console.log(`[TIMING] TTS sent → received: ${ttsMs}ms (audio length: ${audio?.length || 0})`);
     return audio;
   } catch (err) {
-    console.error('TTS error:', err.response?.data || err.message);
+    const ttsMs = Date.now() - ttsStart;
+    console.error(`TTS error (${ttsMs}ms):`, err.response?.data || err.message);
     return null;
   }
 }
 
 async function speakToVobiz(ws, text, language = 'en-IN') {
+  const ttsCallStart = Date.now();
   const audio = await sarvamTTS(text, language);
   if (audio && ws.readyState === 1) {
+    const resampleStart = Date.now();
     const chunks = prepareAudioChunks(audio);
+    const resampleMs = Date.now() - resampleStart;
+    console.log(`[TIMING] Resample + chunk: ${resampleMs}ms (${chunks.length} chunks)`);
     isSpeaking = true;
+    const firstChunkTime = Date.now();
     await sendChunkedAudio(ws, chunks);
+    console.log(`[TIMING] First audio chunk sent at: +${firstChunkTime - ttsCallStart}ms after TTS request`);
     isSpeaking = false;
   } else {
     console.log('Audio not sent - null or ws closed');
@@ -539,6 +564,7 @@ async function loadLeadContext(leadId) {
 }
 
 async function getAIResponse(transcript, conversationHistory, detectedLanguage, leadContext) {
+  const claudeStart = Date.now();
   try {
     conversationHistory.push({ role: 'user', content: '[Caller language: ' + detectedLanguage + '] ' + transcript });
 
@@ -584,14 +610,17 @@ async function getAIResponse(transcript, conversationHistory, detectedLanguage, 
       }
     );
 
+    const claudeMs = Date.now() - claudeStart;
     const aiText = response.data?.content?.[0]?.text?.trim() || null;
     if (aiText) {
       conversationHistory.push({ role: 'assistant', content: aiText });
     }
+    console.log(`[TIMING] Claude sent → received: ${claudeMs}ms`);
     console.log('AI response:', aiText);
     return aiText;
   } catch (err) {
-    console.error('Claude error:', err.response?.status, JSON.stringify(err.response?.data || err.message));
+    const claudeMs = Date.now() - claudeStart;
+    console.error(`Claude error (${claudeMs}ms):`, err.response?.status, JSON.stringify(err.response?.data || err.message));
     return null;
   }
 }
