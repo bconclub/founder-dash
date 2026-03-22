@@ -57,7 +57,18 @@ export function buildPrompt(options: PromptOptions): { systemPrompt: string; use
   const resolvedBrand = brand || process.env.NEXT_PUBLIC_BRAND_ID || process.env.NEXT_PUBLIC_BRAND || 'bcon';
 
   // Build the core system prompt (brand-specific)
-  const systemPrompt = buildSystemPrompt(resolvedBrand, userName, knowledgeBase, messageCount, channel, crossChannelContext, formData);
+  let systemPrompt = buildSystemPrompt(resolvedBrand, userName, knowledgeBase, messageCount, channel, crossChannelContext, formData);
+
+  // Calculate lead's average message length from history to enforce mirroring
+  if (history && history.length > 0) {
+    const userMessages = history.filter(h => h.role === 'user');
+    if (userMessages.length > 0) {
+      const avgLen = Math.round(userMessages.reduce((sum, m) => sum + m.content.length, 0) / userMessages.length);
+      if (avgLen < 20) {
+        systemPrompt += `\n\nIMPORTANT: This lead sends very short messages (avg ${avgLen} chars). Keep all replies under 15 words. One sentence only.`;
+      }
+    }
+  }
 
   // Build the user prompt with context
   const userPrompt = buildUserPrompt({
