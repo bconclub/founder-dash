@@ -1,3 +1,5 @@
+const isTestMode = process.env.TEST_MODE === 'true';
+
 module.exports = {
   apps: [
     {
@@ -9,7 +11,7 @@ module.exports = {
     {
       name: 'bcon-tasks',
       script: 'task-worker.js',
-      cron_restart: '*/5 * * * *',
+      cron_restart: isTestMode ? '*/1 * * * *' : '*/5 * * * *',
       autorestart: false,
       env_file: '.env',
       env: { NODE_ENV: 'production' }
