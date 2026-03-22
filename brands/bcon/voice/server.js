@@ -124,7 +124,8 @@ function openDeepgramStream(onTranscript, onError) {
   const dgWs = new WS(dgUrl, { headers: { Authorization: `Token ${dgKey}` } });
 
   let connected = false;
-  let firstAudioTime = null;
+  let firstAudioTime = null;    // when first audio chunk of this utterance was sent
+  let lastAudioSentTime = null; // when the most recent audio chunk was sent (for processing latency)
 
   dgWs.on('open', () => {
     connected = true;
@@ -142,10 +143,12 @@ function openDeepgramStream(onTranscript, onError) {
         const language = msg.channel?.detected_language || 'en';
 
         if (isFinal && transcript.trim()) {
-          const sttMs = firstAudioTime ? Date.now() - firstAudioTime : 0;
-          console.log(`[TIMING] STT (Deepgram): ${sttMs}ms [final] "${transcript}"`);
-          firstAudioTime = null; // reset for next utterance
-          onTranscript(transcript, language, sttMs, speechFinal);
+          const speakingMs = firstAudioTime ? Date.now() - firstAudioTime : 0;
+          const processingMs = lastAudioSentTime ? Date.now() - lastAudioSentTime : 0;
+          console.log(`[TIMING] STT (Deepgram): speaking=${speakingMs}ms, processing=${processingMs}ms [final] "${transcript}"`);
+          firstAudioTime = null;
+          lastAudioSentTime = null;
+          onTranscript(transcript, language, processingMs, speechFinal);
         }
       }
     } catch (e) {
@@ -165,6 +168,7 @@ function openDeepgramStream(onTranscript, onError) {
   return {
     send(audioBuffer) {
       if (!firstAudioTime) firstAudioTime = Date.now();
+      lastAudioSentTime = Date.now();
       if (dgWs.readyState === WS.OPEN) {
         dgWs.send(audioBuffer);
       }
@@ -601,7 +605,7 @@ async function sarvamTTS(text, language = 'en-IN') {
         inputs: [text],
         target_language_code: language,
         speaker: 'shubh',
-        model: 'bulbul:v3',
+        model: 'bulbul:v1',
         encoding: 'pcm',
         sample_rate: 16000,
       },
@@ -639,7 +643,7 @@ async function speakToVobiz(ws, text, language = 'en-IN') {
   }
 }
 
-const SYSTEM_PROMPT = `You are Prox-ee, a voice assistant at Bee-Con Club. You talk like a real person on a phone call, not like a scripted bot. How you speak: Short. Casual. Like texting but spoken. Never say "How can I help you today" or "Is there anything else I can help with" or any customer service phrases. Just talk normally. If someone says hi, say hi back. If they ask your name, just say it. Do not over-explain. Do not add filler questions after every answer. Examples of how you talk: "Hey, yeah I'm Prox-ee, the A.I. assistant here at Bee-Con." "We do A.I. agents for businesses, basically automates your sales and follow-ups." "What's your business about?" "Cool, yeah we can definitely help with that." "Want me to get someone from the team to call you back?" What you know about Bee-Con Club: We are a Human times A.I. business solutions company. Not a dev shop, not an agency. We build intelligent business systems with A.I. at the core. We have three pillars. First, A.I. in Business. This includes A.I. Lead Machine for lead generation and quality, A.I. chatbots and customer support agents, A.I. workflow automation, A.I. analytics and dashboards, A.I. content generation, and custom A.I. solutions built for specific business needs. Second, Brand Marketing. Full service strategy, creative, execution, and optimization. Marketing that thinks, adapts, and performs. Third, Business Apps. Web apps, mobile apps, SaaS products with A.I. embedded. We also built Prox-ee, an A.I. powered operating system for growing businesses. We work with real estate, education, fitness, travel, consulting, aviation, retail, media, and more. Never say we only do one thing. We cover A.I. systems, marketing, and apps. If someone asks about social media, yes we do brand marketing including social. If someone asks about ads, yes we do A.I. Lead Machine which handles ad strategy and optimization. If asked about pricing, say it depends on scope and the team will map it out on a call. Never give specific prices. Rules: Respond in whatever language the caller is speaking. Match their language exactly. Keep responses under 12 words unless explaining something specific. No markdown. No lists. No emojis. Never repeat what the caller said. One thought per response. If you dont understand, just say "Sorry, didn't catch that, one more time?"`;
+const SYSTEM_PROMPT = `You are Prox-ee, voice assistant at Bee-Con Club. CRITICAL RULE: Maximum 8 words per response. Never exceed 10 words. One short sentence only. Talk like a real person on a call. No customer service phrases. No filler questions. Examples: "Yeah, I'm Prox-ee from Bee-Con." "We build A.I. systems for businesses." "What's your business about?" "Yeah we can help with that." "Want someone to call you back?" "Depends on scope, team can explain." Bee-Con Club: A.I. business solutions. Three pillars: A.I. in Business (lead gen, chatbots, automation), Brand Marketing, Business Apps. Work with real estate, education, fitness, travel, consulting, aviation, retail. If asked pricing: depends on scope, team will map it out on a call. Rules: Match caller's language. Maximum 8 words. No markdown. No lists. No emojis. Never repeat what caller said. If you dont understand: "Sorry, one more time?"`;
 
 async function loadLeadContext(leadId) {
   const ctx = { name: null, stage: null, score: null, previousMessages: [], channels: [], adminNotes: [], unifiedContext: null };
@@ -740,7 +744,7 @@ async function getAIResponse(transcript, conversationHistory, detectedLanguage, 
       'https://api.anthropic.com/v1/messages',
       {
         model: 'claude-haiku-4-5-20251001',
-        max_tokens: 80,
+        max_tokens: 30,
         system: dynamicPrompt,
         messages: conversationHistory,
       },
@@ -755,7 +759,18 @@ async function getAIResponse(transcript, conversationHistory, detectedLanguage, 
     );
 
     const claudeMs = Date.now() - claudeStart;
-    const aiText = response.data?.content?.[0]?.text?.trim() || null;
+    let aiText = response.data?.content?.[0]?.text?.trim() || null;
+
+    // Truncate long responses to first sentence only (keeps TTS fast)
+    if (aiText && aiText.length > 60) {
+      const firstSentence = aiText.match(/^[^.!?]+[.!?]/);
+      if (firstSentence) {
+        const original = aiText;
+        aiText = firstSentence[0].trim();
+        console.log(`[Voice] Truncated: "${original}" → "${aiText}"`);
+      }
+    }
+
     if (aiText) {
       conversationHistory.push({ role: 'assistant', content: aiText });
     }
