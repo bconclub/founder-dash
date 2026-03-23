@@ -1,18 +1,14 @@
 'use client'
 
 import React, { useState, useEffect, useCallback } from 'react'
-import { TasksSkeleton } from '@/components/dashboard/Skeleton'
 import {
   MdNotifications,
   MdMessage,
   MdBarChart,
   MdDescription,
   MdCheckCircle,
-  MdError,
   MdSchedule,
-  MdHourglassEmpty,
 } from 'react-icons/md'
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 
 // --- Types ---
 
@@ -41,7 +37,6 @@ interface Stats {
   successRate: number
 }
 
-type FilterTab = 'all' | 'reminders' | 'follow_ups' | 'scoring' | 'other'
 
 // --- Helpers ---
 
@@ -56,6 +51,7 @@ function statusPill(status: string) {
   const styles: Record<string, { bg: string; color: string; label: string }> = {
     completed: { bg: 'rgba(34,197,94,0.12)', color: '#22c55e', label: 'Completed' },
     failed: { bg: 'rgba(239,68,68,0.12)', color: '#ef4444', label: 'Failed' },
+    failed_24h_window: { bg: 'rgba(239,68,68,0.12)', color: '#ef4444', label: 'Failed (24h)' },
     pending: { bg: 'rgba(245,158,11,0.12)', color: '#f59e0b', label: 'Pending' },
     in_queue: { bg: 'rgba(107,114,128,0.12)', color: '#9ca3af', label: 'Queued' },
   }
@@ -99,31 +95,12 @@ function firesIn(scheduledAt: string | null): string {
   return `Fires at ${formatTime(scheduledAt)}`
 }
 
-function matchesFilter(task: AgentTask, filter: FilterTab): boolean {
-  if (filter === 'all') return true
-  if (filter === 'reminders') return task.task_type.includes('reminder')
-  if (filter === 'follow_ups') return task.task_type.includes('follow')
-  if (filter === 'scoring') return task.task_type.includes('scor') || task.task_type.includes('summary')
-  // 'other'
-  return !task.task_type.includes('reminder') && !task.task_type.includes('follow') && !task.task_type.includes('scor') && !task.task_type.includes('summary')
+function isWithin24Hours(scheduledAt: string | null): boolean {
+  if (!scheduledAt) return false
+  const diff = new Date(scheduledAt).getTime() - Date.now()
+  return diff > 0 && diff <= 24 * 60 * 60 * 1000
 }
 
-function buildHourlyChart(tasks: AgentTask[]): { hour: string; count: number }[] {
-  const now = new Date()
-  const hours: { hour: string; count: number }[] = []
-  for (let i = 23; i >= 0; i--) {
-    const h = new Date(now.getTime() - i * 60 * 60 * 1000)
-    const label = h.toLocaleTimeString('en-IN', { hour: '2-digit', hour12: true })
-    const start = new Date(h)
-    start.setMinutes(0, 0, 0)
-    const end = new Date(start.getTime() + 60 * 60 * 1000)
-    const count = tasks.filter(
-      (t) => t.status === 'completed' && t.completed_at && new Date(t.completed_at) >= start && new Date(t.completed_at) < end
-    ).length
-    hours.push({ hour: label, count })
-  }
-  return hours
-}
 
 // --- Stat Card ---
 
@@ -151,7 +128,6 @@ export default function TasksPage() {
   const [tasks, setTasks] = useState<AgentTask[]>([])
   const [stats, setStats] = useState<Stats>({ completedToday: 0, failedToday: 0, pendingCount: 0, queuedCount: 0, successRate: 100 })
   const [loading, setLoading] = useState(true)
-  const [filter, setFilter] = useState<FilterTab>('all')
 
   const fetchTasks = useCallback(async () => {
     try {
@@ -172,16 +148,48 @@ export default function TasksPage() {
     return () => clearInterval(interval)
   }, [fetchTasks])
 
-  // Split into timeline (completed/failed) and upcoming (pending/in_queue)
-  const timelineTasks = tasks
-    .filter((t) => (t.status === 'completed' || t.status === 'failed') && matchesFilter(t, filter))
+  // Column 1: Completed / Failed / Failed 24h window
+  const completedTasks = tasks
+    .filter((t) => t.status === 'completed' || t.status === 'failed' || t.status === 'failed_24h_window')
     .sort((a, b) => new Date(b.completed_at || b.created_at).getTime() - new Date(a.completed_at || a.created_at).getTime())
 
-  const upcomingTasks = tasks
-    .filter((t) => t.status === 'pending' || t.status === 'in_queue')
+  // Column 2: Next 24 hours (pending within 24h) + queued (in_queue regardless of time)
+  const next24hTasks = tasks
+    .filter((t) => (t.status === 'pending' && isWithin24Hours(t.scheduled_at)) || t.status === 'in_queue')
     .sort((a, b) => new Date(a.scheduled_at || a.created_at).getTime() - new Date(b.scheduled_at || b.created_at).getTime())
 
-  const hourlyData = buildHourlyChart(tasks)
+  // Column 3: Upcoming (pending tasks beyond 24h)
+  const upcomingTasks = tasks
+    .filter((t) => t.status === 'pending' && !isWithin24Hours(t.scheduled_at))
+    .sort((a, b) => new Date(a.scheduled_at || a.created_at).getTime() - new Date(b.scheduled_at || b.created_at).getTime())
+
+  // Action handlers for next-24h column
+  const handleSendNow = async (taskId: string) => {
+    try {
+      await fetch(`/api/dashboard/tasks/${taskId}/send-now`, { method: 'POST' })
+      fetchTasks()
+    } catch (err) {
+      console.error('Send now failed:', err)
+    }
+  }
+
+  const handleReschedule = async (taskId: string) => {
+    try {
+      await fetch(`/api/dashboard/tasks/${taskId}/reschedule`, { method: 'POST' })
+      fetchTasks()
+    } catch (err) {
+      console.error('Reschedule failed:', err)
+    }
+  }
+
+  const handleCancel = async (taskId: string) => {
+    try {
+      await fetch(`/api/dashboard/tasks/${taskId}/cancel`, { method: 'POST' })
+      fetchTasks()
+    } catch (err) {
+      console.error('Cancel failed:', err)
+    }
+  }
 
   if (loading) {
     return (
@@ -215,7 +223,7 @@ export default function TasksPage() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20, height: '100%' }}>
       {/* Header */}
       <h1 style={{ color: 'var(--text-primary)', fontSize: 18, fontWeight: 700, margin: 0 }}>Tasks</h1>
 
@@ -227,49 +235,29 @@ export default function TasksPage() {
         <StatCard label="Success Rate" value={`${stats.successRate}%`} color="var(--text-primary)" />
       </div>
 
-      {/* Main Area */}
-      <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-        {/* Left — Activity Timeline */}
-        <div style={{ flex: '3 1 400px', minWidth: 0 }}>
-          {/* Filter Tabs */}
-          <div style={{ display: 'flex', gap: 4, marginBottom: 12 }}>
-            {(['all', 'reminders', 'follow_ups', 'scoring', 'other'] as FilterTab[]).map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setFilter(tab)}
-                style={{
-                  padding: '5px 12px',
-                  borderRadius: 6,
-                  border: '1px solid rgba(255,255,255,0.08)',
-                  background: filter === tab ? 'rgba(255,255,255,0.1)' : 'transparent',
-                  color: filter === tab ? 'var(--text-primary)' : 'var(--text-secondary)',
-                  fontSize: 12,
-                  fontWeight: 500,
-                  cursor: 'pointer',
-                  textTransform: 'capitalize',
-                }}
-              >
-                {tab === 'follow_ups' ? 'Follow-ups' : tab}
-              </button>
-            ))}
-          </div>
+      {/* 3-Column Layout */}
+      <div style={{ display: 'flex', gap: 16, flex: 1, minHeight: 0 }}>
 
-          {/* Timeline */}
+        {/* Column 1 — Completed */}
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+          <div style={{ color: 'var(--text-primary)', fontWeight: 600, fontSize: 14, marginBottom: 12 }}>
+            Completed
+          </div>
           <div
             style={{
               background: 'var(--bg-secondary, rgba(255,255,255,0.02))',
               border: '1px solid rgba(255,255,255,0.08)',
               borderRadius: 8,
-              maxHeight: 500,
+              flex: 1,
               overflow: 'auto',
             }}
           >
-            {timelineTasks.length === 0 ? (
+            {completedTasks.length === 0 ? (
               <div style={{ color: 'var(--text-secondary)', fontSize: 13, textAlign: 'center', padding: '40px 0', opacity: 0.5 }}>
-                No tasks to show
+                No completed tasks
               </div>
             ) : (
-              timelineTasks.map((task) => (
+              completedTasks.map((task) => (
                 <div
                   key={task.id}
                   style={{
@@ -280,16 +268,13 @@ export default function TasksPage() {
                     alignItems: 'flex-start',
                   }}
                 >
-                  {/* Timestamp */}
                   <div style={{ color: 'var(--text-secondary)', fontSize: 11, minWidth: 60, paddingTop: 2, flexShrink: 0 }}>
                     <div>{formatTime(task.completed_at || task.created_at)}</div>
                     <div style={{ opacity: 0.6 }}>{formatDate(task.completed_at || task.created_at)}</div>
                   </div>
-                  {/* Icon */}
                   <div style={{ color: 'var(--text-secondary)', paddingTop: 1, flexShrink: 0 }}>
                     {taskTypeIcon(task.task_type)}
                   </div>
-                  {/* Content */}
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ color: 'var(--text-primary)', fontSize: 13, lineHeight: '18px' }}>
                       {task.task_description}
@@ -299,13 +284,12 @@ export default function TasksPage() {
                         {task.lead_name} {task.lead_phone ? `(${task.lead_phone})` : ''}
                       </span>
                     )}
-                    {task.status === 'failed' && task.error_message && (
+                    {(task.status === 'failed' || task.status === 'failed_24h_window') && task.error_message && (
                       <div style={{ color: '#ef4444', fontSize: 11, marginTop: 4 }}>
                         {task.error_message}
                       </div>
                     )}
                   </div>
-                  {/* Status */}
                   <div style={{ flexShrink: 0 }}>{statusPill(task.status)}</div>
                 </div>
               ))
@@ -313,24 +297,129 @@ export default function TasksPage() {
           </div>
         </div>
 
-        {/* Right — Upcoming Queue */}
-        <div style={{ flex: '2 1 280px', minWidth: 0 }}>
+        {/* Column 2 — Next 24 Hours */}
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
           <div style={{ color: 'var(--text-primary)', fontWeight: 600, fontSize: 14, marginBottom: 12 }}>
-            Upcoming Queue
+            Next 24 Hours
           </div>
           <div
             style={{
               background: 'var(--bg-secondary, rgba(255,255,255,0.02))',
               border: '1px solid rgba(255,255,255,0.08)',
               borderRadius: 8,
-              maxHeight: 500,
+              flex: 1,
+              overflow: 'auto',
+            }}
+          >
+            {next24hTasks.length === 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 16px', gap: 8 }}>
+                <MdCheckCircle size={28} style={{ color: 'rgba(34,197,94,0.4)' }} />
+                <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>No tasks in the next 24 hours</span>
+              </div>
+            ) : (
+              next24hTasks.map((task) => (
+                <div
+                  key={task.id}
+                  style={{
+                    padding: '12px 16px',
+                    borderBottom: '1px solid rgba(255,255,255,0.05)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 6,
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ color: 'var(--text-primary)', fontSize: 13, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {task.task_description}
+                    </span>
+                    {typeBadge(task.task_type)}
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ color: 'var(--text-secondary)', fontSize: 11 }}>
+                      {task.lead_name || 'Unknown lead'}
+                    </span>
+                    <span style={{ color: '#f59e0b', fontSize: 11, fontWeight: 500 }}>
+                      {firesIn(task.scheduled_at)}
+                    </span>
+                  </div>
+                  {/* Context lines */}
+                  {task.metadata?.context && (
+                    <div style={{ color: 'var(--text-secondary)', fontSize: 11, opacity: 0.7 }}>
+                      {String(task.metadata.context)}
+                    </div>
+                  )}
+                  {/* Action buttons */}
+                  <div style={{ display: 'flex', gap: 6, marginTop: 2 }}>
+                    <button
+                      onClick={() => handleSendNow(task.id)}
+                      style={{
+                        padding: '3px 10px',
+                        fontSize: 11,
+                        fontWeight: 500,
+                        borderRadius: 4,
+                        border: '1px solid rgba(34,197,94,0.3)',
+                        background: 'rgba(34,197,94,0.1)',
+                        color: '#22c55e',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Send Now
+                    </button>
+                    <button
+                      onClick={() => handleReschedule(task.id)}
+                      style={{
+                        padding: '3px 10px',
+                        fontSize: 11,
+                        fontWeight: 500,
+                        borderRadius: 4,
+                        border: '1px solid rgba(245,158,11,0.3)',
+                        background: 'rgba(245,158,11,0.1)',
+                        color: '#f59e0b',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Reschedule
+                    </button>
+                    <button
+                      onClick={() => handleCancel(task.id)}
+                      style={{
+                        padding: '3px 10px',
+                        fontSize: 11,
+                        fontWeight: 500,
+                        borderRadius: 4,
+                        border: '1px solid rgba(239,68,68,0.3)',
+                        background: 'rgba(239,68,68,0.1)',
+                        color: '#ef4444',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* Column 3 — Upcoming */}
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+          <div style={{ color: 'var(--text-primary)', fontWeight: 600, fontSize: 14, marginBottom: 12 }}>
+            Upcoming
+          </div>
+          <div
+            style={{
+              background: 'var(--bg-secondary, rgba(255,255,255,0.02))',
+              border: '1px solid rgba(255,255,255,0.08)',
+              borderRadius: 8,
+              flex: 1,
               overflow: 'auto',
             }}
           >
             {upcomingTasks.length === 0 ? (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 16px', gap: 8 }}>
-                <MdCheckCircle size={28} style={{ color: 'rgba(34,197,94,0.4)' }} />
-                <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>No tasks in queue</span>
+                <MdSchedule size={28} style={{ color: 'rgba(245,158,11,0.4)' }} />
+                <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>No upcoming tasks</span>
               </div>
             ) : (
               upcomingTasks.map((task) => (
@@ -354,53 +443,21 @@ export default function TasksPage() {
                     <span style={{ color: 'var(--text-secondary)', fontSize: 11 }}>
                       {task.lead_name || 'Unknown lead'}
                     </span>
-                    <span style={{ color: '#f59e0b', fontSize: 11, fontWeight: 500 }}>
-                      {firesIn(task.scheduled_at)}
+                    <span style={{ color: 'var(--text-secondary)', fontSize: 11 }}>
+                      {formatDate(task.scheduled_at)} {formatTime(task.scheduled_at)}
                     </span>
                   </div>
+                  {task.metadata?.context && (
+                    <div style={{ color: 'var(--text-secondary)', fontSize: 11, opacity: 0.7 }}>
+                      {String(task.metadata.context)}
+                    </div>
+                  )}
                 </div>
               ))
             )}
           </div>
         </div>
-      </div>
 
-      {/* Task Rate Chart */}
-      <div
-        style={{
-          background: 'var(--bg-secondary, rgba(255,255,255,0.02))',
-          border: '1px solid rgba(255,255,255,0.08)',
-          borderRadius: 8,
-          padding: '16px 20px',
-        }}
-      >
-        <div style={{ color: 'var(--text-secondary)', fontSize: 12, marginBottom: 12 }}>Tasks Completed (Last 24h)</div>
-        <ResponsiveContainer width="100%" height={120}>
-          <BarChart data={hourlyData}>
-            <XAxis
-              dataKey="hour"
-              tick={{ fill: 'var(--text-secondary)', fontSize: 10 }}
-              axisLine={false}
-              tickLine={false}
-              interval={3}
-            />
-            <YAxis hide allowDecimals={false} />
-            <Tooltip
-              contentStyle={{
-                background: '#1a1a1a',
-                border: '1px solid rgba(255,255,255,0.1)',
-                borderRadius: 6,
-                fontSize: 12,
-                color: '#fff',
-              }}
-            />
-            <Bar dataKey="count" radius={[3, 3, 0, 0]} maxBarSize={16}>
-              {hourlyData.map((_, i) => (
-                <Cell key={i} fill="rgba(255,255,255,0.2)" />
-              ))}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
       </div>
     </div>
   )
