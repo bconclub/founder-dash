@@ -1497,12 +1497,6 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                     >
                       <MdNote size={16} className="text-blue-500" /> Add a Note
                     </button>
-                    <button
-                      onClick={() => { setShowActionDropdown(false); closeAllActionForms(); setShowSendMessageForm(true) }}
-                      className="w-full text-left px-3 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-hover)] flex items-center gap-2 transition-colors"
-                    >
-                      <FaWhatsapp size={16} className="text-green-500" /> Send Message
-                    </button>
                   </div>
                 </>
               )}
