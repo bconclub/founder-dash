@@ -1458,13 +1458,15 @@ export default function InboxPage() {
                       className={`flex ${isCustomer ? 'justify-start' : 'justify-end'}`}
                     >
                       <div
-                        className={`max-w-[80%] rounded-xl px-3 py-2 shadow-sm border ${isCustomer
-                          ? 'bg-[var(--bg-secondary)] border-[var(--border-primary)]'
-                          : ''}`}
+                        className="max-w-[80%] rounded-xl px-3 py-2 shadow-sm border"
                         style={{
-                          background: !isCustomer ? 'var(--accent-subtle)' : undefined,
-                          borderColor: !isCustomer ? 'var(--accent-primary)' : undefined,
-                          borderWidth: '1px'
+                          background: isCustomer
+                            ? 'var(--bg-secondary, rgba(255,255,255,0.06))'
+                            : 'var(--accent-subtle, rgba(99,102,241,0.10))',
+                          borderColor: isCustomer
+                            ? 'var(--border-primary, rgba(255,255,255,0.10))'
+                            : 'var(--accent-primary, rgba(99,102,241,0.25))',
+                          borderWidth: '1px',
                         }}
                       >
                         <div className="flex items-center justify-between gap-3 mb-1">
