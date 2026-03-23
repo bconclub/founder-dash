@@ -2312,8 +2312,7 @@ async function executeHumanCallback(task, waPhone) {
  */
 async function executeFirstOutreach(task, waPhone) {
   // Always send template directly - new leads have no 24h window
-  const templateName = 'bcon_proxe_first_outreach';
-  await sendWhatsAppTemplate(waPhone, {
+  const { templateName, renderedText } = await sendWhatsAppTemplate(waPhone, {
     ...task,
     task_type: 'first_outreach',
   });
@@ -2324,7 +2323,7 @@ async function executeFirstOutreach(task, waPhone) {
       lead_id: task.lead_id,
       channel: 'whatsapp',
       sender: 'agent',
-      content: `[Template: ${templateName}] First outreach to ${task.lead_name}`,
+      content: renderedText || `[Template: ${templateName}] First outreach to ${task.lead_name}`,
       message_type: 'text',
       metadata: { task_type: task.task_type, task_id: task.id, autonomous: true, template: templateName }
     }).then(({ error }) => {
@@ -2865,6 +2864,32 @@ const TEMPLATE_PARAM_COUNT = {
   'bcon_proxe_rnr': 1,                   // name
 };
 
+// Template body texts matching Meta-approved templates (used to render human-readable content for conversation logs)
+const TEMPLATE_BODIES = {
+  'bcon_proxe_booking_reminder_24h': 'Hi {{customer_name}}, just a reminder about your {{service_interest}} consultation tomorrow at {{booking_time}}. We look forward to speaking with you!',
+  'bcon_proxe_booking_reminder_30m': 'Hi {{customer_name}}, your {{service_interest}} consultation starts in 30 minutes at {{booking_time}}. See you soon!',
+  'bcon_proxe_reengagement_engaged': 'Hi {{customer_name}}, we were recently discussing {{pain_point}}. Would you like to continue the conversation?',
+  'bcon_proxe_reengagement_noengage': 'Hi {{customer_name}}, we noticed you reached out recently. Would you like to learn more about how BCON can help your business grow?',
+  'bcon_proxe_first_outreach': 'Hi {{customer_name}}, thanks for your interest in BCON! We'd love to learn more about your business and how we can help. When's a good time to chat?',
+  'bcon_proxe_post_call_followup': 'Hi {{customer_name}}, thanks for the great conversation! If you have any questions, feel free to reach out. We're here to help!',
+  'bcon_proxe_followup_engaged': 'Hi {{customer_name}}, following up on our conversation about {{service_interest}}. Would you like to schedule a call to discuss next steps?',
+  'bcon_proxe_followup_noengage': 'Hi {{customer_name}}, we'd love to help you with {{service_interest}}. Would you like to schedule a quick call to learn more?',
+  'bcon_proxe_rnr': 'Hi {{customer_name}}, we tried reaching you but couldn't connect. Would you like to schedule a call at a time that works for you?',
+};
+
+/**
+ * Render a template body by replacing {{param_name}} placeholders with actual values.
+ */
+function renderTemplateText(templateName, params) {
+  const body = TEMPLATE_BODIES[templateName];
+  if (!body) return null;
+  let rendered = body;
+  for (const p of params) {
+    rendered = rendered.replace(`{{${p.parameter_name}}}`, p.value || 'there');
+  }
+  return rendered;
+}
+
 /**
  * Build a human-readable template preview showing template name and parameters.
  */
@@ -2946,8 +2971,8 @@ async function executeSendMessage(task, waPhone, message) {
   if (within24h) {
     waMessageId = await sendWhatsApp(waPhone, message);
   } else {
-    const templateUsed = await sendWhatsAppTemplate(waPhone, task);
-    message = `[Template: ${templateUsed}] Sent to ${task.lead_name}`;
+    const { templateName: templateUsed, renderedText } = await sendWhatsAppTemplate(waPhone, task);
+    message = renderedText || `[Template: ${templateUsed}] Sent to ${task.lead_name}`;
   }
 
   // Log to conversations (include wa_message_id for read receipt tracking)
@@ -3107,7 +3132,8 @@ async function sendWhatsAppTemplate(phone, task) {
   }
 
   console.log(`[WhatsApp] Template sent to ${phone} (${templateName})`);
-  return templateName;
+  const renderedText = renderTemplateText(templateName, resolvedParams);
+  return { templateName, renderedText };
 }
 
 // ============================================
