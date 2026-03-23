@@ -366,6 +366,9 @@ export default function TasksPage() {
   const [loading, setLoading] = useState(true)
   const [selectedLead, setSelectedLead] = useState<any>(null)
   const [isLeadModalOpen, setIsLeadModalOpen] = useState(false)
+  const [completedFilter, setCompletedFilter] = useState<'all' | 'completed' | 'failed'>('all')
+  const [next24hFilter, setNext24hFilter] = useState<'all' | 'pending' | 'queued'>('all')
+  const [upcomingFilter, setUpcomingFilter] = useState<'all' | 'reminders' | 'nudges' | 'follow_ups'>('all')
 
   const fetchTasks = useCallback(async () => {
     try {
@@ -456,16 +459,32 @@ export default function TasksPage() {
   // Column 1: Completed / Failed / Failed 24h window
   const completedTasks = tasks
     .filter((t) => t.status === 'completed' || t.status === 'failed' || t.status === 'failed_24h_window')
+    .filter((t) => {
+      if (completedFilter === 'completed') return t.status === 'completed'
+      if (completedFilter === 'failed') return t.status === 'failed' || t.status === 'failed_24h_window'
+      return true
+    })
     .sort((a, b) => new Date(b.completed_at || b.created_at).getTime() - new Date(a.completed_at || a.created_at).getTime())
 
   // Column 2: Next 24 hours (pending within 24h) + queued (regardless of time)
   const next24hTasks = tasks
     .filter((t) => (t.status === 'pending' && isWithin24Hours(t.scheduled_at)) || t.status === 'queued')
+    .filter((t) => {
+      if (next24hFilter === 'pending') return t.status === 'pending'
+      if (next24hFilter === 'queued') return t.status === 'queued'
+      return true
+    })
     .sort((a, b) => new Date(a.scheduled_at || a.created_at).getTime() - new Date(b.scheduled_at || b.created_at).getTime())
 
   // Column 3: Upcoming (pending tasks beyond 24h)
   const upcomingTasks = tasks
     .filter((t) => t.status === 'pending' && !isWithin24Hours(t.scheduled_at))
+    .filter((t) => {
+      if (upcomingFilter === 'reminders') return t.task_type.includes('reminder') || t.task_type.includes('booking_reminder')
+      if (upcomingFilter === 'nudges') return t.task_type.includes('nudge') || t.task_type.includes('push_to_book')
+      if (upcomingFilter === 'follow_ups') return t.task_type.includes('follow') || t.task_type.includes('re_engage') || t.task_type.includes('post_booking')
+      return true
+    })
     .sort((a, b) => new Date(a.scheduled_at || a.created_at).getTime() - new Date(b.scheduled_at || b.created_at).getTime())
 
   if (loading) {
@@ -496,8 +515,24 @@ export default function TasksPage() {
 
         {/* Column 1 — Completed */}
         <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-          <div style={{ color: 'var(--text-primary)', fontWeight: 600, fontSize: 14, marginBottom: 12 }}>
+          <div style={{ color: 'var(--text-primary)', fontWeight: 600, fontSize: 14, marginBottom: 8 }}>
             Completed
+          </div>
+          <div style={{ display: 'flex', gap: 12, marginBottom: 8 }}>
+            {([['all', 'All'], ['completed', 'Completed'], ['failed', 'Failed']] as const).map(([key, label]) => (
+              <button
+                key={key}
+                onClick={() => setCompletedFilter(key)}
+                style={{
+                  background: 'none', border: 'none', cursor: 'pointer', padding: '2px 0',
+                  fontSize: 12, fontWeight: completedFilter === key ? 700 : 400,
+                  color: completedFilter === key ? 'var(--text-primary)' : 'var(--text-muted)',
+                  borderBottom: completedFilter === key ? '2px solid var(--text-primary)' : '2px solid transparent',
+                }}
+              >
+                {label}
+              </button>
+            ))}
           </div>
           <div
             style={{
@@ -557,8 +592,24 @@ export default function TasksPage() {
 
         {/* Column 2 — Next 24 Hours */}
         <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-          <div style={{ color: 'var(--text-primary)', fontWeight: 600, fontSize: 14, marginBottom: 12 }}>
+          <div style={{ color: 'var(--text-primary)', fontWeight: 600, fontSize: 14, marginBottom: 8 }}>
             Next 24 Hours
+          </div>
+          <div style={{ display: 'flex', gap: 12, marginBottom: 8 }}>
+            {([['all', 'All'], ['pending', 'Pending'], ['queued', 'Awaiting Approval']] as const).map(([key, label]) => (
+              <button
+                key={key}
+                onClick={() => setNext24hFilter(key)}
+                style={{
+                  background: 'none', border: 'none', cursor: 'pointer', padding: '2px 0',
+                  fontSize: 12, fontWeight: next24hFilter === key ? 700 : 400,
+                  color: next24hFilter === key ? 'var(--text-primary)' : 'var(--text-muted)',
+                  borderBottom: next24hFilter === key ? '2px solid var(--text-primary)' : '2px solid transparent',
+                }}
+              >
+                {label}
+              </button>
+            ))}
           </div>
           <div
             style={{
@@ -582,8 +633,24 @@ export default function TasksPage() {
 
         {/* Column 3 — Upcoming */}
         <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-          <div style={{ color: 'var(--text-primary)', fontWeight: 600, fontSize: 14, marginBottom: 12 }}>
+          <div style={{ color: 'var(--text-primary)', fontWeight: 600, fontSize: 14, marginBottom: 8 }}>
             Upcoming
+          </div>
+          <div style={{ display: 'flex', gap: 12, marginBottom: 8 }}>
+            {([['all', 'All'], ['reminders', 'Reminders'], ['nudges', 'Nudges'], ['follow_ups', 'Follow-ups']] as const).map(([key, label]) => (
+              <button
+                key={key}
+                onClick={() => setUpcomingFilter(key)}
+                style={{
+                  background: 'none', border: 'none', cursor: 'pointer', padding: '2px 0',
+                  fontSize: 12, fontWeight: upcomingFilter === key ? 700 : 400,
+                  color: upcomingFilter === key ? 'var(--text-primary)' : 'var(--text-muted)',
+                  borderBottom: upcomingFilter === key ? '2px solid var(--text-primary)' : '2px solid transparent',
+                }}
+              >
+                {label}
+              </button>
+            ))}
           </div>
           <div
             style={{
