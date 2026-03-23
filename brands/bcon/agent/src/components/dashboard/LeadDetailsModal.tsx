@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { formatDateTime, formatDate } from '@/lib/utils'
 import { createClient } from '../../lib/supabase/client'
 import { format } from 'date-fns'
-import { MdLanguage, MdChat, MdPhone, MdShare, MdAutoAwesome, MdOpenInNew, MdHistory, MdCall, MdEvent, MdMessage, MdNote, MdEdit, MdTrendingUp, MdTrendingDown, MdRemove, MdCheckCircle, MdSchedule, MdPsychology, MdFlashOn, MdBarChart, MdEmail, MdChevronRight, MdSmartToy, MdPerson, MdRefresh, MdHelpOutline, MdInfo, MdCheck, MdPayments, MdReportProblem, MdSchool, MdHistoryEdu, MdFlightTakeoff, MdAccountBalanceWallet, MdPersonOutline, MdOutlineInsights, MdMic, MdAdd, MdMoreHoriz, MdDynamicForm } from 'react-icons/md'
+import { MdLanguage, MdChat, MdPhone, MdShare, MdAutoAwesome, MdOpenInNew, MdHistory, MdCall, MdEvent, MdMessage, MdNote, MdEdit, MdTrendingUp, MdTrendingDown, MdRemove, MdCheckCircle, MdSchedule, MdPsychology, MdFlashOn, MdBarChart, MdEmail, MdChevronRight, MdSmartToy, MdPerson, MdRefresh, MdHelpOutline, MdInfo, MdCheck, MdPayments, MdReportProblem, MdSchool, MdHistoryEdu, MdFlightTakeoff, MdAccountBalanceWallet, MdPersonOutline, MdOutlineInsights, MdMic, MdAdd, MdMoreHoriz, MdDynamicForm, MdClose } from 'react-icons/md'
 import { FaWhatsapp } from 'react-icons/fa'
 import { useRouter } from 'next/navigation'
 import LeadStageSelector from './LeadStageSelector'
@@ -63,6 +63,55 @@ function formatBookingDateShort(dateString: string | null | undefined): string {
   } catch {
     return dateString;
   }
+}
+
+function formatCountdown(scheduledAt: string): string {
+  const now = Date.now()
+  const target = new Date(scheduledAt).getTime()
+  const diff = target - now
+
+  if (diff <= 0) return 'Now'
+
+  const minutes = Math.floor(diff / 60000)
+  const hours = Math.floor(minutes / 60)
+  const days = Math.floor(hours / 24)
+
+  if (days > 0) {
+    const date = new Date(scheduledAt)
+    const tomorrow = new Date()
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    tomorrow.setHours(0, 0, 0, 0)
+    const dayAfter = new Date(tomorrow)
+    dayAfter.setDate(dayAfter.getDate() + 1)
+
+    if (target < dayAfter.getTime()) {
+      return `Tomorrow at ${date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' })}`
+    }
+    return `In ${days}d ${hours % 24}h`
+  }
+
+  if (hours > 0) return `In ${hours}h ${minutes % 60}m`
+  return `In ${minutes}m`
+}
+
+function getTaskTypeConfig(taskType: string): { color: string; bg: string; label: string } {
+  const t = (taskType || '').toLowerCase()
+  if (t.includes('nudge')) return { color: '#F97316', bg: 'rgba(249,115,22,0.12)', label: 'Nudge' }
+  if (t.includes('reminder')) return { color: '#3B82F6', bg: 'rgba(59,130,246,0.12)', label: 'Reminder' }
+  if (t.includes('re_engage') || t.includes('reengage')) return { color: '#EF4444', bg: 'rgba(239,68,68,0.12)', label: 'Re-engage' }
+  if (t.includes('follow')) return { color: '#22C55E', bg: 'rgba(34,197,94,0.12)', label: 'Follow-up' }
+  return { color: '#8B5CF6', bg: 'rgba(139,92,246,0.12)', label: taskType?.replace(/_/g, ' ') || 'Task' }
+}
+
+function getTaskActionLabel(task: any): string {
+  const channel = task.metadata?.channel || 'WhatsApp'
+  const t = (task.task_type || '').toLowerCase()
+  if (t.includes('nudge')) return `${channel} nudge`
+  if (t.includes('reminder') && t.includes('booking')) return 'Booking reminder'
+  if (t.includes('reminder')) return `${channel} reminder`
+  if (t.includes('follow')) return `${channel} follow-up`
+  if (t.includes('re_engage') || t.includes('reengage')) return `${channel} re-engagement`
+  return task.task_description || task.task_type?.replace(/_/g, ' ') || 'Scheduled action'
 }
 
 function renderMarkdown(text: string) {
@@ -259,6 +308,11 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
 
   // "+" action dropdown
   const [showActionDropdown, setShowActionDropdown] = useState(false)
+
+  // Next Actions state
+  const [leadTasks, setLeadTasks] = useState<any[]>([])
+  const [loadingTasks, setLoadingTasks] = useState(false)
+  const [, setTick] = useState(0)
 
   // Calculate and set unified score (using shared utility) and persist to DB
   const calculateAndSetScore = async () => {
@@ -464,6 +518,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
       loadChannelData()
       loadQuickStats()
       loadScoreHistory()
+      loadLeadTasks()
       // Calculate score immediately with lead prop (will recalculate when freshLeadData loads)
       calculateAndSetScore()
     }
@@ -487,6 +542,11 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, lead, isOpen])
 
+  // Live countdown timer - re-render every 60s for task countdowns
+  useEffect(() => {
+    const interval = setInterval(() => setTick(t => t + 1), 60000)
+    return () => clearInterval(interval)
+  }, [])
 
   const loadUnifiedSummary = async (refresh = false) => {
     if (!lead) return
@@ -761,6 +821,37 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
     }
   }
 
+  const loadLeadTasks = async () => {
+    if (!lead) return
+    setLoadingTasks(true)
+    try {
+      const response = await fetch(`/api/dashboard/tasks?lead_id=${lead.id}`)
+      if (response.ok) {
+        const data = await response.json()
+        setLeadTasks(data.tasks || [])
+      }
+    } catch (error) {
+      console.error('Error loading lead tasks:', error)
+    } finally {
+      setLoadingTasks(false)
+    }
+  }
+
+  const handleCancelTask = async (taskId: string) => {
+    try {
+      const response = await fetch(`/api/dashboard/tasks/${taskId}/action`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'cancel' }),
+      })
+      if (response.ok) {
+        loadLeadTasks()
+      }
+    } catch (error) {
+      console.error('Error cancelling task:', error)
+    }
+  }
+
 
   if (!isOpen || !lead) return null
 
@@ -870,6 +961,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
       setAdminNoteText('')
       setShowAdminNoteInput(false)
       loadActivities()
+      loadLeadTasks()
       loadFreshLeadData()
     } catch (err) {
       console.error('Error saving admin note:', err)
@@ -895,6 +987,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
       setLogCallOutcome('Connected')
       setLogCallNotes('')
       loadActivities()
+      loadLeadTasks()
       loadFreshLeadData()
     } catch (err) {
       console.error('Error logging call:', err)
@@ -1620,8 +1713,52 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                   </div>
                 ) : (
                   <ol className="lead-activity-list space-y-4" aria-label="Lead activity timeline">
-                    {activities.map((activity, index) => {
+                    {(() => {
+                      // Merge activities with task events for unified timeline
+                      const taskActivities: any[] = []
+                      leadTasks.forEach((task: any) => {
+                        // Task creation event
+                        taskActivities.push({
+                          id: `task-created-${task.id}`,
+                          type: 'proxe',
+                          actor: 'PROXe',
+                          action: `Created ${task.task_type?.replace(/_/g, ' ')} task`,
+                          content: task.task_description || null,
+                          timestamp: task.created_at,
+                          color: '#8B5CF6',
+                          _taskIcon: 'created',
+                        })
+                        // Task completion event
+                        if (task.status === 'completed' && task.completed_at) {
+                          taskActivities.push({
+                            id: `task-done-${task.id}`,
+                            type: 'proxe',
+                            actor: 'PROXe',
+                            action: task.metadata?.completed_action || `Sent ${task.task_type?.replace(/_/g, ' ')}`,
+                            channel: task.metadata?.channel || 'whatsapp',
+                            timestamp: task.completed_at,
+                            color: '#22C55E',
+                            _taskIcon: 'completed',
+                          })
+                        }
+                        // Task failure event
+                        if ((task.status === 'failed' || task.status === 'failed_24h_window') && task.completed_at) {
+                          taskActivities.push({
+                            id: `task-fail-${task.id}`,
+                            type: 'proxe',
+                            actor: 'PROXe',
+                            action: task.error_message || `${task.task_type?.replace(/_/g, ' ')} failed`,
+                            timestamp: task.completed_at,
+                            color: '#EF4444',
+                            _taskIcon: 'failed',
+                          })
+                        }
+                      })
+                      const merged = [...activities, ...taskActivities].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+                      return merged.map((activity, index) => {
                       const getActivityIcon = () => {
+                        if (activity._taskIcon === 'completed') return <MdCheckCircle size={18} />
+                        if (activity._taskIcon === 'failed') return <MdReportProblem size={18} />
                         if (activity.type === 'proxe') {
                           return <MdSmartToy size={18} />
                         } else if (activity.type === 'customer') {
@@ -1653,7 +1790,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                             >
                               {Icon}
                             </div>
-                            {index < activities.length - 1 && (
+                            {index < merged.length - 1 && (
                               <div
                                 className="lead-activity-connector w-0.5 flex-1 mt-2"
                                 style={{ backgroundColor: color, opacity: 0.3 }}
@@ -1713,7 +1850,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                           </article>
                         </li>
                       )
-                    })}
+                    })})()}
                   </ol>
                 )}
               </section>
@@ -1766,6 +1903,64 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                         </div>
                       )}
                     </article>
+
+                    {/* Next Actions */}
+                    <section className="lead-next-actions mt-4">
+                      <h3 className="text-xs font-semibold mb-2 flex items-center gap-1.5 text-[var(--text-primary)]">
+                        <MdSchedule size={14} className="text-orange-500" />
+                        Next Actions
+                      </h3>
+                      {loadingTasks ? (
+                        <div className="text-xs text-[var(--text-muted)] animate-pulse py-2">Loading tasks...</div>
+                      ) : (() => {
+                        const pendingTasks = leadTasks.filter(t => ['pending', 'queued', 'awaiting_approval'].includes(t.status))
+                        if (pendingTasks.length === 0) {
+                          return (
+                            <p className="text-xs text-[var(--text-muted)] py-2 italic">
+                              No actions scheduled. Add a note to trigger next steps.
+                            </p>
+                          )
+                        }
+                        return (
+                          <div className="space-y-2">
+                            {pendingTasks.map((task: any) => {
+                              const typeConfig = getTaskTypeConfig(task.task_type)
+                              const actionLabel = getTaskActionLabel(task)
+                              const reason = task.metadata?.timing_reason || task.metadata?.next_action_reason || ''
+                              return (
+                                <div key={task.id} className="flex items-start gap-2 p-2.5 rounded-lg border border-[var(--border-primary)] bg-[var(--bg-primary)] group">
+                                  <span
+                                    className="text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wider flex-shrink-0 mt-0.5"
+                                    style={{ color: typeConfig.color, backgroundColor: typeConfig.bg }}
+                                  >
+                                    {typeConfig.label}
+                                  </span>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-xs font-semibold text-[var(--text-primary)] capitalize">{actionLabel}</p>
+                                    {task.scheduled_at && (
+                                      <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">
+                                        <MdSchedule size={11} className="inline mr-0.5 -mt-0.5" />
+                                        {formatCountdown(task.scheduled_at)}
+                                      </p>
+                                    )}
+                                    {reason && (
+                                      <p className="text-[10px] text-[var(--text-muted)] mt-0.5 truncate">{reason}</p>
+                                    )}
+                                  </div>
+                                  <button
+                                    onClick={() => handleCancelTask(task.id)}
+                                    className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-50 dark:hover:bg-red-900/20 text-[var(--text-muted)] hover:text-red-500 transition-all flex-shrink-0"
+                                    title="Cancel task"
+                                  >
+                                    <MdClose size={14} />
+                                  </button>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        )
+                      })()}
+                    </section>
 
                     {/* Compact Intelligence Insights - Only render when data exists */}
                     {(() => {
@@ -1895,6 +2090,20 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                         })()}
                       </div>
                     </article>
+                      )
+                    })()}
+
+                    {/* Next step one-liner */}
+                    {(() => {
+                      const firstPending = leadTasks.find(t => ['pending', 'queued', 'awaiting_approval'].includes(t.status))
+                      if (!firstPending) return null
+                      const actionLabel = getTaskActionLabel(firstPending)
+                      const countdown = firstPending.scheduled_at ? formatCountdown(firstPending.scheduled_at) : ''
+                      return (
+                        <p className="text-xs text-[var(--text-secondary)] mt-3 pt-3 border-t border-[var(--border-primary)] flex items-center gap-1.5">
+                          <MdFlashOn size={13} className="text-orange-500 flex-shrink-0" />
+                          <span><strong className="text-[var(--text-primary)]">Next:</strong> {actionLabel} {countdown ? countdown.toLowerCase() : ''}{firstPending.metadata?.next_action_reason ? ` — ${firstPending.metadata.next_action_reason}` : ''}</span>
+                        </p>
                       )
                     })()}
                   </section>

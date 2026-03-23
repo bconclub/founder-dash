@@ -20,6 +20,7 @@ export async function GET(request: NextRequest) {
     const type = searchParams.get('type')
     const from = searchParams.get('from')
     const to = searchParams.get('to')
+    const leadId = searchParams.get('lead_id')
 
     const now = new Date()
     const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000)
@@ -33,6 +34,7 @@ export async function GET(request: NextRequest) {
         .order('scheduled_at', { ascending: false })
 
       if (type) query = query.eq('task_type', type)
+      if (leadId) query = query.eq('lead_id', leadId)
       if (from) query = query.gte('created_at', from)
       if (to) query = query.lte('created_at', to)
 
@@ -52,17 +54,19 @@ export async function GET(request: NextRequest) {
       .order('scheduled_at', { ascending: true })
 
     if (type) pendingQuery = pendingQuery.eq('task_type', type)
+    if (leadId) pendingQuery = pendingQuery.eq('lead_id', leadId)
 
     // Query 2: completed/failed tasks with date filter
     let historyQuery = supabase
       .from('agent_tasks')
       .select('*')
       .in('status', ['completed', 'failed', 'failed_24h_window'])
-      .gte('created_at', from || yesterday.toISOString())
+      .gte('created_at', from || (leadId ? '2020-01-01T00:00:00Z' : yesterday.toISOString()))
       .order('completed_at', { ascending: false })
 
     if (to) historyQuery = historyQuery.lte('created_at', to)
     if (type) historyQuery = historyQuery.eq('task_type', type)
+    if (leadId) historyQuery = historyQuery.eq('lead_id', leadId)
 
     const [pendingResult, historyResult] = await Promise.all([
       pendingQuery.limit(100),

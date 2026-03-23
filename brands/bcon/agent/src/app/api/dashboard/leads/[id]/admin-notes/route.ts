@@ -191,8 +191,14 @@ export async function POST(
     }
 
     // 5b2. "no show" / "didnt show" / "didn't show" / "no answer" / "didnt pick up" / "didn't pick up"
-    //      → missed call followup (immediate) + follow-up sequence (day 1, 3, 5, 7)
-    if (/no\s*show|didn'?t\s*show|no\s*answer|didn'?t\s*pick\s*up/.test(lowerNote)) {
+    //      / "RNR" / "rnr" / "rang no response" → missed call followup (30 min) + follow-up sequence (day 1, 3, 5, 7)
+    if (/no\s*show|didn'?t\s*show|no\s*answer|didn'?t\s*pick\s*up|\brnr\b|rang\s*no\s*response/.test(lowerNote)) {
+      // Update last_touchpoint to voice (this was a call attempt)
+      await supabase
+        .from('all_leads')
+        .update({ last_touchpoint: 'voice', last_interaction_at: now.toISOString() })
+        .eq('id', leadId)
+
       // Cancel any remaining booking reminder tasks for this lead
       await supabase
         .from('agent_tasks')
@@ -201,7 +207,7 @@ export async function POST(
         .in('task_type', ['booking_reminder_24h', 'booking_reminder_30m'])
         .in('status', ['pending', 'queued'])
 
-      // Create immediate missed_call_followup
+      // Create missed_call_followup in 30 minutes
       const { error: missedErr } = await supabase.from('agent_tasks').insert({
         task_type: 'missed_call_followup',
         task_description: `Missed call follow-up: ${trimmedNote}`,
@@ -209,8 +215,8 @@ export async function POST(
         lead_phone: leadPhone,
         lead_name: leadName,
         status: 'pending',
-        scheduled_at: now.toISOString(),
-        metadata: { source: 'admin_note', sequence: 'no_show', step: 0 },
+        scheduled_at: new Date(now.getTime() + 30 * 60 * 1000).toISOString(),
+        metadata: { source: 'admin_note', sequence: 'no_show', step: 0, timing_reason: 'RNR — follow-up in 30 min' },
         created_at: now.toISOString(),
       })
       if (!missedErr) actions.push('missed_call_followup_created')
