@@ -2,8 +2,9 @@
 
 /**
  * Script to auto-increment build version
- * - Reads package.json version
- * - Increments patch number (1.0.0 → 1.0.1)
+ * - Reads package.json version (format: 0.minor.patch)
+ * - Increments patch by 1 each deploy
+ * - When patch reaches 100, rolls over: 0.0.100 → 0.1.0, 0.1.100 → 0.2.0, etc.
  * - Writes back to package.json
  * - Creates .build-info file with timestamp
  */
@@ -22,19 +23,24 @@ if (!fs.existsSync(packageJsonPath)) {
 }
 
 const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'))
-const currentVersion = packageJson.version || '1.0.0'
+const currentVersion = packageJson.version || '0.0.0'
 
 // Parse version (semver format: major.minor.patch)
 const versionParts = currentVersion.split('.')
 if (versionParts.length !== 3) {
-  console.error('❌ Error: Invalid version format. Expected semver (e.g., 1.0.0)')
+  console.error('❌ Error: Invalid version format. Expected semver (e.g., 0.0.1)')
   process.exit(1)
 }
 
-// Increment patch version
+// Increment patch version with rollover at 100
 const major = parseInt(versionParts[0], 10)
-const minor = parseInt(versionParts[1], 10)
-const patch = parseInt(versionParts[2], 10) + 1
+let minor = parseInt(versionParts[1], 10)
+let patch = parseInt(versionParts[2], 10) + 1
+
+if (patch >= 100) {
+  minor += 1
+  patch = 0
+}
 
 const newVersion = `${major}.${minor}.${patch}`
 
