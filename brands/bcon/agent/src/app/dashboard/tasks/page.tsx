@@ -14,6 +14,8 @@ import {
   MdHourglassEmpty,
 } from 'react-icons/md'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
+import { useRouter } from 'next/navigation'
+import LeadDetailsModal from '@/components/dashboard/LeadDetailsModal'
 
 // --- Types ---
 
@@ -147,6 +149,47 @@ function formatDate(dateStr: string | null): string {
   return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })
 }
 
+/** Build a short context line for a task card based on type, status, and metadata */
+function getContextLine(task: AgentTask): string | null {
+  const meta = task.metadata || {}
+  const type = task.task_type
+
+  // Completed: show what was sent (first 50 chars)
+  if (task.status === 'completed') {
+    const sent = (meta.completed_action as string) || (meta.message_sent as string) || task.task_description
+    if (sent) return sent.length > 50 ? sent.substring(0, 47) + '...' : sent
+  }
+
+  // Failed: show parsed error
+  if (task.status === 'failed' || task.status === 'failed_24h_window') {
+    return cleanErrorMessage(task.error_message)
+  }
+
+  // Type-specific context for pending/queued
+  if (type.includes('re_engage')) {
+    const days = meta.days_inactive as number
+    const stage = (meta.lead_stage as string) || (meta.stage as string)
+    if (days || stage) return `Inactive ${days || '?'} days${stage ? `, stage: ${stage}` : ''}`
+  }
+
+  if (type.includes('nudge')) {
+    const question = (meta.last_question as string) || (meta.last_unanswered as string)
+    if (question) return `Last question: ${question.length > 40 ? question.substring(0, 37) + '...' : question}`
+  }
+
+  if (type === 'push_to_book') {
+    const msgCount = meta.message_count as number
+    if (msgCount) return `${msgCount} messages, no booking`
+  }
+
+  if (type.includes('booking_reminder')) {
+    const time = (meta.booking_time as string)
+    if (time) return `Call at ${time}`
+  }
+
+  return null
+}
+
 function matchesFilter(task: AgentTask, filter: FilterTab): boolean {
   if (filter === 'all') return true
   if (filter === 'completed') return task.status === 'completed'
@@ -231,11 +274,12 @@ function CountdownTimer({ scheduledAt }: { scheduledAt: string | null }) {
 
 // --- Queue Task Card (shared between both sections) ---
 
-function QueueTaskCard({ task, onAction }: { task: AgentTask; onAction?: (taskId: string, action: string, scheduledAt?: string) => void }) {
+function QueueTaskCard({ task, onAction, onLeadClick }: { task: AgentTask; onAction?: (taskId: string, action: string, scheduledAt?: string) => void; onLeadClick?: (task: AgentTask) => void }) {
   const isQueued = task.status === 'queued'
   const isPending = task.status === 'pending'
   const [showReschedule, setShowReschedule] = useState(false)
   const [rescheduleTime, setRescheduleTime] = useState('')
+  const contextLine = getContextLine(task)
 
   const btnStyle = (bg: string, color: string): React.CSSProperties => ({
     fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 4,
@@ -256,7 +300,10 @@ function QueueTaskCard({ task, onAction }: { task: AgentTask; onAction?: (taskId
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', flex: 1, minWidth: 0 }}>
           {channelIcon(task.metadata)}
-          <span style={{ color: 'var(--text-primary)', fontSize: 13, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <span
+            onClick={() => onLeadClick?.(task)}
+            style={{ color: 'var(--text-primary)', fontSize: 13, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'pointer', textDecoration: 'underline', textDecorationColor: 'rgba(255,255,255,0.2)', textUnderlineOffset: 2 }}
+          >
             {task.lead_name || 'Unknown lead'}
           </span>
           {task.lead_phone && (
@@ -268,6 +315,11 @@ function QueueTaskCard({ task, onAction }: { task: AgentTask; onAction?: (taskId
       <div style={{ color: 'var(--text-secondary)', fontSize: 12, lineHeight: '16px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
         {task.task_description}
       </div>
+      {contextLine && (
+        <div style={{ color: 'var(--text-secondary)', fontSize: 11, opacity: 0.6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {contextLine}
+        </div>
+      )}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         {/* Action buttons for pending/queued tasks */}
         {(isPending || isQueued) && onAction ? (
@@ -339,10 +391,13 @@ function StatCard({ label, value, color }: { label: string; value: string | numb
 // --- Main Page ---
 
 export default function TasksPage() {
+  const router = useRouter()
   const [tasks, setTasks] = useState<AgentTask[]>([])
   const [stats, setStats] = useState<Stats>({ completedToday: 0, failedToday: 0, pendingCount: 0, queuedCount: 0, firingNextHour: 0, successRate: 100 })
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<FilterTab>('all')
+  const [selectedLead, setSelectedLead] = useState<any>(null)
+  const [isLeadModalOpen, setIsLeadModalOpen] = useState(false)
 
   const fetchTasks = useCallback(async () => {
     try {
@@ -374,6 +429,57 @@ export default function TasksPage() {
       console.error('Task action error:', err)
     }
   }, [fetchTasks])
+
+  const handleLeadClick = useCallback(async (task: AgentTask) => {
+    if (task.lead_id) {
+      // Fetch lead details and open modal
+      try {
+        const res = await fetch(`/api/dashboard/leads/${task.lead_id}`)
+        if (res.ok) {
+          const lead = await res.json()
+          setSelectedLead({
+            id: lead.id,
+            name: lead.customer_name || lead.name || task.lead_name || 'Unknown',
+            email: lead.email || '',
+            phone: lead.customer_phone_normalized || lead.phone || task.lead_phone || '',
+            source: lead.first_touchpoint || lead.last_touchpoint || 'whatsapp',
+            first_touchpoint: lead.first_touchpoint || null,
+            last_touchpoint: lead.last_touchpoint || null,
+            timestamp: lead.created_at || '',
+            status: lead.status || null,
+            booking_date: lead.unified_context?.web?.booking_date || null,
+            booking_time: lead.unified_context?.web?.booking_time || null,
+            unified_context: lead.unified_context || null,
+            metadata: lead.metadata || {},
+            lead_score: lead.lead_score || null,
+            lead_stage: lead.lead_stage || null,
+            sub_stage: lead.sub_stage || null,
+          })
+          setIsLeadModalOpen(true)
+        }
+      } catch (err) {
+        console.error('Failed to fetch lead:', err)
+      }
+    } else if (task.lead_phone) {
+      // No lead_id — navigate to inbox filtered by phone
+      router.push(`/dashboard/inbox?phone=${encodeURIComponent(task.lead_phone)}`)
+    }
+  }, [router])
+
+  const updateLeadStatus = useCallback(async (leadId: string, newStatus: string) => {
+    try {
+      const res = await fetch(`/api/dashboard/leads/${leadId}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      })
+      if (res.ok && selectedLead?.id === leadId) {
+        setSelectedLead({ ...selectedLead, status: newStatus })
+      }
+    } catch (err) {
+      console.error('Failed to update lead status:', err)
+    }
+  }, [selectedLead])
 
   useEffect(() => {
     fetchTasks()
@@ -490,11 +596,15 @@ export default function TasksPage() {
                     <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 2 }}>
                       {channelIcon(task.metadata)}
                       {task.lead_name && (
-                        <span style={{ color: 'var(--text-secondary)', fontSize: 11 }}>
+                        <span
+                          onClick={() => handleLeadClick(task)}
+                          style={{ color: 'var(--text-secondary)', fontSize: 11, cursor: 'pointer', textDecoration: 'underline', textDecorationColor: 'rgba(255,255,255,0.15)', textUnderlineOffset: 2 }}
+                        >
                           {task.lead_name} {task.lead_phone ? `(${task.lead_phone})` : ''}
                         </span>
                       )}
                     </div>
+                    {(() => { const ctx = getContextLine(task); return ctx ? <div style={{ color: 'var(--text-secondary)', fontSize: 11, opacity: 0.6, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ctx}</div> : null })()}
                   </div>
                   <div style={{ flexShrink: 0 }}>{statusPill(task.status, task.error_message)}</div>
                 </div>
@@ -530,7 +640,7 @@ export default function TasksPage() {
                 <span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>Nothing firing soon</span>
               </div>
             ) : (
-              upNextTasks.map((task) => <QueueTaskCard key={task.id} task={task} onAction={handleTaskAction} />)
+              upNextTasks.map((task) => <QueueTaskCard key={task.id} task={task} onAction={handleTaskAction} onLeadClick={handleLeadClick} />)
             )}
           </div>
 
@@ -554,7 +664,7 @@ export default function TasksPage() {
                   opacity: 0.7,
                 }}
               >
-                {upcomingTasks.map((task) => <QueueTaskCard key={task.id} task={task} onAction={handleTaskAction} />)}
+                {upcomingTasks.map((task) => <QueueTaskCard key={task.id} task={task} onAction={handleTaskAction} onLeadClick={handleLeadClick} />)}
               </div>
             </>
           )}
@@ -584,7 +694,7 @@ export default function TasksPage() {
                 <span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>Nothing queued</span>
               </div>
             ) : (
-              awaitingApprovalTasks.map((task) => <QueueTaskCard key={task.id} task={task} onAction={handleTaskAction} />)
+              awaitingApprovalTasks.map((task) => <QueueTaskCard key={task.id} task={task} onAction={handleTaskAction} onLeadClick={handleLeadClick} />)
             )}
           </div>
         </div>
@@ -627,6 +737,15 @@ export default function TasksPage() {
           </BarChart>
         </ResponsiveContainer>
       </div>
+
+      {selectedLead && (
+        <LeadDetailsModal
+          lead={selectedLead}
+          isOpen={isLeadModalOpen}
+          onClose={() => { setIsLeadModalOpen(false); setSelectedLead(null) }}
+          onStatusUpdate={updateLeadStatus}
+        />
+      )}
     </div>
   )
 }
