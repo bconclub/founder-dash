@@ -3047,27 +3047,36 @@ async function sendWhatsAppTemplate(phone, task) {
 
   const url = `https://graph.facebook.com/v21.0/${WA_PHONE_ID}/messages`;
 
+  const payload = {
+    messaging_product: 'whatsapp',
+    recipient_type: 'individual',
+    to: phone,
+    type: 'template',
+    template: {
+      name: templateName,
+      language: { code: 'en' },
+      components,
+    }
+  };
+
+  console.log(`[WhatsApp] Template payload for ${phone} (${templateName}):`, JSON.stringify(payload, null, 2));
+
   const res = await fetch(url, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${WA_TOKEN}`,
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify({
-      messaging_product: 'whatsapp',
-      recipient_type: 'individual',
-      to: phone,
-      type: 'template',
-      template: {
-        name: templateName,
-        language: { code: 'en' },
-        components,
-      }
-    })
+    body: JSON.stringify(payload)
   });
 
   if (!res.ok) {
     const errBody = await res.text();
+    // Log failure to Telegram for visibility
+    if (TELEGRAM_BOT_TOKEN && TELEGRAM_ADMIN_CHAT_ID) {
+      const tgMsg = `⚠️ <b>Template Failed</b>\n<b>Template:</b> ${templateName}\n<b>Phone:</b> ${phone}\n<b>Lead:</b> ${task.lead_name || 'unknown'} (${task.lead_id || 'no id'})\n<b>Error:</b> ${errBody.substring(0, 200)}\n<b>Payload:</b>\n<pre>${JSON.stringify(payload.template, null, 2)}</pre>`;
+      sendTelegram(TELEGRAM_ADMIN_CHAT_ID, tgMsg).catch(() => {});
+    }
     throw new Error(`WhatsApp Template API error (${templateName}): ${res.status} ${errBody}`);
   }
 
