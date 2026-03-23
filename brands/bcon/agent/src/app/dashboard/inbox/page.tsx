@@ -212,6 +212,7 @@ export default function InboxPage() {
   const [isSending, setIsSending] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
   const [leadDetails, setLeadDetails] = useState<any>(null)
+  const [messageChannelFilter, setMessageChannelFilter] = useState<string>('all')
 
   // Handle URL parameters to open specific conversation
   useEffect(() => {
@@ -668,30 +669,11 @@ export default function InboxPage() {
 
   async function fetchMessages(leadId: string) {
     setMessagesLoading(true)
+    setMessageChannelFilter('all')
     try {
-      console.log('Fetching messages for lead:', leadId, 'channel:', selectedChannel)
+      console.log('Fetching all messages for lead:', leadId)
 
-      // First, try to fetch messages for the selected channel if one is set
-      if (selectedChannel) {
-        const { data: channelData, error: channelError } = await supabase
-          .from('conversations')
-          .select('*')
-          .eq('lead_id', leadId)
-          .eq('channel', selectedChannel)
-          .order('created_at', { ascending: true })
-
-        if (channelError) {
-          console.error('Error fetching messages by channel:', channelError)
-        } else if (channelData && channelData.length > 0) {
-          console.log('Fetched messages for channel:', selectedChannel, 'count:', channelData.length)
-          setMessages(channelData)
-          setMessagesLoading(false)
-          return
-        }
-      }
-
-      // Fallback: Fetch all conversations for this lead (regardless of channel)
-      console.log('Fetching all conversations for lead (no channel filter)')
+      // Always fetch ALL messages for this lead (channel filtering is done client-side)
       const { data, error } = await supabase
         .from('conversations')
         .select('*')
@@ -1026,6 +1008,11 @@ export default function InboxPage() {
 
   const selectedConversation = conversations.find((c) => c.lead_id === selectedLeadId)
 
+  // Filter messages by channel tab selection (client-side)
+  const filteredMessages = messageChannelFilter === 'all'
+    ? messages
+    : messages.filter(m => m.channel === messageChannelFilter)
+
   // Render the inbox UI
   return (
     <div className="flex-1 flex overflow-hidden min-h-0" style={{ background: 'var(--bg-primary)', position: 'absolute', inset: 0 }}>
@@ -1131,9 +1118,14 @@ export default function InboxPage() {
                     <div className="absolute left-0 top-0 bottom-0 w-1 rounded-r" style={{ background: 'var(--accent-primary)' }} />
 
                     <div className="px-3 py-2 pl-4">
-                      {/* Line 1: Score Ring + Name + Timestamp + Open */}
+                      {/* Line 1: Score Ring + Channel icons + Name + Timestamp + Open */}
                       <div className="flex items-center gap-2.5">
                         <ScoreRing score={conv.lead_score} size={28} />
+                        <span className="inline-flex items-center gap-0.5 flex-shrink-0">
+                          {conv.channels.map((ch) => (
+                            <ChannelIcon key={ch} channel={ch} size={14} active={true} />
+                          ))}
+                        </span>
                         <span className="text-sm font-semibold truncate flex-1" style={{ color: 'var(--text-primary)' }}>
                           {conv.lead_name || conv.lead_phone || 'Unknown'}
                         </span>
@@ -1150,18 +1142,12 @@ export default function InboxPage() {
                         </button>
                       </div>
 
-                      {/* Line 2: Brand · Location · Source */}
-                      <div className="text-xs truncate mt-1 flex items-center gap-1" style={{ color: 'var(--text-muted)', paddingLeft: '38px' }}>
-                        {[conv.brand_name, conv.city].filter(Boolean).join(' · ')}
-                        {(conv.brand_name || conv.city) && conv.channels.length > 0 && (
-                          <span className="mx-0.5" style={{ opacity: 0.4 }}>·</span>
-                        )}
-                        <span className="inline-flex items-center gap-0.5">
-                          {conv.channels.map((ch) => (
-                            <ChannelIcon key={ch} channel={ch} size={10} active={true} />
-                          ))}
-                        </span>
-                      </div>
+                      {/* Line 2: Brand · Location */}
+                      {(conv.brand_name || conv.city) && (
+                        <div className="text-xs truncate mt-1" style={{ color: 'var(--text-muted)', paddingLeft: '38px' }}>
+                          {[conv.brand_name, conv.city].filter(Boolean).join(' · ')}
+                        </div>
+                      )}
 
                       {/* Line 3: Event pill (highlighted for upcoming, muted for past) */}
                       {conv.booking_date && (() => {
@@ -1208,8 +1194,13 @@ export default function InboxPage() {
                   }}
                 >
                   <div className="px-3 py-2.5">
-                    {/* Line 1: Name + Timestamp */}
-                    <div className="flex items-center">
+                    {/* Line 1: Channel icons + Name + Timestamp */}
+                    <div className="flex items-center gap-1.5">
+                      <span className="inline-flex items-center gap-0.5 flex-shrink-0">
+                        {conv.channels.map((ch) => (
+                          <ChannelIcon key={ch} channel={ch} size={13} active={true} />
+                        ))}
+                      </span>
                       <span className="text-[12px] font-semibold truncate flex-1" style={{ color: 'var(--text-primary)' }}>
                         {conv.lead_name || conv.lead_phone || 'Unknown'}
                       </span>
@@ -1283,6 +1274,33 @@ export default function InboxPage() {
               </div>
             )}
 
+            {/* Channel filter tabs */}
+            {selectedConversation && selectedConversation.channels.length > 0 && (
+              <div className="px-4 pt-2 pb-1 border-b flex items-center gap-1" style={{ borderColor: 'var(--border-primary)' }}>
+                {['all', ...selectedConversation.channels].map((ch) => {
+                  const isActive = messageChannelFilter === ch
+                  const label = ch === 'all' ? 'All' : ch === 'whatsapp' ? 'WhatsApp' : ch === 'web' ? 'Web' : ch === 'voice' ? 'Voice' : ch === 'social' ? 'Social' : ch
+                  const count = ch === 'all' ? messages.length : messages.filter(m => m.channel === ch).length
+                  return (
+                    <button
+                      key={ch}
+                      onClick={() => setMessageChannelFilter(ch)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-semibold transition-all"
+                      style={{
+                        background: isActive ? 'var(--accent-subtle)' : 'transparent',
+                        color: isActive ? 'var(--accent-primary)' : 'var(--text-muted)',
+                        borderBottom: isActive ? '2px solid var(--accent-primary)' : '2px solid transparent',
+                      }}
+                    >
+                      {ch !== 'all' && <ChannelIcon channel={ch} size={12} active={isActive} />}
+                      {label}
+                      <span className="text-[9px] opacity-60">({count})</span>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+
             {/* Messages */}
             <div
               className="flex-1 overflow-y-auto px-4 py-3 space-y-3 relative"
@@ -1293,12 +1311,14 @@ export default function InboxPage() {
             >
               {messagesLoading ? (
                 <div className="text-center text-xs" style={{ color: 'var(--text-secondary)' }}>Loading messages...</div>
-              ) : messages.length === 0 ? (
-                <div className="text-center text-xs" style={{ color: 'var(--text-secondary)' }}>No messages yet</div>
+              ) : filteredMessages.length === 0 ? (
+                <div className="text-center text-xs" style={{ color: 'var(--text-secondary)' }}>
+                  {messageChannelFilter !== 'all' ? `No ${messageChannelFilter} messages` : 'No messages yet'}
+                </div>
               ) : (
                 <>
                 {/* Show form data card at top if lead came via meta_forms and first message isn't already a parsed form */}
-                {selectedConversation?.form_data && !parseFormFields(messages[0]?.content) && (() => {
+                {messageChannelFilter === 'all' && selectedConversation?.form_data && !parseFormFields(filteredMessages[0]?.content) && (() => {
                   const fd = selectedConversation.form_data!
                   const formFields: { label: string; value: string }[] = []
                   if (fd.brand_name) formFields.push({ label: 'Brand', value: fd.brand_name })
@@ -1334,10 +1354,10 @@ export default function InboxPage() {
                     </div>
                   )
                 })()}
-                {messages.map((msg, msgIdx) => {
+                {filteredMessages.map((msg, msgIdx) => {
                   // Date separator between messages from different days
                   const showDateSeparator = msgIdx === 0 ||
-                    getDateKey(msg.created_at) !== getDateKey(messages[msgIdx - 1].created_at);
+                    getDateKey(msg.created_at) !== getDateKey(filteredMessages[msgIdx - 1].created_at);
 
                   // Check if this is a form data message (first customer message with form fields)
                   const isCustomer = msg.sender === 'customer';
@@ -1363,7 +1383,7 @@ export default function InboxPage() {
                     });
                     const otherFields = formData.fields.filter(f => !priorityFields.includes(f));
 
-                    const formGapMs = msgIdx > 0 ? new Date(msg.created_at).getTime() - new Date(messages[msgIdx - 1].created_at).getTime() : 0;
+                    const formGapMs = msgIdx > 0 ? new Date(msg.created_at).getTime() - new Date(filteredMessages[msgIdx - 1].created_at).getTime() : 0;
 
                     return (
                       <React.Fragment key={msg.id}>
@@ -1422,7 +1442,7 @@ export default function InboxPage() {
                   }
 
                   // Regular message bubble
-                  const gapMs = msgIdx > 0 ? new Date(msg.created_at).getTime() - new Date(messages[msgIdx - 1].created_at).getTime() : 0;
+                  const gapMs = msgIdx > 0 ? new Date(msg.created_at).getTime() - new Date(filteredMessages[msgIdx - 1].created_at).getTime() : 0;
 
                   return (
                     <React.Fragment key={msg.id}>
@@ -1449,12 +1469,15 @@ export default function InboxPage() {
                       >
                         <div className="flex items-center justify-between gap-3 mb-1">
                           <div className="flex items-center gap-1">
-                            <ChannelIcon channel={msg.channel} size={9} active={true} />
+                            <ChannelIcon channel={msg.channel} size={11} active={true} />
                             <span
                               className="text-[9px] font-bold uppercase tracking-wider"
                               style={{ color: isCustomer ? 'var(--text-secondary)' : 'var(--accent-primary)' }}
                             >
                               {isCustomer ? selectedConversation?.lead_name || 'Customer' : 'PROXe AI'}
+                            </span>
+                            <span className="text-[8px] px-1 py-0.5 rounded" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--text-muted)' }}>
+                              {msg.channel === 'whatsapp' ? 'WA' : msg.channel === 'web' ? 'Web' : msg.channel === 'voice' ? 'Voice' : msg.channel}
                             </span>
                           </div>
                           <span className="text-[8px]" style={{ color: 'var(--text-muted)' }}>
