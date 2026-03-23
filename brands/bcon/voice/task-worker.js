@@ -2861,7 +2861,7 @@ const TEMPLATE_PARAM_COUNT = {
   'bcon_proxe_first_outreach': 1,        // name
   'bcon_proxe_post_call_followup': 1,    // name
   'bcon_proxe_followup_engaged': 2,      // name, service
-  'bcon_proxe_followup_noengage': 1,     // name only (Meta template has 1 variable)
+  'bcon_proxe_followup_noengage': 2,     // name, service
   'bcon_proxe_rnr': 1,                   // name
 };
 
@@ -2922,6 +2922,7 @@ function getTemplatePreview(task, lead) {
       name: 'bcon_proxe_followup_noengage',
       params: [
         { label: 'Name', parameter_name: 'customer_name', value: leadName },
+        { label: 'Service', parameter_name: 'service_interest', value: serviceInterest },
       ],
     };
   } else {
