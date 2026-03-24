@@ -177,6 +177,22 @@ function getFormFieldLabel(key: string): string {
   return key.length > 15 ? key.substring(0, 15) + '…' : key;
 }
 
+const TEMPLATE_BUTTONS: Record<string, string[]> = {
+  'bcon_proxe_first_outreach': ['Yes, tell me more', 'Just exploring'],
+  'bcon_proxe_reengagement_engaged': ['Yes, let\'s continue', 'Not right now'],
+  'bcon_proxe_reengagement_noengage': ['Yes, tell me more', 'Not interested'],
+  'bcon_proxe_followup_engaged': ['Yes, let\'s schedule', 'Maybe later'],
+  'bcon_proxe_followup_noengage': ['Yes, tell me more', 'Not right now'],
+  'bcon_proxe_booking_reminder_24h': ['I\'ll be there', 'Need to reschedule'],
+  'bcon_proxe_booking_reminder_30m': ['On my way', 'Running late'],
+  'bcon_proxe_post_call_followup': ['I have a question', 'All good, thanks'],
+  'bcon_proxe_rnr': ['Yes, let\'s reschedule', 'I\'ll call back'],
+};
+
+function getTemplateButtons(templateName: string): string[] {
+  return TEMPLATE_BUTTONS[templateName] || [];
+}
+
 export default function InboxPage() {
   const supabase = createClient()
   const searchParams = useSearchParams()
@@ -1419,6 +1435,9 @@ export default function InboxPage() {
                   // Regular message bubble
                   const templateName = msg.metadata?.template || null;
                   const isTemplate = !isCustomer && !!templateName;
+                  const templateButtons: string[] = isTemplate
+                    ? (msg.metadata?.template_buttons || getTemplateButtons(templateName))
+                    : [];
 
                   return (
                     <div
@@ -1462,16 +1481,35 @@ export default function InboxPage() {
                           {renderMarkdown(msg.content)}
                         </div>
                         {isTemplate && (
-                          <div className="mt-1.5 flex items-center gap-1">
-                            <span
-                              className="text-[8px] font-medium uppercase tracking-wider px-1.5 py-0.5 rounded"
-                              style={{
-                                color: 'var(--template-accent, #E8912D)',
-                                background: 'var(--template-badge-bg, rgba(232, 145, 45, 0.1))',
-                              }}
-                            >
-                              {templateName.replace(/^bcon_proxe_/, '').replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())} Template
-                            </span>
+                          <div className="mt-1.5 flex flex-col gap-1">
+                            <div className="flex items-center gap-1">
+                              <span
+                                className="text-[8px] font-medium uppercase tracking-wider px-1.5 py-0.5 rounded"
+                                style={{
+                                  color: 'var(--template-accent, #E8912D)',
+                                  background: 'var(--template-badge-bg, rgba(232, 145, 45, 0.1))',
+                                }}
+                              >
+                                {templateName.replace(/^bcon_proxe_/, '').replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())} Template
+                              </span>
+                            </div>
+                            {templateButtons.length > 0 && (
+                              <div className="flex flex-wrap gap-1">
+                                {templateButtons.map((btn: string, i: number) => (
+                                  <span
+                                    key={i}
+                                    className="text-[9px] px-2 py-0.5 rounded-full"
+                                    style={{
+                                      color: 'var(--text-secondary)',
+                                      background: 'var(--bg-tertiary)',
+                                      border: '1px solid var(--border-primary)',
+                                    }}
+                                  >
+                                    {btn}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
