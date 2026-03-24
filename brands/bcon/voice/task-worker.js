@@ -20,9 +20,6 @@ const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || null;
 const TELEGRAM_ADMIN_CHAT_ID = process.env.TELEGRAM_ADMIN_CHAT_ID || null;
 const VOBIZ_OUTBOUND_API_URL = process.env.VOBIZ_OUTBOUND_API_URL || null;
 const VOBIZ_OUTBOUND_API_KEY = process.env.VOBIZ_OUTBOUND_API_KEY || null;
-const TEST_MODE = process.env.TEST_MODE === 'true';
-
-if (TEST_MODE) console.log('[TEST] TEST_MODE enabled — all timers compressed');
 
 // ============================================
 // HELPERS
@@ -51,34 +48,6 @@ function formatTimeTo12h(raw) {
   return s;
 }
 
-// ============================================
-// TEST MODE - Timer Compression
-// ============================================
-// Maps production durations to compressed test durations.
-// Call t(ms) for any timer that should be compressed in test mode.
-const MS_MINUTE = 60 * 1000;
-const MS_HOUR = 60 * MS_MINUTE;
-const MS_DAY = 24 * MS_HOUR;
-
-function t(productionMs) {
-  if (!TEST_MODE) return productionMs;
-
-  // Map known production timers to test equivalents
-  if (productionMs >= 7 * MS_DAY) { log('7d → 10m'); return 10 * MS_MINUTE; }   // weekly → 10 min
-  if (productionMs >= 3 * MS_DAY) { log('3d → 5m'); return 5 * MS_MINUTE; }     // 3-day gap → 5 min
-  if (productionMs >= 2 * MS_DAY) { log('2d → 4m'); return 4 * MS_MINUTE; }     // 2-day gap → 4 min
-  if (productionMs >= MS_DAY) { log('1d → 3m'); return 3 * MS_MINUTE; }         // 1-day gap → 3 min
-  if (productionMs >= 14 * MS_HOUR) { log('14h → 3m'); return 3 * MS_MINUTE; }  // 14h → 3 min
-  if (productionMs >= 4 * MS_HOUR) { log('4h → 5m'); return 5 * MS_MINUTE; }    // push_to_book → 5 min
-  if (productionMs >= 2 * MS_HOUR) { log('2h → 2m'); return 2 * MS_MINUTE; }    // nudge → 2 min
-  if (productionMs >= MS_HOUR) { log('1h → 1m'); return MS_MINUTE; }            // 1h → 1 min
-  if (productionMs >= 30 * MS_MINUTE) { log('30m → 30s'); return 30 * 1000; }   // 30m → 30 sec
-  return productionMs; // anything shorter stays as-is
-
-  function log(label) {
-    console.log(`[TEST] Timer compressed: ${label}`);
-  }
-}
 
 // File to persist Telegram getUpdates offset across runs
 const TELEGRAM_OFFSET_FILE = path.join(__dirname, '.telegram_offset');
@@ -307,7 +276,7 @@ async function calculateNextAction(leadId, taskMetadata) {
     if (lastReadAt && (Date.now() - new Date(lastReadAt).getTime()) < 48 * 60 * 60 * 1000) {
       // Treat as cool, not cold
       const angle = getNextAngle('cool', anglesUsed);
-      const gapMs = t(3 * 24 * 60 * 60 * 1000); // 3 days (compressed in test)
+      const gapMs = 3 * 24 * 60 * 60 * 1000; // 3 days
       const scheduledAt = getScheduledAtForActiveHour(gapMs, responsePatterns);
       return {
         action: 'follow_up',
@@ -326,7 +295,7 @@ async function calculateNextAction(leadId, taskMetadata) {
     }
 
     // Natural cold → monthly re-engage only
-    const scheduledAt = new Date(Date.now() + t(30 * 24 * 60 * 60 * 1000));
+    const scheduledAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
     return {
       action: 'reengagement',
       channel: 'whatsapp',
@@ -344,7 +313,7 @@ async function calculateNextAction(leadId, taskMetadata) {
     }
 
     if (followUpCount < 3) {
-      const gapMs = t(1 * 60 * 60 * 1000); // 1 hour (compressed in test)
+      const gapMs = 1 * 60 * 60 * 1000; // 1 hour
       // Channel: whichever they respond fastest on
       const waAvg = channelPerf.whatsapp?.avg_response_time || 9999;
       const voiceAvg = channelPerf.voice?.avg_response_time || 9999;
@@ -362,7 +331,7 @@ async function calculateNextAction(leadId, taskMetadata) {
     }
 
     // 3+ follow-ups sent, still no booking → back off
-    const scheduledAt = new Date(Date.now() + t(24 * 60 * 60 * 1000));
+    const scheduledAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
     return {
       action: 'follow_up',
       channel: 'whatsapp',
@@ -375,7 +344,7 @@ async function calculateNextAction(leadId, taskMetadata) {
 
   // ── WARM temperature ──
   if (temperature === 'warm') {
-    const gapMs = t(24 * 60 * 60 * 1000); // 1 day (compressed in test)
+    const gapMs = 24 * 60 * 60 * 1000; // 1 day
 
     // If objection exists and not yet addressed with matching angle
     if (objections.length > 0) {
@@ -441,12 +410,12 @@ async function calculateNextAction(leadId, taskMetadata) {
 
   // ── COOL temperature ──
   // (temperature === 'cool' or default)
-  const coolGapMs = t(3 * 24 * 60 * 60 * 1000); // 3 days (compressed in test)
+  const coolGapMs = 3 * 24 * 60 * 60 * 1000; // 3 days
 
   // Timing objection → 2 weeks out
   const hasTimingObjection = objections.some(o => o.type === 'timing');
   if (hasTimingObjection && !anglesUsed.includes('timing')) {
-    const scheduledAt = new Date(Date.now() + t(14 * 24 * 60 * 60 * 1000));
+    const scheduledAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
     return {
       action: 'follow_up',
       channel: 'whatsapp',
@@ -460,7 +429,7 @@ async function calculateNextAction(leadId, taskMetadata) {
   // After 2 unanswered attempts → back off to weekly
   const unansweredWa = channelsTried.filter(c => c.channel === 'whatsapp' && c.result !== 'read').length;
   if (unansweredWa >= 2) {
-    const weeklyGap = t(7 * 24 * 60 * 60 * 1000);
+    const weeklyGap = 7 * 24 * 60 * 60 * 1000;
     const angle = getNextAngle('cool', anglesUsed);
     const scheduledAt = getScheduledAtForActiveHour(weeklyGap, responsePatterns);
     return {
@@ -490,9 +459,6 @@ async function calculateNextAction(leadId, taskMetadata) {
  * Helper: calculate a scheduled time, snapped to lead's active hours.
  */
 function getScheduledAtForActiveHour(delayMs, responsePatterns) {
-  // In test mode: just use the compressed delay, don't snap to active hours
-  if (TEST_MODE) return new Date(Date.now() + t(delayMs));
-
   let scheduledAt = new Date(Date.now() + delayMs);
   const activeHours = responsePatterns?.active_hours;
   const preferredPart = responsePatterns?.preferred_day_parts;
@@ -864,7 +830,7 @@ async function executeVoiceCall(task, waPhone) {
     lead_phone: phone10,
     lead_name: task.lead_name,
     status: 'pending',
-    scheduled_at: new Date(Date.now() + t(30 * 60 * 1000)).toISOString(),
+    scheduled_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
     metadata: {
       source: 'voice_escalation',
       prev_task_id: task.id,
@@ -1744,7 +1710,7 @@ async function createBookingReminderTasks() {
           leadId: session.lead_id || null,
           leadPhone: phone,
           leadName: name,
-          scheduledAt: new Date(bookingDateTime.getTime() - t(24 * 60 * 60 * 1000)).toISOString(),
+          scheduledAt: new Date(bookingDateTime.getTime() - 24 * 60 * 60 * 1000).toISOString(),
           metadata: { booking_date: session.booking_date, booking_time: session.booking_time, session_id: session.id }
         });
       }
@@ -1755,7 +1721,7 @@ async function createBookingReminderTasks() {
           leadId: session.lead_id || null,
           leadPhone: phone,
           leadName: name,
-          scheduledAt: new Date(bookingDateTime.getTime() - t(1 * 60 * 60 * 1000)).toISOString(),
+          scheduledAt: new Date(bookingDateTime.getTime() - 1 * 60 * 60 * 1000).toISOString(),
           metadata: { booking_date: session.booking_date, booking_time: session.booking_time, session_id: session.id }
         });
       }
@@ -1766,7 +1732,7 @@ async function createBookingReminderTasks() {
           leadId: session.lead_id || null,
           leadPhone: phone,
           leadName: name,
-          scheduledAt: new Date(bookingDateTime.getTime() - t(30 * 60 * 1000)).toISOString(),
+          scheduledAt: new Date(bookingDateTime.getTime() - 30 * 60 * 1000).toISOString(),
           metadata: { booking_date: session.booking_date, booking_time: session.booking_time, session_id: session.id }
         });
       }
@@ -1806,7 +1772,7 @@ async function createFollowUpTasks() {
 
       if (lastMsg && lastMsg.sender === 'agent') {
         // Schedule 24h from their last interaction, not NOW
-        const scheduledAt = new Date(new Date(lead.last_interaction_at).getTime() + t(24 * 60 * 60 * 1000)).toISOString();
+        const scheduledAt = new Date(new Date(lead.last_interaction_at).getTime() + 24 * 60 * 60 * 1000).toISOString();
         await createTaskIfNotExists({
           taskType: 'follow_up_24h',
           leadId: lead.id,
@@ -1844,7 +1810,7 @@ async function createColdLeadTasks() {
   for (const lead of leads) {
     try {
       // Schedule 7 days from their last interaction, not NOW
-      const scheduledAt = new Date(new Date(lead.last_interaction_at).getTime() + t(7 * 24 * 60 * 60 * 1000)).toISOString();
+      const scheduledAt = new Date(new Date(lead.last_interaction_at).getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
       await createTaskIfNotExists({
         taskType: 're_engage',
         leadId: lead.id,
@@ -1930,7 +1896,7 @@ async function processPendingTasks() {
         continue;
       }
 
-      // Quiet hours: 9 PM – 9 AM IST - reschedule to 9 AM IST next morning (always enforced, even in test mode)
+      // Quiet hours: 9 PM – 9 AM IST - reschedule to 9 AM IST next morning
       const nowIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
       const hourIST = nowIST.getHours();
       if (hourIST >= 21 || hourIST < 9) {
@@ -2152,7 +2118,7 @@ async function executeNudgeWaiting(task, waPhone) {
   if (readAt) {
     // ── READ but no reply ──
     const readTime = new Date(readAt).getTime();
-    const thirtyMinAfterRead = readTime + t(30 * 60 * 1000);
+    const thirtyMinAfterRead = readTime + 30 * 60 * 1000;
     const now = Date.now();
 
     if (now >= thirtyMinAfterRead) {
@@ -2341,7 +2307,7 @@ async function executeFirstOutreach(task, waPhone) {
     lead_phone: resolvedPhone,
     lead_name: task.lead_name,
     status: 'pending',
-    scheduled_at: new Date(Date.now() + t(2 * 60 * 60 * 1000)).toISOString(),
+    scheduled_at: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
     metadata: {
       source: task.metadata?.source || 'inbound',
       campaign: task.metadata?.campaign || null,
@@ -2369,7 +2335,7 @@ async function executePostBookingFollowup(task, waPhone) {
   // If this is a post_call sequence step 0, schedule next step
   if (task.metadata?.sequence === 'post_call') {
     const phone10 = waPhone.replace(/\D/g, '').slice(-10);
-    await scheduleNextSequenceStep(task, 'follow_up_day1', 1, t(24 * 60 * 60 * 1000), 'post_call', phone10);
+    await scheduleNextSequenceStep(task, 'follow_up_day1', 1, 24 * 60 * 60 * 1000, 'post_call', phone10);
   }
   return result;
 }
@@ -2613,7 +2579,7 @@ async function scheduleNextSequenceStep(task, nextType, nextStep, delayMs, seque
   }
 
   // Apply test mode compression then temperature multiplier
-  let adjustedDelay = applyTemperatureDelay(t(delayMs), leadTemperature);
+  let adjustedDelay = applyTemperatureDelay(delayMs, leadTemperature);
   let timingReason = '';
   if (leadTemperature !== 'warm') {
     timingReason = `Temperature ${leadTemperature}: delay ${leadTemperature === 'hot' ? 'halved' : 'extended'} to ${Math.round(adjustedDelay / (60 * 60 * 1000))}h`;
@@ -2787,8 +2753,7 @@ async function executePushToBook(task, waPhone) {
 async function sendTelegram(chatId, text, replyMarkup) {
   if (!TELEGRAM_BOT_TOKEN) return;
   const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
-  const finalText = TEST_MODE ? `[TEST MODE] ${text}` : text;
-  const payload = { chat_id: chatId, text: finalText, parse_mode: 'HTML' };
+  const payload = { chat_id: chatId, text, parse_mode: 'HTML' };
   if (replyMarkup) payload.reply_markup = replyMarkup;
   const res = await fetch(url, {
     method: 'POST',
