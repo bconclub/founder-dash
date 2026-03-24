@@ -35,6 +35,7 @@ interface Stats {
   pendingCount: number
   queuedCount: number
   successRate: number
+  reEngagedCount: number
 }
 
 
@@ -126,7 +127,7 @@ function StatCard({ label, value, color }: { label: string; value: string | numb
 
 export default function TasksPage() {
   const [tasks, setTasks] = useState<AgentTask[]>([])
-  const [stats, setStats] = useState<Stats>({ completedToday: 0, failedToday: 0, pendingCount: 0, queuedCount: 0, successRate: 100 })
+  const [stats, setStats] = useState<Stats>({ completedToday: 0, failedToday: 0, pendingCount: 0, queuedCount: 0, successRate: 100, reEngagedCount: 0 })
   const [loading, setLoading] = useState(true)
 
   const fetchTasks = useCallback(async () => {
@@ -233,6 +234,7 @@ export default function TasksPage() {
         <StatCard label="Pending" value={stats.pendingCount} color="#f59e0b" />
         <StatCard label="In Queue" value={stats.queuedCount} color="#9ca3af" />
         <StatCard label="Success Rate" value={`${stats.successRate}%`} color="var(--text-primary)" />
+        <StatCard label="Re-engaged" value={stats.reEngagedCount} color="#8b5cf6" />
       </div>
 
       {/* 3-Column Layout */}

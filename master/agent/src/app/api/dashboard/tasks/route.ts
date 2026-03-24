@@ -53,13 +53,22 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ tasks: data || [] })
     }
 
-    const [pendingResult, historyResult] = await Promise.all([
+    // Query 3: re_engage completed tasks (all time)
+    const reEngageQuery = supabase
+      .from('agent_tasks')
+      .select('id', { count: 'exact', head: true })
+      .eq('task_type', 're_engage')
+      .eq('status', 'completed')
+
+    const [pendingResult, historyResult, reEngageResult] = await Promise.all([
       pendingQuery.limit(100),
       historyQuery.limit(200),
+      reEngageQuery,
     ])
 
     if (pendingResult.error) throw pendingResult.error
     if (historyResult.error) throw historyResult.error
+    if (reEngageResult.error) throw reEngageResult.error
 
     const tasks = [...(pendingResult.data || []), ...(historyResult.data || [])]
 
@@ -78,6 +87,7 @@ export async function GET(request: NextRequest) {
     const successRate = completedToday + failedToday > 0
       ? Math.round((completedToday / (completedToday + failedToday)) * 100)
       : 100
+    const reEngagedCount = reEngageResult.count ?? 0
 
     return NextResponse.json({
       tasks,
@@ -87,6 +97,7 @@ export async function GET(request: NextRequest) {
         pendingCount,
         queuedCount,
         successRate,
+        reEngagedCount,
       },
     })
   } catch (error) {
