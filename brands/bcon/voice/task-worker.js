@@ -1930,10 +1930,10 @@ async function processPendingTasks() {
         continue;
       }
 
-      // Quiet hours: 9 PM – 9 AM IST - reschedule to 9 AM IST next morning (disabled in test mode)
+      // Quiet hours: 9 PM – 9 AM IST - reschedule to 9 AM IST next morning (always enforced, even in test mode)
       const nowIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
       const hourIST = nowIST.getHours();
-      if (!TEST_MODE && (hourIST >= 21 || hourIST < 9)) {
+      if (hourIST >= 21 || hourIST < 9) {
         const nextMorning = new Date(nowIST);
         if (hourIST >= 21) nextMorning.setDate(nextMorning.getDate() + 1);
         nextMorning.setHours(9, 0, 0, 0);
