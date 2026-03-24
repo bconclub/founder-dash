@@ -20,7 +20,9 @@ import {
   MdOutlineInsights,
   MdTrendingUp,
   MdTrendingDown,
-  MdRemove
+  MdRemove,
+  MdAdd,
+  MdClose,
 } from 'react-icons/md'
 import { createClient } from '@/lib/supabase/client'
 import { FaWhatsapp } from 'react-icons/fa'
@@ -138,6 +140,14 @@ export default function LeadsTable({
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [limit, setLimit] = useState<number>(initialLimit || 50)
+
+  // Add Lead modal state
+  const [isAddLeadOpen, setIsAddLeadOpen] = useState(false)
+  const [addLeadForm, setAddLeadForm] = useState({ name: '', phone: '', email: '', source: 'manual', context_note: '', auto_sequence: true })
+  const [addLeadSubmitting, setAddLeadSubmitting] = useState(false)
+  const [addLeadError, setAddLeadError] = useState<string | null>(null)
+  const [addLeadDuplicateId, setAddLeadDuplicateId] = useState<string | null>(null)
+  const [addLeadSuccess, setAddLeadSuccess] = useState(false)
 
   useEffect(() => {
     if (initialLimit) {
@@ -424,6 +434,39 @@ export default function LeadsTable({
     a.click()
   }
 
+  const handleAddLeadSubmit = async () => {
+    setAddLeadError(null)
+    setAddLeadDuplicateId(null)
+    setAddLeadSubmitting(true)
+    try {
+      const res = await fetch('/api/dashboard/leads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(addLeadForm),
+      })
+      const data = await res.json()
+      if (res.status === 409) {
+        setAddLeadError('Lead with this phone already exists')
+        setAddLeadDuplicateId(data.existing_lead_id)
+        return
+      }
+      if (!res.ok) {
+        setAddLeadError(data.error || 'Failed to create lead')
+        return
+      }
+      setAddLeadSuccess(true)
+      setTimeout(() => {
+        setIsAddLeadOpen(false)
+        setAddLeadForm({ name: '', phone: '', email: '', source: 'manual', context_note: '', auto_sequence: true })
+        setAddLeadSuccess(false)
+      }, 1500)
+    } catch {
+      setAddLeadError('Network error — please try again')
+    } finally {
+      setAddLeadSubmitting(false)
+    }
+  }
+
   // Filter select style — compact Vercel-like
   const filterClass = "px-2.5 py-1 text-xs border rounded-md appearance-none cursor-pointer"
   const filterStyle: CSSProperties = {
@@ -526,6 +569,15 @@ export default function LeadsTable({
               <option value={50}>50</option>
             </select>
           )}
+
+          <button
+            onClick={() => { setIsAddLeadOpen(true); setAddLeadError(null); setAddLeadDuplicateId(null); setAddLeadSuccess(false) }}
+            className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-md text-white transition-colors"
+            style={{ backgroundColor: 'var(--accent-primary)' }}
+          >
+            <MdAdd size={14} />
+            Add Lead
+          </button>
 
           <button
             onClick={exportToCSV}
@@ -791,6 +843,157 @@ export default function LeadsTable({
         onClose={handleCloseModal}
         onStatusUpdate={updateLeadStatus}
       />
+
+      {/* Add Lead Modal */}
+      {isAddLeadOpen && (
+        <>
+          <div
+            className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm z-40"
+            onClick={() => setIsAddLeadOpen(false)}
+          />
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            onClick={() => setIsAddLeadOpen(false)}
+          >
+            <div
+              className="relative rounded-lg shadow-xl w-full max-w-md"
+              style={{ backgroundColor: 'var(--bg-primary)' }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: 'var(--border-primary)' }}>
+                <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Add New Lead</h3>
+                <button onClick={() => setIsAddLeadOpen(false)} className="p-1 rounded hover:bg-gray-100 dark:hover:bg-[#333]">
+                  <MdClose size={16} style={{ color: 'var(--text-secondary)' }} />
+                </button>
+              </div>
+
+              {/* Form */}
+              <div className="px-5 py-4 flex flex-col gap-3">
+                <div>
+                  <label className="block text-[11px] font-medium mb-1 uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>Name *</label>
+                  <input
+                    type="text"
+                    value={addLeadForm.name}
+                    onChange={(e) => setAddLeadForm({ ...addLeadForm, name: e.target.value })}
+                    className="w-full px-3 py-2 text-sm rounded-md border outline-none focus:ring-1"
+                    style={{ borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)', '--tw-ring-color': 'var(--accent-primary)' } as CSSProperties}
+                    placeholder="Lead name"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-medium mb-1 uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>Phone *</label>
+                  <input
+                    type="tel"
+                    value={addLeadForm.phone}
+                    onChange={(e) => setAddLeadForm({ ...addLeadForm, phone: e.target.value })}
+                    className="w-full px-3 py-2 text-sm rounded-md border outline-none focus:ring-1"
+                    style={{ borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)', '--tw-ring-color': 'var(--accent-primary)' } as CSSProperties}
+                    placeholder="+91 98765 43210"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-medium mb-1 uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>Email</label>
+                  <input
+                    type="email"
+                    value={addLeadForm.email}
+                    onChange={(e) => setAddLeadForm({ ...addLeadForm, email: e.target.value })}
+                    className="w-full px-3 py-2 text-sm rounded-md border outline-none focus:ring-1"
+                    style={{ borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)', '--tw-ring-color': 'var(--accent-primary)' } as CSSProperties}
+                    placeholder="email@example.com"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-medium mb-1 uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>Source</label>
+                  <select
+                    value={addLeadForm.source}
+                    onChange={(e) => setAddLeadForm({ ...addLeadForm, source: e.target.value })}
+                    className="w-full px-3 py-2 text-sm rounded-md border outline-none cursor-pointer"
+                    style={{ borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
+                  >
+                    <option value="manual">Manual Entry</option>
+                    <option value="referral">Referral</option>
+                    <option value="walk-in">Walk-in</option>
+                    <option value="phone-call">Phone Call</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-medium mb-1 uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>Context Note</label>
+                  <textarea
+                    value={addLeadForm.context_note}
+                    onChange={(e) => setAddLeadForm({ ...addLeadForm, context_note: e.target.value })}
+                    className="w-full px-3 py-2 text-sm rounded-md border outline-none focus:ring-1 resize-none"
+                    style={{ borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)', '--tw-ring-color': 'var(--accent-primary)' } as CSSProperties}
+                    rows={3}
+                    placeholder="Add any context about this lead - what they need, how you met them, etc."
+                  />
+                </div>
+
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={addLeadForm.auto_sequence}
+                    onChange={(e) => setAddLeadForm({ ...addLeadForm, auto_sequence: e.target.checked })}
+                    className="rounded"
+                    style={{ accentColor: 'var(--accent-primary)' }}
+                  />
+                  <span className="text-xs" style={{ color: 'var(--text-primary)' }}>Start outreach sequence automatically</span>
+                </label>
+
+                {/* Error / Duplicate */}
+                {addLeadError && (
+                  <div className="text-xs px-3 py-2 rounded-md" style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', color: '#EF4444' }}>
+                    {addLeadError}
+                    {addLeadDuplicateId && (
+                      <button
+                        onClick={() => {
+                          setIsAddLeadOpen(false)
+                          const lead = leads.find(l => l.id === addLeadDuplicateId)
+                          if (lead) { setSelectedLead(lead as any); setIsModalOpen(true) }
+                        }}
+                        className="ml-2 underline font-medium"
+                      >
+                        View existing lead
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {/* Success */}
+                {addLeadSuccess && (
+                  <div className="text-xs px-3 py-2 rounded-md" style={{ backgroundColor: 'rgba(34, 197, 94, 0.1)', color: '#22C55E' }}>
+                    Lead created successfully!
+                  </div>
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="flex items-center justify-end gap-2 px-5 py-3 border-t" style={{ borderColor: 'var(--border-primary)' }}>
+                <button
+                  onClick={() => setIsAddLeadOpen(false)}
+                  className="px-3 py-1.5 text-xs font-medium rounded-md border transition-colors"
+                  style={{ borderColor: 'var(--border-primary)', color: 'var(--text-primary)', backgroundColor: 'var(--bg-primary)' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleAddLeadSubmit}
+                  disabled={addLeadSubmitting || !addLeadForm.name.trim() || !addLeadForm.phone.trim()}
+                  className="px-3 py-1.5 text-xs font-medium rounded-md text-white transition-colors disabled:opacity-50"
+                  style={{ backgroundColor: 'var(--accent-primary)' }}
+                >
+                  {addLeadSubmitting ? 'Creating...' : 'Create Lead'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   )
 }
