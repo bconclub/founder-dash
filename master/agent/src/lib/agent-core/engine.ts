@@ -44,7 +44,18 @@ export async function process(
   // 3. Check for existing booking
   const existingBookingMessage = await checkBooking(supabase, input);
 
-  // 4. Build prompt (brand-aware)
+  // 4. Check for repetition in conversation history
+  const repetitionBailout = detectRepetition(input.conversationHistory);
+  if (repetitionBailout) {
+    return {
+      response: repetitionBailout,
+      followUps: [],
+      intent,
+      leadId: null,
+    };
+  }
+
+  // 5. Build prompt (brand-aware)
   const finalMessage = existingBookingMessage
     ? `${existingBookingMessage}\n\nUser's message: ${input.message}`
     : input.message;
@@ -61,7 +72,7 @@ export async function process(
     brand: brandId,
   });
 
-  // 5. Generate response
+  // 6. Generate response
   let rawResponse: string;
 
   if (input.channel === 'whatsapp' && !existingBookingMessage) {
@@ -129,7 +140,16 @@ export async function* processStream(
     // 3. Check for existing booking
     const existingBookingMessage = await checkBooking(supabase, input);
 
-    // 4. Build prompt (brand-aware)
+    // 4. Check for repetition in conversation history
+    const repetitionBailout = detectRepetition(input.conversationHistory);
+    if (repetitionBailout) {
+      yield { type: 'chunk', text: repetitionBailout };
+      yield { type: 'followUps', followUps: [] };
+      yield { type: 'done' };
+      return;
+    }
+
+    // 5. Build prompt (brand-aware)
     const finalMessage = existingBookingMessage
       ? `${existingBookingMessage}\n\nUser's message: ${input.message}`
       : input.message;
@@ -146,7 +166,7 @@ export async function* processStream(
       brand: brandId,
     });
 
-    // 5. Stream response
+    // 6. Stream response
     let rawResponse = '';
     for await (const text of streamResponse(systemPrompt, userPrompt)) {
       rawResponse += text;
@@ -176,6 +196,73 @@ export async function* processStream(
 }
 
 // --- Helper functions ---
+
+/**
+ * Detect if PROXe is stuck in a repetition loop.
+ * Checks assistant messages for repeated intents: offering time slots, asking the same question,
+ * pushing for booking, etc. Returns a bailout message if 3+ similar messages detected.
+ */
+function detectRepetition(history: { role: string; content: string }[]): string | null {
+  const assistantMessages = history
+    .filter(m => m.role === 'assistant' && m.content)
+    .map(m => m.content.toLowerCase().trim());
+
+  if (assistantMessages.length < 3) return null;
+
+  // Normalize messages for comparison: strip punctuation, collapse whitespace
+  const normalize = (s: string) => s.replace(/[^\w\s]/g, '').replace(/\s+/g, ' ').trim();
+
+  // Check for near-duplicate messages (high similarity)
+  const recent = assistantMessages.slice(-6); // look at last 6 assistant messages
+  const intentBuckets: Record<string, number> = {};
+
+  for (const msg of recent) {
+    const norm = normalize(msg);
+
+    // Classify into intent buckets based on content patterns
+    let intent = 'other';
+    if (/when\s*(works|are you free|is good|do you prefer|would you like)/.test(msg) ||
+        /what\s*(day|time|date)/.test(msg) ||
+        /available\s*(slots?|times?)/.test(msg) ||
+        /\d{1,2}:\d{2}\s*(am|pm)/i.test(msg) ||
+        /morning|afternoon|evening/.test(msg)) {
+      intent = 'scheduling';
+    } else if (/ai brand audit|book.*call|set up.*session|schedule/.test(msg)) {
+      intent = 'push_booking';
+    } else if (/what does your business|tell me about your business|what do you guys do/.test(msg)) {
+      intent = 'ask_business';
+    } else if (/what.*bottleneck|what.*challenge|what.*pain|what.*problem|what.*costing/.test(msg)) {
+      intent = 'probe_pain';
+    }
+
+    intentBuckets[intent] = (intentBuckets[intent] || 0) + 1;
+
+    // Also check for near-exact duplicates
+    let dupeCount = 0;
+    for (const other of recent) {
+      if (other === msg) continue;
+      const otherNorm = normalize(other);
+      // Simple similarity: check if messages share >70% of words
+      const words = new Set(norm.split(' '));
+      const otherWords = new Set(otherNorm.split(' '));
+      const intersection = [...words].filter(w => otherWords.has(w) && w.length > 2);
+      const similarity = intersection.length / Math.max(words.size, otherWords.size);
+      if (similarity > 0.7) dupeCount++;
+    }
+    if (dupeCount >= 2) {
+      return "I'll have the team reach out to you directly.";
+    }
+  }
+
+  // Check if any single intent appeared 3+ times
+  for (const [intent, count] of Object.entries(intentBuckets)) {
+    if (intent !== 'other' && count >= 3) {
+      return "I'll have the team reach out to you directly.";
+    }
+  }
+
+  return null;
+}
 
 function formatKnowledgeContext(docs: KnowledgeResult[]): string {
   if (docs.length === 0) return 'No relevant snippets found.';
