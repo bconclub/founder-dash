@@ -2831,15 +2831,15 @@ const TEMPLATE_PARAM_COUNT = {
 
 // Template body texts matching Meta-approved templates (used to render human-readable content for conversation logs)
 const TEMPLATE_BODIES = {
-  'bcon_proxe_booking_reminder_24h': 'Hi {{customer_name}}, just a reminder about your {{service_interest}} consultation tomorrow at {{booking_time}}. We look forward to speaking with you!',
-  'bcon_proxe_booking_reminder_30m': 'Hi {{customer_name}}, your {{service_interest}} consultation starts in 30 minutes at {{booking_time}}. See you soon!',
-  'bcon_proxe_reengagement_engaged': 'Hi {{customer_name}}, we were recently discussing {{pain_point}}. Would you like to continue the conversation?',
-  'bcon_proxe_reengagement_noengage': 'Hi {{customer_name}}, we noticed you reached out recently. Would you like to learn more about how BCON can help your business grow?',
-  'bcon_proxe_first_outreach': 'Hi {{customer_name}}, thanks for your interest in BCON! We'd love to learn more about your business and how we can help. When's a good time to chat?',
-  'bcon_proxe_post_call_followup': 'Hi {{customer_name}}, thanks for the great conversation! If you have any questions, feel free to reach out. We're here to help!',
-  'bcon_proxe_followup_engaged': 'Hi {{customer_name}}, following up on our conversation about {{service_interest}}. Would you like to schedule a call to discuss next steps?',
-  'bcon_proxe_followup_noengage': 'Hi {{customer_name}}, we'd love to help you with {{service_interest}}. Would you like to schedule a quick call to learn more?',
-  'bcon_proxe_rnr': 'Hi {{customer_name}}, we tried reaching you but couldn't connect. Would you like to schedule a call at a time that works for you?',
+  'bcon_proxe_booking_reminder_24h': `Hi {{customer_name}}, just a reminder about your {{service_interest}} consultation tomorrow at {{booking_time}}. We look forward to speaking with you!`,
+  'bcon_proxe_booking_reminder_30m': `Hi {{customer_name}}, your {{service_interest}} consultation starts in 30 minutes at {{booking_time}}. See you soon!`,
+  'bcon_proxe_reengagement_engaged': `Hi {{customer_name}}, we were recently discussing {{pain_point}}. Would you like to continue the conversation?`,
+  'bcon_proxe_reengagement_noengage': `Hi {{customer_name}}, we noticed you reached out recently. Would you like to learn more about how BCON can help your business grow?`,
+  'bcon_proxe_first_outreach': `Hi {{customer_name}}, thanks for your interest in BCON! We'd love to learn more about your business and how we can help. When's a good time to chat?`,
+  'bcon_proxe_post_call_followup': `Hi {{customer_name}}, thanks for the great conversation! If you have any questions, feel free to reach out. We're here to help!`,
+  'bcon_proxe_followup_engaged': `Hi {{customer_name}}, following up on our conversation about {{service_interest}}. Would you like to schedule a call to discuss next steps?`,
+  'bcon_proxe_followup_noengage': `Hi {{customer_name}}, we'd love to help you with {{service_interest}}. Would you like to schedule a quick call to learn more?`,
+  'bcon_proxe_rnr': `Hi {{customer_name}}, we tried reaching you but couldn't connect. Would you like to schedule a call at a time that works for you?`,
 };
 
 /**
