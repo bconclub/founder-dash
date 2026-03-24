@@ -33,13 +33,13 @@ const GRAPH_API_BASE = `https://graph.facebook.com/${GRAPH_API_VERSION}`;
 // ─── Meta Graph API helpers ───────────────────────────────────────────────────
 
 /** Send a text reply back to the customer via Meta Graph API */
-async function sendWhatsAppReply(to: string, message: string): Promise<boolean> {
+async function sendWhatsAppReply(to: string, message: string): Promise<string | null> {
   const phoneNumberId = process.env.META_WHATSAPP_PHONE_NUMBER_ID;
   const accessToken = process.env.META_WHATSAPP_ACCESS_TOKEN;
 
   if (!phoneNumberId || !accessToken) {
     console.error('[meta/webhook] Missing META_WHATSAPP_PHONE_NUMBER_ID or META_WHATSAPP_ACCESS_TOKEN');
-    return false;
+    return null;
   }
 
   try {
@@ -61,13 +61,14 @@ async function sendWhatsAppReply(to: string, message: string): Promise<boolean> 
     if (!res.ok) {
       const err = await res.text();
       console.error('[meta/webhook] Graph API error:', res.status, err);
-      return false;
+      return null;
     }
 
-    return true;
+    const resBody = await res.json();
+    return resBody.messages?.[0]?.id || null;
   } catch (err) {
     console.error('[meta/webhook] Failed to send reply:', err);
-    return false;
+    return null;
   }
 }
 
@@ -349,7 +350,13 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
       return;
     }
 
-    // 7. Log AI response
+    // 7. Send reply via Meta Graph API (send first to capture wamid)
+    const replyWamid = await sendWhatsAppReply(customerPhone, result.response);
+    if (!replyWamid) {
+      console.error('[meta/webhook] Failed to send reply to', customerPhone);
+    }
+
+    // 8. Log AI response (include wamid for delivery status tracking)
     await logMessage(
       leadId,
       'whatsapp',
@@ -361,11 +368,12 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
         ai_generated: true,
         intent: result.intent,
         source: 'meta_cloud_api',
+        ...(replyWamid ? { whatsapp_message_id: replyWamid } : {}),
       },
       supabase,
     );
 
-    // 8. Update lead context
+    // 9. Update lead context
     await supabase
       .from('all_leads')
       .update({
@@ -373,12 +381,6 @@ async function handleIncomingMessage(msg: IncomingMessage): Promise<void> {
         last_interaction_at: new Date().toISOString(),
       })
       .eq('id', leadId);
-
-    // 9. Send reply via Meta Graph API
-    const sent = await sendWhatsAppReply(customerPhone, result.response);
-    if (!sent) {
-      console.error('[meta/webhook] Failed to send reply to', customerPhone);
-    }
 
     // 10. Fire-and-forget: trigger AI scoring
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';

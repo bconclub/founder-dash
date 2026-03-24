@@ -2278,7 +2278,7 @@ async function executeHumanCallback(task, waPhone) {
  */
 async function executeFirstOutreach(task, waPhone) {
   // Always send template directly - new leads have no 24h window
-  const { templateName, renderedText } = await sendWhatsAppTemplate(waPhone, {
+  const { templateName, renderedText, wamid } = await sendWhatsAppTemplate(waPhone, {
     ...task,
     task_type: 'first_outreach',
   });
@@ -2291,7 +2291,7 @@ async function executeFirstOutreach(task, waPhone) {
       sender: 'agent',
       content: renderedText || `[Template: ${templateName}] First outreach to ${task.lead_name}`,
       message_type: 'text',
-      metadata: { task_type: task.task_type, task_id: task.id, autonomous: true, template: templateName }
+      metadata: { task_type: task.task_type, task_id: task.id, autonomous: true, template: templateName, ...(wamid ? { whatsapp_message_id: wamid, wa_message_id: wamid } : {}) }
     }).then(({ error }) => {
       if (error) console.error('[FirstOutreach] Conversation log error:', error.message);
     });
@@ -2936,8 +2936,9 @@ async function executeSendMessage(task, waPhone, message) {
   if (within24h) {
     waMessageId = await sendWhatsApp(waPhone, message);
   } else {
-    const { templateName: templateUsed, renderedText } = await sendWhatsAppTemplate(waPhone, task);
+    const { templateName: templateUsed, renderedText, wamid } = await sendWhatsAppTemplate(waPhone, task);
     message = renderedText || `[Template: ${templateUsed}] Sent to ${task.lead_name}`;
+    waMessageId = wamid;
   }
 
   // Log to conversations (include wa_message_id for read receipt tracking)
@@ -2953,6 +2954,7 @@ async function executeSendMessage(task, waPhone, message) {
         task_id: task.id,
         autonomous: true,
         wa_message_id: waMessageId || undefined,
+        ...(waMessageId ? { whatsapp_message_id: waMessageId } : {}),
       }
     }).then(({ error }) => {
       if (error) console.error('[executeTask] Conversation log error:', error.message);
@@ -3096,9 +3098,11 @@ async function sendWhatsAppTemplate(phone, task) {
     throw new Error(`WhatsApp Template API error (${templateName}): ${res.status} ${errBody}`);
   }
 
-  console.log(`[WhatsApp] Template sent to ${phone} (${templateName})`);
+  const resBody = await res.json();
+  const wamid = resBody.messages?.[0]?.id || null;
+  console.log(`[WhatsApp] Template sent to ${phone} (${templateName}) wamid: ${wamid}`);
   const renderedText = renderTemplateText(templateName, resolvedParams);
-  return { templateName, renderedText };
+  return { templateName, renderedText, wamid };
 }
 
 // ============================================
