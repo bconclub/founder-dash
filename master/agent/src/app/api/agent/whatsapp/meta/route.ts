@@ -91,6 +91,68 @@ async function markAsRead(messageId: string): Promise<void> {
   }).catch((err) => console.error('[meta/webhook] markAsRead failed:', err));
 }
 
+// ─── Status Update Handler ────────────────────────────────────────────────────
+
+const STATUS_RANK: Record<string, number> = { sent: 1, delivered: 2, read: 3, failed: 99 };
+
+/** Process Meta status webhooks: update delivery_status on matching conversation rows */
+async function handleStatusUpdates(statuses: any[]): Promise<void> {
+  const supabase = getServiceClient() || getClient();
+  if (!supabase) return;
+
+  for (const status of statuses) {
+    const wamid = status.id;
+    const statusValue: string = status.status; // sent | delivered | read | failed
+    const timestamp = status.timestamp;
+    const errors = status.errors; // present on failed
+
+    if (!wamid || !statusValue) continue;
+
+    try {
+      // Find the conversation row matching this wamid
+      // Messages are stored with wamid under either whatsapp_message_id or wa_message_id in metadata
+      const { data: rows } = await supabase
+        .from('conversations')
+        .select('id, delivery_status, metadata')
+        .or(`metadata->>whatsapp_message_id.eq.${wamid},metadata->>wa_message_id.eq.${wamid}`)
+        .limit(1);
+
+      if (!rows || rows.length === 0) continue;
+
+      const row = rows[0];
+
+      // Only update if new status is higher rank (or failed always overwrites)
+      const currentRank = STATUS_RANK[row.delivery_status] || 0;
+      const newRank = STATUS_RANK[statusValue] || 0;
+      if (newRank <= currentRank && statusValue !== 'failed') continue;
+
+      const updateData: Record<string, any> = {
+        delivery_status: statusValue,
+        status_updated_at: timestamp
+          ? new Date(parseInt(timestamp) * 1000).toISOString()
+          : new Date().toISOString(),
+      };
+
+      // For failed status, save error details into metadata
+      if (statusValue === 'failed' && errors) {
+        updateData.metadata = {
+          ...row.metadata,
+          delivery_error: errors,
+        };
+      }
+
+      await supabase
+        .from('conversations')
+        .update(updateData)
+        .eq('id', row.id);
+
+      console.log(`[meta/webhook] Status ${statusValue} for wamid ${wamid}`);
+    } catch (err) {
+      console.error(`[meta/webhook] Status update failed for wamid ${wamid}:`, err);
+    }
+  }
+}
+
 // ─── GET — Webhook Verification ───────────────────────────────────────────────
 
 export async function GET(request: NextRequest) {
@@ -131,8 +193,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ status: 'no_value' }, { status: 200 });
     }
 
-    // Skip status updates (delivered, read, etc.)
+    // Handle status updates (sent, delivered, read, failed)
     if (value.statuses && !value.messages) {
+      await handleStatusUpdates(value.statuses);
       return NextResponse.json({ status: 'status_update' }, { status: 200 });
     }
 
