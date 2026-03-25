@@ -1023,6 +1023,24 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
     }
   }
 
+  const handleDeleteAdminNote = async (note: any) => {
+    if (!lead || !confirm('Delete this note?')) return
+    try {
+      const response = await fetch(`/api/dashboard/leads/${lead.id}/admin-notes`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ note_id: note.id, note_text: note.text, note_created_at: note.created_at }),
+      })
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Failed to delete note')
+      }
+      loadFreshLeadData()
+    } catch (err) {
+      console.error('Error deleting admin note:', err)
+    }
+  }
+
   const handleLogCall = async () => {
     if (!lead) return
     setSavingLogCall(true)
@@ -1627,9 +1645,16 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                             arr.findIndex((n: any) => n.text === note.text && n.created_at === note.created_at) === idx
                           )
                           .slice().reverse().map((note: any, i: number) => (
-                          <div key={`${note.created_at}-${i}`} className="text-[11px] text-[var(--text-muted)] flex items-start gap-1.5">
+                          <div key={note.id || `${note.created_at}-${i}`} className="group text-[11px] text-[var(--text-muted)] flex items-start gap-1.5">
                             <MdNote size={11} className="mt-0.5 flex-shrink-0 text-orange-400" />
-                            <span>{note.text} <span className="text-[var(--text-muted)]">({new Date(note.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })})</span></span>
+                            <span className="flex-1">{note.text} <span className="text-[var(--text-muted)]">({new Date(note.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })})</span></span>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleDeleteAdminNote(note) }}
+                              className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-red-500/20 text-[var(--text-muted)] hover:text-red-400"
+                              title="Delete note"
+                            >
+                              <MdClose size={10} />
+                            </button>
                           </div>
                         ))}
                       </div>

@@ -195,10 +195,21 @@ export async function POST(
       return NextResponse.json({ error: 'Lead not found' }, { status: 404 })
     }
 
-    // 2. Append to unified_context.admin_notes[]
+    // 2. Duplicate guard — skip if same note text was added in the last 30 seconds
     const existingCtx = lead.unified_context || {}
-    const existingNotes = existingCtx.admin_notes || []
+    const existingNotes: any[] = existingCtx.admin_notes || []
+    const thirtySecsAgo = new Date(Date.now() - 30000).toISOString()
+    const isDuplicate = existingNotes.some(
+      (n: any) => n.text === trimmedNote && n.created_at > thirtySecsAgo
+    )
+    if (isDuplicate) {
+      console.warn(`[AdminNote] Duplicate guard: "${trimmedNote.substring(0, 40)}" was just saved, skipping`)
+      return NextResponse.json({ success: true, note: existingNotes[existingNotes.length - 1], actions: [], actions_taken: ['Duplicate note — skipped'], classification: { category: 'INFO_ONLY', summary: null }, new_stage: null, new_score: null, summary_refreshed: false })
+    }
+
+    // 3. Append to unified_context.admin_notes[]
     const newNote = {
+      id: `note_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
       text: trimmedNote,
       created_by: createdBy,
       created_at: new Date().toISOString(),
@@ -209,7 +220,7 @@ export async function POST(
       admin_notes: [...existingNotes, newNote],
     }
 
-    // 3. Update all_leads with new note
+    // 4. Update all_leads with new note
     const { error: updateError } = await supabase
       .from('all_leads')
       .update({ unified_context: updatedCtx })
@@ -217,7 +228,7 @@ export async function POST(
 
     if (updateError) throw updateError
 
-    // 4. Also insert into activities table (appears in Activity tab)
+    // 5. Also insert into activities table (appears in Activity tab)
     await supabase
       .from('activities')
       .insert({
@@ -249,7 +260,7 @@ export async function POST(
         .from('agent_tasks')
         .update({ status: 'cancelled', completed_at: now.toISOString(), error_message: `Cancelled: booking made via admin note` })
         .eq('lead_id', leadId)
-        .in('task_type', ['follow_up_day1', 'follow_up_day3', 'follow_up_day5', 're_engage', 'nudge_waiting', 'push_to_book', 'missed_call_followup'])
+        .in('task_type', ['follow_up_day1', 'follow_up_day3', 'follow_up_day5', 're_engage', 'nudge_waiting', 'push_to_book', 'missed_call_followup', 'human_callback', 'post_call_followup', 'follow_up_24h'])
         .in('status', ['pending', 'queued', 'in_queue', 'awaiting_approval'])
         .select('id')
       const cancelCount = cancelledTasks?.length || 0
@@ -307,14 +318,22 @@ export async function POST(
       // Update stage and boost score
       newStage = 'Booking Made'
       newScore = 80
-      await supabase
+      const { error: stageScoreErr, count: stageScoreCount } = await supabase
         .from('all_leads')
         .update({ lead_stage: newStage, stage_override: true, lead_score: newScore })
         .eq('id', leadId)
+      if (stageScoreErr) {
+        console.error(`[AdminNote] Step 3d: FAILED to update stage/score:`, stageScoreErr.message)
+      } else {
+        console.log(`[AdminNote] Step 3d: Stage → Booking Made, Score → 80 (rows updated: ${stageScoreCount ?? 'unknown'})`)
+      }
+      // Verify the write persisted
+      const { data: verifyLead } = await supabase.from('all_leads').select('lead_score, lead_stage, stage_override').eq('id', leadId).single()
+      console.log(`[AdminNote] Step 3e: DB verify — lead_score=${verifyLead?.lead_score}, lead_stage=${verifyLead?.lead_stage}, stage_override=${verifyLead?.stage_override}`)
       actions.push('stage_updated:Booking Made,score_80')
       actionsTaken.push(`Stage changed to Booking Made`)
       actionsTaken.push(`Score updated to 80`)
-      console.log(`[AdminNote] Step 3d: Stage → Booking Made, Score → 80`)
+
     }
 
     if (classification.category === 'POST_CALL') {
@@ -721,6 +740,67 @@ export async function POST(
     })
   } catch (error) {
     console.error('Error saving admin note:', error)
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Unknown error' },
+      { status: 500 }
+    )
+  }
+}
+
+/**
+ * DELETE /api/dashboard/leads/[id]/admin-notes
+ * Remove an admin note by its id (or text+created_at fallback) from unified_context.admin_notes[].
+ */
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const supabase = await createClient()
+    const leadId = params.id
+    const body = await request.json()
+    const { note_id, note_text, note_created_at } = body
+
+    if (!note_id && !note_text) {
+      return NextResponse.json({ error: 'note_id or note_text is required' }, { status: 400 })
+    }
+
+    const { data: lead, error: leadError } = await supabase
+      .from('all_leads')
+      .select('unified_context')
+      .eq('id', leadId)
+      .single()
+
+    if (leadError || !lead) {
+      return NextResponse.json({ error: 'Lead not found' }, { status: 404 })
+    }
+
+    const ctx = lead.unified_context || {}
+    const notes: any[] = ctx.admin_notes || []
+
+    // Find and remove the note by id, or fallback to text+created_at match
+    const filtered = notes.filter((n: any) => {
+      if (note_id && n.id === note_id) return false
+      if (!note_id && n.text === note_text && n.created_at === note_created_at) return false
+      return true
+    })
+
+    if (filtered.length === notes.length) {
+      return NextResponse.json({ error: 'Note not found' }, { status: 404 })
+    }
+
+    const { error: updateError } = await supabase
+      .from('all_leads')
+      .update({ unified_context: { ...ctx, admin_notes: filtered } })
+      .eq('id', leadId)
+
+    if (updateError) throw updateError
+
+    console.log(`[AdminNote] Deleted note for lead ${leadId}. ${notes.length} → ${filtered.length} notes`)
+
+    return NextResponse.json({ success: true, remaining: filtered.length })
+  } catch (error) {
+    console.error('Error deleting admin note:', error)
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
