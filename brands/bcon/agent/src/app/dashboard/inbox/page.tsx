@@ -486,6 +486,7 @@ export default function InboxPage() {
               fbUc?.whatsapp?.profile?.full_name ||
               fbUc?.web?.profile?.full_name ||
               lead.customer_name ||
+              lead.phone ||
               'Unknown';
             const fbBrand =
               fbUc?.web?.what_is_your_brand_name ||
@@ -674,6 +675,7 @@ export default function InboxPage() {
           uc?.whatsapp?.profile?.full_name ||
           uc?.web?.profile?.full_name ||
           lead?.customer_name ||
+          lead?.phone ||
           'Unknown';
 
         const conversation: Conversation = {
@@ -843,7 +845,7 @@ export default function InboxPage() {
       // Transform to match the Lead interface expected by LeadDetailsModal
       const leadData = {
         id: typedLead.id,
-        name: typedLead.customer_name || 'Unknown',
+        name: typedLead.customer_name || typedLead.phone || 'Unknown',
         email: typedLead.email || '',
         phone: typedLead.phone || '',
         source: typedLead.first_touchpoint || typedLead.last_touchpoint || 'web',
@@ -1694,7 +1696,7 @@ export default function InboxPage() {
             const ctx = leadDetails.unified_context?.bcon || leadDetails.unified_context?.windchasers || {}
             const city = ctx.city || ctx.location || ''
             const brand = ctx.brand || ctx.brand_name || ctx.company || ''
-            const initials = (leadDetails.customer_name || 'U').split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()
+            const initials = (leadDetails.customer_name || leadDetails.phone || 'U').split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()
             const stageAvatarColors: Record<string, string> = {
               'Converted': '#22c55e',
               'Booking Made': '#60a5fa',
@@ -1714,7 +1716,7 @@ export default function InboxPage() {
                   {initials}
                 </div>
                 <p className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>
-                  {leadDetails.customer_name || 'Unknown'}
+                  {leadDetails.customer_name || leadDetails.phone || 'Unknown'}
                 </p>
                 {brand && (
                   <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{brand}</p>
