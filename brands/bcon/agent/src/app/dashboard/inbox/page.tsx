@@ -1500,6 +1500,16 @@ export default function InboxPage() {
                         <div className="text-[13px] leading-relaxed" style={{ color: 'var(--text-primary)' }}>
                           {renderMarkdown(msg.content)}
                         </div>
+                        {msg.metadata?.template_name && (
+                          <div className="flex items-center gap-1.5 mt-1.5 pt-1 border-t" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+                            <span className="text-[8px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded" style={{ background: 'rgba(99,102,241,0.15)', color: 'rgba(139,142,255,0.9)' }}>
+                              Template
+                            </span>
+                            <span className="text-[8px] font-mono" style={{ color: 'var(--text-muted)' }}>
+                              {msg.metadata.template_name}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </div>
                     </React.Fragment>
