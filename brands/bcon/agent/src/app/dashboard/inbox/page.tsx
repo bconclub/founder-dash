@@ -203,6 +203,45 @@ function gapColor(ms: number): string {
   return '#ef4444';
 }
 
+const TEMPLATE_LABELS: Record<string, string> = {
+  bcon_proxe_followup_engaged: 'Follow-up',
+  bcon_proxe_followup_noengage: 'Follow-up',
+  bcon_proxe_reengagement_engaged: 'Re-engagement',
+  bcon_proxe_reengagement_noengage: 'Re-engagement',
+  bcon_proxe_booking_reminder_24h: 'Booking Reminder 24h',
+  bcon_proxe_booking_reminder_30m: 'Booking Reminder 30m',
+}
+
+function getTemplateLabel(name: string): string {
+  return TEMPLATE_LABELS[name] || name.replace(/^bcon_proxe_/, '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+}
+
+function getDeliveryStatusStyle(status: string | undefined): { bg: string; color: string } {
+  if (!status) return { bg: 'rgba(245,158,11,0.15)', color: '#F59E0B' }
+  switch (status) {
+    case 'read': return { bg: 'rgba(34,197,94,0.15)', color: '#22C55E' }
+    case 'delivered': return { bg: 'rgba(34,197,94,0.15)', color: '#22C55E' }
+    case 'failed': return { bg: 'rgba(239,68,68,0.15)', color: '#EF4444' }
+    default: return { bg: 'rgba(245,158,11,0.15)', color: '#F59E0B' }
+  }
+}
+
+function DeliveryStatusIcon({ status }: { status: string | undefined }) {
+  if (!status || status === 'sent' || status === 'pending') {
+    return <svg width="10" height="10" viewBox="0 0 16 16" fill="none"><path d="M3 8l3 3 7-7" stroke="#F59E0B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+  }
+  if (status === 'delivered') {
+    return <svg width="12" height="10" viewBox="0 0 20 16" fill="none"><path d="M1 8l3 3 7-7" stroke="#22C55E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><path d="M7 8l3 3 7-7" stroke="#22C55E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+  }
+  if (status === 'read') {
+    return <svg width="12" height="10" viewBox="0 0 20 16" fill="none"><path d="M1 8l3 3 7-7" stroke="#3B82F6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><path d="M7 8l3 3 7-7" stroke="#3B82F6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+  }
+  if (status === 'failed') {
+    return <svg width="10" height="10" viewBox="0 0 16 16" fill="none"><path d="M3 3l10 10M13 3l-10 10" stroke="#EF4444" strokeWidth="2" strokeLinecap="round"/></svg>
+  }
+  return null
+}
+
 export default function InboxPage() {
   const supabase = createClient()
   const searchParams = useSearchParams()
@@ -1478,6 +1517,7 @@ export default function InboxPage() {
                             ? 'rgba(255,255,255,0.12)'
                             : 'rgba(99,102,241,0.30)',
                           borderWidth: '1px',
+                          ...(msg.metadata?.template_name ? { borderLeft: '3px solid #F59E0B' } : {}),
                         }}
                       >
                         <div className="flex items-center justify-between gap-3 mb-1">
@@ -1500,16 +1540,25 @@ export default function InboxPage() {
                         <div className="text-[13px] leading-relaxed" style={{ color: 'var(--text-primary)' }}>
                           {renderMarkdown(msg.content)}
                         </div>
-                        {msg.metadata?.template_name && (
-                          <div className="flex items-center gap-1.5 mt-1.5 pt-1 border-t" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
-                            <span className="text-[8px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded" style={{ background: 'rgba(99,102,241,0.15)', color: 'rgba(139,142,255,0.9)' }}>
-                              Template
-                            </span>
-                            <span className="text-[8px] font-mono" style={{ color: 'var(--text-muted)' }}>
-                              {msg.metadata.template_name}
-                            </span>
-                          </div>
-                        )}
+                        {msg.metadata?.template_name && (() => {
+                          const ds = msg.metadata?.delivery_status
+                          const statusStyle = getDeliveryStatusStyle(ds)
+                          return (
+                            <div className="flex items-center gap-1.5 mt-1.5 pt-1 border-t" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+                              <span className="text-[8px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded" style={{ background: statusStyle.bg, color: statusStyle.color }}>
+                                Template
+                              </span>
+                              <span className="text-[9px] font-medium" style={{ color: 'var(--text-secondary)' }}>
+                                {getTemplateLabel(msg.metadata.template_name)}
+                              </span>
+                              {ds && (
+                                <span className="flex items-center" title={ds}>
+                                  <DeliveryStatusIcon status={ds} />
+                                </span>
+                              )}
+                            </div>
+                          )
+                        })()}
                       </div>
                     </div>
                     </React.Fragment>
