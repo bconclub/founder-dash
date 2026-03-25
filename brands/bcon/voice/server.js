@@ -19,14 +19,14 @@ async function preloadGreeting() {
   console.log('Pre-loading greeting audio...');
   const raw = await elevenLabsTTS("Hi there! Thank you for calling Bee-Con Club. I'm Prox-ee How can I help you today?");
   if (raw) {
-    greetingAudioChunks = prepareUlawChunks(raw);
+    greetingAudioChunks = preparePcmChunks(raw);
     console.log('Greeting audio ready, chunks:', greetingAudioChunks.length);
   }
 }
 
-// Break raw ulaw_8000 buffer into 300ms chunks (8kHz, 8-bit, mono = 2400 bytes/chunk)
-function prepareUlawChunks(buffer) {
-  const CHUNK_SIZE = 2400; // 300ms at 8kHz, 8-bit mono
+// Break raw pcm_16000 buffer into 300ms chunks (16kHz, 16-bit, mono = 9600 bytes/chunk)
+function preparePcmChunks(buffer) {
+  const CHUNK_SIZE = 9600; // 300ms at 16kHz, 16-bit mono
   const chunks = [];
   for (let i = 0; i < buffer.length; i += CHUNK_SIZE) {
     chunks.push(buffer.slice(i, i + CHUNK_SIZE).toString('base64'));
@@ -44,8 +44,8 @@ async function sendChunkedAudio(ws, chunks) {
     ws.send(JSON.stringify({
       event: 'playAudio',
       media: {
-        contentType: 'audio/x-mulaw',
-        sampleRate: 8000,
+        contentType: 'audio/x-l16',
+        sampleRate: 16000,
         payload: chunks[i]
       }
     }));
@@ -574,7 +574,7 @@ async function elevenLabsTTS(text) {
         body: JSON.stringify({
           text,
           model_id: 'eleven_flash_v2_5',
-          output_format: 'ulaw_8000',
+          output_format: 'pcm_16000',
           voice_settings: { stability: 0.4, similarity_boost: 0.75 },
         }),
       }
@@ -605,7 +605,7 @@ async function speakToVobiz(ws, text, language = 'en-IN') {
   const audio = await elevenLabsTTS(text);
 
   if (audio && ws.readyState === 1) {
-    const chunks = prepareUlawChunks(audio);
+    const chunks = preparePcmChunks(audio);
     if (chunks.length > 0) {
       const firstChunkTime = Date.now();
       await sendChunkedAudio(ws, chunks);
