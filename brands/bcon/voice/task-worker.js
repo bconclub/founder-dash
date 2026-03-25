@@ -1452,8 +1452,8 @@ async function morningBriefing() {
       .lt('scheduled_at', tomorrowStart.toISOString());
 
     // Build Telegram message (must stay under 4096 chars — target 4000 to be safe)
-    const MAX_MSG_LEN = 4000;
-    const MAX_ITEMS_PER_SECTION = 10;
+    const MAX_MSG_LEN = 3800;
+    const MAX_ITEMS_PER_SECTION = 5;
 
     function buildSection(title, items) {
       if (items.length === 0) return '';
