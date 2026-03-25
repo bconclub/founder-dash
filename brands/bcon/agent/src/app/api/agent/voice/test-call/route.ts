@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(req: NextRequest) {
-  const { phone } = await req.json();
+  const { phone, leadName } = await req.json();
   if (!phone) return NextResponse.json({ error: 'Phone required' }, { status: 400 });
 
   try {
     const authId = process.env.VOBIZ_AUTH_ID;
     const authToken = process.env.VOBIZ_AUTH_TOKEN;
-    const fromNumber = process.env.VOBIZ_PHONE_NUMBER;
-    const answerUrl = `${process.env.NEXT_PUBLIC_APP_URL}/api/agent/voice/answer`;
+    const fromNumber = process.env.VOBIZ_FROM_NUMBER;
+    const answerUrl = `${process.env.NEXT_PUBLIC_APP_URL}/api/agent/voice/answer?direction=outbound&lead_name=${encodeURIComponent(leadName || '')}`;
 
     const res = await fetch(
       `https://api.vobiz.ai/api/v1/Account/${authId}/Call/`,
@@ -19,12 +19,13 @@ export async function POST(req: NextRequest) {
           'X-Auth-Token': authToken || '',
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ from: fromNumber, to: phone, answer_url: answerUrl, answer_method: 'POST' }),
+        body: JSON.stringify({ from: fromNumber, to: phone, answer_url: answerUrl, answer_method: 'POST', caller_name: 'BCON Club' }),
       }
     );
 
     const data = await res.json();
-    return NextResponse.json({ success: true, callId: data?.CallUUID });
+    if (!res.ok) return NextResponse.json({ success: false, error: data }, { status: res.status });
+    return NextResponse.json({ success: true, callId: data?.call_uuid });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }

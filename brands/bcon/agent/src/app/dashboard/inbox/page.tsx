@@ -271,6 +271,7 @@ export default function InboxPage() {
   const [showSummary, setShowSummary] = useState(false)
   const [replyText, setReplyText] = useState('')
   const [isSending, setIsSending] = useState(false)
+  const [callingLeadId, setCallingLeadId] = useState<string | null>(null)
   const [isGenerating, setIsGenerating] = useState(false)
   const [leadDetails, setLeadDetails] = useState<any>(null)
   const [messageChannelFilter, setMessageChannelFilter] = useState<string>('all')
@@ -1790,18 +1791,34 @@ export default function InboxPage() {
 
           {/* 3. Quick Action Buttons - Call, WhatsApp, Email */}
           <div className="px-4 py-3 border-b flex gap-2" style={{ borderColor: 'var(--border-primary)' }}>
-            <a
-              href={leadDetails.phone ? `tel:${leadDetails.phone}` : undefined}
-              className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[11px] font-medium transition-opacity"
+            <button
+              disabled={!leadDetails.phone || callingLeadId === leadDetails.id}
+              onClick={async () => {
+                if (!leadDetails.phone) return;
+                setCallingLeadId(leadDetails.id);
+                try {
+                  const res = await fetch('/api/agent/voice/test-call', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phone: leadDetails.phone, leadName: leadDetails.customer_name }),
+                  });
+                  const data = await res.json();
+                  if (data.success) alert(`Calling ${leadDetails.customer_name || leadDetails.phone}...`);
+                  else alert(`Call failed: ${JSON.stringify(data.error)}`);
+                } catch (e: any) {
+                  alert(`Error: ${e.message}`);
+                } finally {
+                  setCallingLeadId(null);
+                }
+              }}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[11px] font-medium transition-opacity disabled:opacity-40"
               style={{
                 background: leadDetails.phone ? 'rgba(34,197,94,0.12)' : 'var(--bg-tertiary)',
                 color: leadDetails.phone ? '#22c55e' : 'var(--text-muted)',
-                opacity: leadDetails.phone ? 1 : 0.4,
-                pointerEvents: leadDetails.phone ? 'auto' : 'none',
               }}
             >
-              <MdPhone size={14} /> Call
-            </a>
+              <MdPhone size={14} /> {callingLeadId === leadDetails.id ? 'Calling...' : 'Call'}
+            </button>
             <a
               href={leadDetails.phone ? `https://wa.me/${leadDetails.phone.replace(/[^0-9]/g, '')}` : undefined}
               target="_blank"
