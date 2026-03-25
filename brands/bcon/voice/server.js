@@ -765,7 +765,7 @@ async function streamAndSpeak(transcript, conversationHistory, detectedLanguage,
     let sentenceCount = 0;
 
     for await (const chunk of res.body) {
-      const text = incomplete + chunk.toString('utf8');
+      const text = incomplete + Buffer.from(chunk).toString('utf8');
       incomplete = '';
       const lines = text.split('\n');
       incomplete = lines.pop() || '';
