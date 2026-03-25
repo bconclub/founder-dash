@@ -305,7 +305,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
       {/* Fixed Sidebar */}
       <div
-        className={`dashboard-layout-sidebar fixed inset-y-0 left-0 z-50 flex flex-col overflow-hidden ${isMobile && !mobileSidebarOpen ? '-translate-x-full' : 'translate-x-0'
+        className={`dashboard-layout-sidebar fixed inset-y-0 left-0 z-50 flex flex-col overflow-visible ${isMobile && !mobileSidebarOpen ? '-translate-x-full' : 'translate-x-0'
           }`}
         style={{
           width: sidebarWidth,
@@ -641,18 +641,20 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             </div>
 
             {/* Version badge inline */}
-            <div
-              className="dashboard-layout-version-badge px-1 py-px rounded text-[8px] font-normal"
-              style={{
-                backgroundColor: 'transparent',
-                color: 'var(--text-muted)',
-                border: '1px solid var(--border-primary)',
-              }}
-              title={buildDate ? `v${buildVersion} - Build: ${buildDate}` : `v${buildVersion}`}
-              suppressHydrationWarning
-            >
-              v{buildVersion}
-            </div>
+            {!isCollapsed && (
+              <div
+                className="dashboard-layout-version-badge px-1 py-px rounded text-[8px] font-normal"
+                style={{
+                  backgroundColor: 'transparent',
+                  color: 'var(--text-muted)',
+                  border: '1px solid var(--border-primary)',
+                }}
+                title={buildDate ? `v${buildVersion} - Build: ${buildDate}` : `v${buildVersion}`}
+                suppressHydrationWarning
+              >
+                v{buildVersion}
+              </div>
+            )}
           </div>
         </div>
       </div>
