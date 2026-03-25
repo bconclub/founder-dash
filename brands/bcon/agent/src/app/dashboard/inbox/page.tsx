@@ -219,10 +219,21 @@ function getTemplateLabel(name: string): string {
 function getDeliveryStatusStyle(status: string | undefined): { bg: string; color: string } {
   if (!status) return { bg: 'rgba(245,158,11,0.15)', color: '#F59E0B' }
   switch (status) {
-    case 'read': return { bg: 'rgba(34,197,94,0.15)', color: '#22C55E' }
+    case 'read': return { bg: 'rgba(59,130,246,0.12)', color: '#3B82F6' }
     case 'delivered': return { bg: 'rgba(34,197,94,0.15)', color: '#22C55E' }
     case 'failed': return { bg: 'rgba(239,68,68,0.15)', color: '#EF4444' }
     default: return { bg: 'rgba(245,158,11,0.15)', color: '#F59E0B' }
+  }
+}
+
+function getDeliveryTooltip(status: string | undefined, error?: string): string {
+  if (!status) return 'Status: Pending \u2013 awaiting delivery confirmation'
+  switch (status) {
+    case 'sent': return 'Status: Sent \u2013 waiting for delivery'
+    case 'delivered': return 'Status: Delivered'
+    case 'read': return 'Status: Read by customer'
+    case 'failed': return `Status: Failed \u2013 ${error || 'unknown error'}`
+    default: return 'Status: Pending \u2013 awaiting delivery confirmation'
   }
 }
 
@@ -1066,6 +1077,31 @@ export default function InboxPage() {
   // Render the inbox UI
   return (
     <div className="flex-1 flex overflow-hidden min-h-0" style={{ background: 'var(--bg-primary)', position: 'absolute', inset: 0 }}>
+      <style>{`
+        .template-status-tag { position: relative; }
+        .template-status-tag::after {
+          content: attr(data-tooltip);
+          position: absolute;
+          bottom: calc(100% + 6px);
+          left: 50%;
+          transform: translateX(-50%);
+          padding: 4px 8px;
+          border-radius: 4px;
+          font-size: 9px;
+          font-weight: 500;
+          letter-spacing: 0;
+          text-transform: none;
+          white-space: nowrap;
+          background: #1a1a1a;
+          color: #e0e0e0;
+          border: 1px solid rgba(255,255,255,0.12);
+          opacity: 0;
+          pointer-events: none;
+          transition: opacity 0.15s;
+          z-index: 10;
+        }
+        .template-status-tag:hover::after { opacity: 1; }
+      `}</style>
       {/* Loading Overlay */}
       <LoadingOverlay
         isLoading={loading || messagesLoading}
@@ -1543,19 +1579,22 @@ export default function InboxPage() {
                         {msg.metadata?.template_name && (() => {
                           const ds = msg.metadata?.delivery_status
                           const statusStyle = getDeliveryStatusStyle(ds)
+                          const tooltip = getDeliveryTooltip(ds, msg.metadata?.delivery_error)
                           return (
                             <div className="flex items-center gap-1.5 mt-1.5 pt-1 border-t" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
-                              <span className="text-[8px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded" style={{ background: statusStyle.bg, color: statusStyle.color }}>
+                              <span
+                                className="template-status-tag text-[8px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded relative cursor-default"
+                                style={{ background: statusStyle.bg, color: statusStyle.color }}
+                                data-tooltip={tooltip}
+                              >
                                 Template
                               </span>
                               <span className="text-[9px] font-medium" style={{ color: 'var(--text-secondary)' }}>
                                 {getTemplateLabel(msg.metadata.template_name)}
                               </span>
-                              {ds && (
-                                <span className="flex items-center" title={ds}>
-                                  <DeliveryStatusIcon status={ds} />
-                                </span>
-                              )}
+                              <span className="flex items-center" title={ds || 'pending'}>
+                                <DeliveryStatusIcon status={ds} />
+                              </span>
                             </div>
                           )
                         })()}
