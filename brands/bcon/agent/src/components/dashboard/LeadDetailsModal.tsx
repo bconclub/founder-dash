@@ -6,6 +6,7 @@ import { createClient } from '../../lib/supabase/client'
 import { format } from 'date-fns'
 import { MdLanguage, MdChat, MdPhone, MdShare, MdAutoAwesome, MdOpenInNew, MdHistory, MdCall, MdEvent, MdMessage, MdNote, MdEdit, MdTrendingUp, MdTrendingDown, MdRemove, MdCheckCircle, MdSchedule, MdPsychology, MdFlashOn, MdBarChart, MdEmail, MdChevronRight, MdSmartToy, MdPerson, MdRefresh, MdHelpOutline, MdInfo, MdCheck, MdPayments, MdReportProblem, MdSchool, MdHistoryEdu, MdFlightTakeoff, MdAccountBalanceWallet, MdPersonOutline, MdOutlineInsights, MdMic, MdAdd, MdMoreHoriz, MdDynamicForm, MdClose } from 'react-icons/md'
 import { FaWhatsapp } from 'react-icons/fa'
+import { Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer } from 'recharts'
 import { useRouter } from 'next/navigation'
 import LeadStageSelector from './LeadStageSelector'
 import ActivityLoggerModal from './ActivityLoggerModal'
@@ -2318,6 +2319,23 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                             })()}
                           </div>
                           <p className="text-xs text-[var(--text-muted)] mt-1">Based on conversation activity and intent signals</p>
+                        </div>
+
+                        {/* Radar Chart */}
+                        <div style={{ width: '100%', height: 260 }}>
+                          <ResponsiveContainer width="100%" height="100%">
+                            <RadarChart data={[
+                              { axis: 'Intent', value: calculatedScore.breakdown.details.intentScore },
+                              { axis: 'Buying Signals', value: calculatedScore.breakdown.details.buyingScore },
+                              { axis: 'Sentiment', value: calculatedScore.breakdown.details.sentimentScore },
+                              { axis: 'Response Rate', value: calculatedScore.breakdown.details.responseRate },
+                              { axis: 'Recency', value: Math.max(0, 100 - calculatedScore.breakdown.details.daysInactive * 10) },
+                            ]}>
+                              <PolarGrid stroke="var(--border-primary)" />
+                              <PolarAngleAxis dataKey="axis" tick={{ fill: 'var(--text-secondary)', fontSize: 11 }} />
+                              <Radar dataKey="value" stroke="var(--accent-primary)" fill="var(--accent-primary)" fillOpacity={0.2} />
+                            </RadarChart>
+                          </ResponsiveContainer>
                         </div>
 
                         {/* Temperature History Timeline */}
