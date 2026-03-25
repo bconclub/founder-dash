@@ -164,7 +164,7 @@ const CHANNEL_CONFIG = {
   voice: {
     name: 'AI Voice',
     icon: PhoneSparkleIcon,
-    color: 'var(--accent-primary)',
+    color: '#8B5CF6',
     emoji: '📞'
   },
   phone: {
@@ -1091,7 +1091,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
             <section className="lead-journey-stats-section flex-1 flex flex-col h-full gap-4">
               {/* Customer Journey - TOP */}
               <section className="lead-journey-section">
-                <h3 className="lead-journey-title text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">Customer Journey</h3>
+                <h3 className="lead-journey-title text-xs font-semibold text-gray-700 dark:text-gray-200 mb-2 border-b border-transparent">Customer Journey</h3>
                 {activeChannels.length > 0 ? (
                   <nav className="lead-journey-channels flex items-center gap-1.5 flex-wrap" aria-label="Customer journey channels">
                     {activeChannels.map((channel, index) => (
@@ -1117,14 +1117,14 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
 
               {/* Quick Stats - BELOW Journey (3 in a row) */}
               <section className="lead-quick-stats-section">
-                <h3 className="lead-quick-stats-title text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">Quick Stats</h3>
+                <h3 className="lead-quick-stats-title text-xs font-semibold text-gray-700 dark:text-gray-200 mb-2 border-b border-transparent">Quick Stats</h3>
                 <div className="lead-quick-stats-grid grid grid-cols-3 gap-2">
-                  <article className="lead-stat-card lead-stat-messages flex flex-col justify-between h-full p-3 min-h-[80px] bg-white dark:bg-[#1A1A1A] rounded-lg border border-gray-200 dark:border-[#262626]">
-                    <p className="lead-stat-label text-sm text-gray-400 dark:text-gray-500">Messages</p>
+                  <article className="lead-stat-card lead-stat-messages flex flex-col justify-between h-full p-3 min-h-[80px] bg-white dark:bg-[#1A1A1A] rounded-lg border border-gray-200 dark:border-[#333333]">
+                    <p className="lead-stat-label text-sm text-gray-400 dark:text-gray-400 font-medium">Messages</p>
                     <p className="lead-stat-value text-2xl font-bold text-gray-900 dark:text-white mt-auto" aria-label={`${quickStats.totalMessages} total messages`}>{quickStats.totalMessages}</p>
                   </article>
-                  <article className="lead-stat-card lead-stat-response-rate flex flex-col justify-between h-full p-3 min-h-[80px] bg-white dark:bg-[#1A1A1A] rounded-lg border border-gray-200 dark:border-[#262626]">
-                    <p className="lead-stat-label text-sm text-gray-400 dark:text-gray-500">Response Rate</p>
+                  <article className="lead-stat-card lead-stat-response-rate flex flex-col justify-between h-full p-3 min-h-[80px] bg-white dark:bg-[#1A1A1A] rounded-lg border border-gray-200 dark:border-[#333333]">
+                    <p className="lead-stat-label text-sm text-gray-400 dark:text-gray-400 font-medium">Response Rate</p>
                     <p className="lead-stat-value text-2xl font-bold text-gray-900 dark:text-white mt-auto" aria-label={`${quickStats.responseRate}% response rate`}>{quickStats.responseRate}%</p>
                   </article>
                   <article className={`lead-stat-card lead-stat-key-event flex flex-col justify-between h-full p-3 min-h-[80px] rounded-lg border ${(() => {
@@ -1148,10 +1148,10 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                       currentLead.unified_context?.social?.booking?.time;
                     return bookingDate && bookingTime
                       ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
-                      : 'bg-white dark:bg-[#1A1A1A] border-gray-200 dark:border-[#262626]';
+                      : 'bg-white dark:bg-[#1A1A1A] border-gray-200 dark:border-[#333333]';
                   })()
                     }`}>
-                    <p className="lead-stat-label text-xs text-gray-400 dark:text-gray-500">Key Event</p>
+                    <p className="lead-stat-label text-xs text-gray-400 dark:text-gray-400 font-medium">Key Event</p>
                     <div className="lead-stat-content mt-auto">
                       {(() => {
                         const bookingDate = currentLead.booking_date ||
@@ -1266,7 +1266,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
               onClick={() => setActiveTab('summary')}
               className={`lead-modal-tab lead-details-modal-tab lead-details-modal-tab-summary px-4 py-1.5 text-sm font-medium transition-colors border-b-2 ${activeTab === 'summary'
                 ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-300 dark:hover:text-white'
                 }`}
               role="tab"
               aria-selected={activeTab === 'summary'}
@@ -1279,7 +1279,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
               onClick={() => setActiveTab('activity')}
               className={`lead-modal-tab lead-details-modal-tab lead-details-modal-tab-activity px-4 py-1.5 text-sm font-medium transition-colors border-b-2 ${activeTab === 'activity'
                 ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-300 dark:hover:text-white'
                 }`}
               role="tab"
               aria-selected={activeTab === 'activity'}
@@ -1292,7 +1292,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
               onClick={() => setActiveTab('breakdown')}
               className={`lead-modal-tab lead-details-modal-tab lead-details-modal-tab-breakdown px-4 py-1.5 text-sm font-medium transition-colors border-b-2 ${activeTab === 'breakdown'
                 ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-300 dark:hover:text-white'
                 }`}
               role="tab"
               aria-selected={activeTab === 'breakdown'}
@@ -1305,7 +1305,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
               onClick={() => setActiveTab('interaction')}
               className={`lead-modal-tab lead-details-modal-tab lead-details-modal-tab-interaction px-4 py-1.5 text-sm font-medium transition-colors border-b-2 ${activeTab === 'interaction'
                 ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+                : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-300 dark:hover:text-white'
                 }`}
               role="tab"
               aria-selected={activeTab === 'interaction'}
@@ -1476,7 +1476,7 @@ export default function LeadDetailsModal({ lead, isOpen, onClose, onStatusUpdate
                             {unifiedSummary ? renderSummary(unifiedSummary) : <p className="text-xs text-gray-500">No summary available. Click Refresh to generate one.</p>}
                           </div>
                           {summaryAttribution && (
-                            <footer className="lead-summary-attribution text-[10px] pt-2 border-t border-blue-200 dark:border-blue-800 text-gray-400 dark:text-gray-500">
+                            <footer className="lead-summary-attribution text-[10px] pt-2 border-t border-blue-200 dark:border-blue-800 text-gray-400 dark:text-gray-400">
                               {summaryAttribution}
                             </footer>
                           )}

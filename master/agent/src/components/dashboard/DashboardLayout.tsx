@@ -625,23 +625,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                     }}
                     onMouseEnter={(e) => {
                       e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = 'transparent'
-                    }}
-                  >
-                    {isDarkMode ? (
-                      <>
-                        <MdLightMode size={18} style={{ marginRight: '12px' }} />
-                        Light Mode
-                      </>
-                    ) : (
-                      <>
-                        <MdDarkMode size={18} style={{ marginRight: '12px' }} />
-                        Dark Mode
-                      </>
-                    )}
-                  </button>
                   <Link
                     href="/status"
                     onClick={() => {

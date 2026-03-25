@@ -19,7 +19,6 @@ import {
   MdMenu,
   MdLightMode,
   MdDarkMode,
-  MdPalette,
   MdChatBubbleOutline,
   MdMonitorHeart,
   MdMoreHoriz,
@@ -27,7 +26,6 @@ import {
   MdChecklist,
   MdViewKanban,
 } from 'react-icons/md'
-import { useTheme, type ThemeMode } from './ThemeProvider'
 
 interface DashboardLayoutProps {
   children: React.ReactNode
@@ -52,7 +50,7 @@ const navigation: NavItem[] = [
   // OPERATIONS
   { name: 'Events', href: '/dashboard/bookings', icon: MdCalendarToday },
   { name: 'Tasks', href: '/dashboard/tasks', icon: MdChecklist },
-  { name: 'Flows', href: '/dashboard/flows', icon: MdTimeline },
+  { name: 'Flow', href: '/dashboard/settings/sequences', icon: MdTimeline },
   // SYSTEM
   { name: 'Agents', href: '/dashboard/agents', icon: MdChatBubbleOutline },
   { name: 'Knowledge', href: '/dashboard/settings/knowledge-base', icon: MdMenuBook },
@@ -71,7 +69,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [isMobile, setIsMobile] = useState(false)
   const [isCheckingAuth, setIsCheckingAuth] = useState(true)
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
-  const { theme, setTheme } = useTheme()
+  const [isDarkMode, setIsDarkMode] = useState(true)
   const [unreadCount] = useState(0) // TODO: Implement unread count logic
   const [buildDate, setBuildDate] = useState<string>('')
   const [buildVersion, setBuildVersion] = useState<string>('0.0.1')
@@ -144,15 +142,43 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     setIsCheckingAuth(false)
   }, [])
 
-  // Load collapsed state from localStorage (theme is handled by ThemeProvider)
+  // Load collapsed state and theme from localStorage
   useEffect(() => {
     try {
+      // Set theme immediately to prevent white screen
+      if (typeof document !== 'undefined') {
+        const savedTheme = localStorage.getItem('theme')
+        if (savedTheme) {
+          if (savedTheme === 'dark') {
+            document.documentElement.classList.add('dark')
+            document.documentElement.classList.remove('light')
+            setIsDarkMode(true)
+          } else {
+            document.documentElement.classList.add('light')
+            document.documentElement.classList.remove('dark')
+            setIsDarkMode(false)
+          }
+        } else {
+          // Default to dark mode
+          document.documentElement.classList.add('dark')
+          document.documentElement.classList.remove('light')
+          setIsDarkMode(true)
+        }
+      }
+
       const savedState = localStorage.getItem('sidebar-collapsed')
       if (savedState !== null) {
         setIsCollapsed(savedState === 'true')
       }
+      // Note: Don't set default collapsed state here - let auto-hide handle it after initial render
     } catch (error) {
       console.error('Error loading preferences:', error)
+      // Fallback to dark mode
+      if (typeof document !== 'undefined') {
+        document.documentElement.classList.add('dark')
+        document.documentElement.classList.remove('light')
+        setIsDarkMode(true)
+      }
     }
   }, [])
 
@@ -208,7 +234,21 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   }
 
   const handleSidebarItemClick = () => {
-    // No-op - sidebar stays open/closed via manual toggle only
+    // No-op — sidebar stays open/closed via manual toggle only
+  }
+
+  const toggleTheme = () => {
+    const newMode = !isDarkMode
+    setIsDarkMode(newMode)
+    localStorage.setItem('theme', newMode ? 'dark' : 'light')
+
+    if (newMode) {
+      document.documentElement.classList.add('dark')
+      document.documentElement.classList.remove('light')
+    } else {
+      document.documentElement.classList.add('light')
+      document.documentElement.classList.remove('dark')
+    }
   }
 
   // AUTHENTICATION DISABLED - Logout function disabled
@@ -265,12 +305,13 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
       {/* Fixed Sidebar */}
       <div
-        className={`dashboard-layout-sidebar fixed inset-y-0 left-0 z-50 flex flex-col transition-all duration-300 ease-in-out overflow-hidden ${isMobile && !mobileSidebarOpen ? '-translate-x-full' : 'translate-x-0'
+        className={`dashboard-layout-sidebar fixed inset-y-0 left-0 z-50 flex flex-col overflow-hidden ${isMobile && !mobileSidebarOpen ? '-translate-x-full' : 'translate-x-0'
           }`}
         style={{
           width: sidebarWidth,
-          backgroundColor: 'var(--bg-secondary)',
+          backgroundColor: 'var(--bg-primary)',
           borderRight: '1px solid var(--border-primary)',
+          transition: 'width 200ms cubic-bezier(0.2,0,0,1), transform 200ms cubic-bezier(0.2,0,0,1)',
         }}
         onMouseEnter={handleSidebarMouseEnter}
         onMouseLeave={handleSidebarMouseLeave}
@@ -279,7 +320,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         <div
           className="dashboard-layout-sidebar-header flex items-center justify-between flex-shrink-0"
           style={{
-            padding: isCollapsed ? '12px' : '12px 14px',
+            padding: isCollapsed ? '10px' : '10px 12px',
             justifyContent: isCollapsed ? 'center' : 'space-between',
           }}
         >
@@ -360,43 +401,32 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 const itemIsActive = pathname === navItem.href
                 const itemHref = navItem.comingSoon ? '#' : navItem.href
 
-                // Premium Item Style
                 const baseStyle: React.CSSProperties = {
                   fontSize: '13px',
-                  fontWeight: itemIsActive ? 700 : 500,
-                  color: itemIsActive ? 'var(--accent-primary)' : 'var(--text-secondary)',
-                  backgroundColor: itemIsActive ? 'var(--accent-subtle)' : 'transparent',
+                  fontWeight: itemIsActive ? 600 : 400,
+                  color: itemIsActive ? 'var(--text-primary)' : 'var(--text-secondary)',
+                  backgroundColor: itemIsActive ? 'var(--bg-hover)' : 'transparent',
+                  borderLeft: itemIsActive && !isCollapsed ? '2px solid var(--text-primary)' : '2px solid transparent',
                   margin: isCollapsed ? '2px 6px' : '1px 4px',
-                  borderRadius: '8px',
+                  borderRadius: '6px',
                   padding: isCollapsed ? '10px' : isChild ? '7px 12px 7px 36px' : '7px 12px',
                   justifyContent: isCollapsed ? 'center' : 'flex-start',
                   opacity: navItem.comingSoon ? 0.5 : 1,
                   cursor: navItem.comingSoon ? 'not-allowed' : 'pointer',
-                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                  transition: 'background 100ms ease',
                   position: 'relative',
                   overflow: 'hidden',
                 }
 
-                // Sub-active indicator glow
-                const activeGlow = itemIsActive && !isCollapsed ? (
-                  <div
-                    className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 rounded-r-full"
-                    style={{ backgroundColor: 'var(--accent-primary)', boxShadow: '0 0 10px var(--accent-primary)' }}
-                  />
-                ) : null;
-
                 const content = (
                   <>
-                    {activeGlow}
                     <span
                       className="dashboard-layout-nav-item-icon"
                       style={{
                         marginRight: isCollapsed ? '0' : '10px',
                         display: 'flex',
                         alignItems: 'center',
-                        color: itemIsActive ? 'var(--accent-primary)' : 'inherit',
-                        transform: itemIsActive ? 'scale(1.1)' : 'scale(1)',
-                        transition: 'transform 0.3s ease'
+                        color: 'inherit',
                       }}
                     >
                       <navItem.icon size={16} />
@@ -502,12 +532,20 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 <React.Fragment key={item.name}>
                   {needsDivider && !isCollapsed && (
                     <div
-                      className="dashboard-layout-nav-divider"
+                      className="dashboard-layout-nav-group-label"
                       style={{
                         borderTop: '1px solid var(--border-primary)',
-                        margin: '6px 12px',
+                        margin: '8px 12px 4px',
+                        paddingTop: '8px',
+                        fontSize: '10px',
+                        fontWeight: 500,
+                        letterSpacing: '0.08em',
+                        textTransform: 'uppercase',
+                        color: 'var(--text-muted)',
                       }}
-                    />
+                    >
+                      {index === 4 ? 'Operations' : index === 7 ? 'System' : ''}
+                    </div>
                   )}
 
                   {renderNavItem(item)}
@@ -524,19 +562,19 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           </div>
         </nav>
 
-        {/* Footer Section: Menu + Version */}
+        {/* Footer Section: User + Menu + Version in one compact strip */}
         <div
           className="dashboard-layout-sidebar-footer flex-shrink-0 border-t flex flex-col"
           style={{
             borderColor: 'var(--border-primary)',
           }}
         >
-          {/* Footer row: three-dot menu + version */}
+          {/* Compact footer row: three-dot menu + version */}
           <div
-            className="dashboard-layout-footer-row flex flex-row items-center gap-2"
+            className="dashboard-layout-footer-row flex items-center"
             style={{
               padding: isCollapsed ? '6px' : '5px 10px',
-              justifyContent: isCollapsed ? 'center' : 'flex-start',
+              justifyContent: isCollapsed ? 'center' : 'space-between',
             }}
           >
             {/* Three-dot menu */}
@@ -576,6 +614,17 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                     minWidth: '180px',
                   }}
                 >
+                  <button
+                    onClick={() => {
+                      setMoreOptionsOpen(false)
+                      toggleTheme()
+                    }}
+                    className="dashboard-layout-more-options-item flex items-center w-full text-left px-4 py-2 text-sm transition-colors duration-200"
+                    style={{
+                      color: 'var(--text-primary)',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
                   <Link
                     href="/status"
                     onClick={() => {
@@ -598,48 +647,17 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                     <MdMonitorHeart size={18} style={{ marginRight: '12px' }} />
                     System Status
                   </Link>
-                  {!isCollapsed && (<>
-                  <div style={{ height: '1px', backgroundColor: 'var(--border-primary)', margin: '4px 0' }} />
-                  <div className="px-4 py-1.5 text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'var(--text-secondary)' }}>Theme</div>
-                  {([
-                    { mode: 'bw-dark' as ThemeMode, label: 'Dark', icon: <MdDarkMode size={16} /> },
-                    { mode: 'bw-light' as ThemeMode, label: 'Light', icon: <MdLightMode size={16} /> },
-                    { mode: 'brand' as ThemeMode, label: 'Brand', icon: <MdPalette size={16} /> },
-                  ]).map(({ mode, label, icon }) => (
-                    <button
-                      key={mode}
-                      onClick={() => {
-                        setTheme(mode)
-                        setMoreOptionsOpen(false)
-                      }}
-                      className="dashboard-layout-more-options-item flex items-center w-full text-left px-4 py-2 text-sm transition-colors duration-200"
-                      style={{
-                        color: 'var(--text-primary)',
-                        backgroundColor: theme === mode ? 'var(--bg-hover)' : 'transparent',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = 'var(--bg-hover)'
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = theme === mode ? 'var(--bg-hover)' : 'transparent'
-                      }}
-                    >
-                      <span style={{ marginRight: '12px', display: 'flex' }}>{icon}</span>
-                      {label}
-                      {theme === mode && <span className="ml-auto text-[10px]" style={{ color: 'var(--accent-primary)' }}>✓</span>}
-                    </button>
-                  ))}
-                  </>)}
                 </div>
               )}
             </div>
 
             {/* Version badge inline */}
             <div
-              className="dashboard-layout-version-badge px-1 py-px rounded text-[9px] font-medium"
+              className="dashboard-layout-version-badge px-1 py-px rounded text-[8px] font-normal"
               style={{
-                backgroundColor: 'var(--accent-primary)',
-                color: theme === 'bw-light' ? '#ffffff' : '#000000',
+                backgroundColor: 'transparent',
+                color: 'var(--text-muted)',
+                border: '1px solid var(--border-primary)',
               }}
               title={buildDate ? `v${buildVersion} - Build: ${buildDate}` : `v${buildVersion}`}
               suppressHydrationWarning
@@ -668,26 +686,33 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
       {/* Main Content */}
       <div
-        className="dashboard-layout-main-content flex flex-col transition-all duration-300 ease-in-out"
+        className="dashboard-layout-main-content flex flex-col"
         style={{
           marginLeft: sidebarContentMargin,
           backgroundColor: 'var(--bg-primary)',
           height: '100vh',
           width: isMobile ? '100%' : `calc(100% - ${sidebarWidth})`,
           overflow: 'hidden',
+          transition: 'margin-left 200ms cubic-bezier(0.2,0,0,1), width 200ms cubic-bezier(0.2,0,0,1)',
         }}
       >
         {/* Page Transition Loader */}
         <PageTransitionLoader />
 
         {/* Page content */}
-        <main className="dashboard-layout-main-content-wrapper flex-1 overflow-y-auto flex flex-col" style={{ backgroundColor: 'var(--bg-primary)', position: 'relative' }}>
-          <div className="dashboard-layout-main-content-container flex flex-col flex-1 min-h-0 py-6" style={{ backgroundColor: 'var(--bg-primary)' }}>
-            <div className="dashboard-layout-main-content-inner flex flex-col flex-1 min-h-0 px-4 sm:px-6 md:px-8">
-              {children}
+        {pathname === '/dashboard/inbox' ? (
+          <main className="dashboard-layout-main-content-wrapper flex-1" style={{ backgroundColor: 'var(--bg-primary)', position: 'relative', overflow: 'hidden' }}>
+            {children}
+          </main>
+        ) : (
+          <main className="dashboard-layout-main-content-wrapper flex-1 overflow-y-auto" style={{ backgroundColor: 'var(--bg-primary)', position: 'relative' }}>
+            <div className="dashboard-layout-main-content-container py-6" style={{ backgroundColor: 'var(--bg-primary)' }}>
+              <div className="dashboard-layout-main-content-inner px-4 sm:px-6 md:px-8">
+                {children}
+              </div>
             </div>
-          </div>
-        </main>
+          </main>
+        )}
       </div>
     </div>
   )
