@@ -2300,7 +2300,7 @@ async function executeFirstOutreach(task, waPhone) {
       sender: 'agent',
       content: renderedText || `[Template: ${templateName}] First outreach to ${task.lead_name}`,
       message_type: 'text',
-      metadata: { task_type: task.task_type, task_id: task.id, autonomous: true, template_name: templateName, ...(wamid ? { whatsapp_message_id: wamid, wa_message_id: wamid } : {}) }
+      metadata: { task_type: task.task_type, task_id: task.id, autonomous: true, template_name: templateName, template_buttons: TEMPLATE_BUTTONS[templateName] || undefined, ...(wamid ? { whatsapp_message_id: wamid, wa_message_id: wamid } : {}) }
     }).then(({ error }) => {
       if (error) console.error('[FirstOutreach] Conversation log error:', error.message);
     });
@@ -2896,6 +2896,16 @@ const TEMPLATE_PARAM_COUNT = {
   'bcon_proxe_rnr': 1,                   // name
 };
 
+// Template quick reply button labels matching Meta-approved templates
+const TEMPLATE_BUTTONS = {
+  'bcon_proxe_followup_engaged': ['Yes, let\'s go'],
+  'bcon_proxe_followup_noengage': ['Yes, tell me more', 'Just exploring'],
+  'bcon_proxe_booking_reminder_24h': ['Yes, I\'ll be there', 'No, I need to reschedule'],
+  'bcon_proxe_booking_reminder_30m': ['I\'m ready!'],
+  'bcon_proxe_reengagement_engaged': ['Yes, let\'s talk'],
+  'bcon_proxe_reengagement_noengage': ['Yes Lets Talk'],
+};
+
 // Template body texts matching Meta-approved templates (used to render human-readable content for conversation logs)
 const TEMPLATE_BODIES = {
   'bcon_proxe_booking_reminder_24h': `Hi {{customer_name}}, your call with the BCON Team is tomorrow at {{booking_time}}.\nWe'll be going over {{service_interest}} for your business.\nSee you there.`,
@@ -3022,7 +3032,7 @@ async function executeSendMessage(task, waPhone, message) {
         task_type: task.task_type,
         task_id: task.id,
         autonomous: true,
-        ...(templateUsed ? { template_name: templateUsed } : {}),
+        ...(templateUsed ? { template_name: templateUsed, template_buttons: TEMPLATE_BUTTONS[templateUsed] || undefined } : {}),
         wa_message_id: waMessageId || undefined,
         ...(waMessageId ? { whatsapp_message_id: waMessageId } : {}),
       }

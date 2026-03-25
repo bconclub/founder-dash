@@ -1598,6 +1598,19 @@ export default function InboxPage() {
                             </div>
                           )
                         })()}
+                        {msg.metadata?.template_buttons && Array.isArray(msg.metadata.template_buttons) && msg.metadata.template_buttons.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5 mt-1.5">
+                            {msg.metadata.template_buttons.map((btn: string, btnIdx: number) => (
+                              <span
+                                key={btnIdx}
+                                className="inline-block text-[10px] font-medium px-2.5 py-1 rounded-full border"
+                                style={{ borderColor: 'rgba(99,102,241,0.3)', color: 'rgba(139,142,255,0.9)', background: 'rgba(99,102,241,0.08)' }}
+                              >
+                                {btn}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
                     </React.Fragment>
