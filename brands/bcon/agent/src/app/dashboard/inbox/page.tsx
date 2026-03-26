@@ -1556,7 +1556,7 @@ export default function InboxPage() {
                             ? 'rgba(255,255,255,0.12)'
                             : 'rgba(99,102,241,0.30)',
                           borderWidth: '1px',
-                          ...(msg.metadata?.template_name ? { borderLeft: '3px solid #F59E0B' } : {}),
+                          ...(msg.metadata?.template_name ? { borderLeft: `3px solid ${getDeliveryStatusStyle(msg.metadata?.delivery_status).color}` } : {}),
                         }}
                       >
                         <div className="flex items-center justify-between gap-3 mb-1">

@@ -1888,6 +1888,18 @@ async function processPendingTasks() {
   console.log(`[ProcessTasks] Processing ${sortedTasks.length} tasks (sorted by temperature)`);
 
   for (const task of sortedTasks) {
+    // ── Atomic lock: mark as 'processing' before executing to prevent duplicate runs ──
+    const { error: lockErr, count: lockCount } = await supabase
+      .from('agent_tasks')
+      .update({ status: 'processing', metadata: { ...task.metadata, processing_started_at: new Date().toISOString() } })
+      .eq('id', task.id)
+      .eq('status', 'pending')
+      .select('id', { count: 'exact', head: true });
+    if (lockErr || lockCount === 0) {
+      console.log(`[ProcessTasks] Task ${task.id} (${task.task_type}) already processing or completed by another worker — skipping`);
+      continue;
+    }
+
     try {
       // ── Cold lead handling: stop all sequences, only allow re_engage ──
       const leadTemp = tempCache[task.lead_id] || 'warm';
@@ -1923,6 +1935,7 @@ async function processPendingTasks() {
         const scheduledUtc = new Date(Date.now() + (nextMorning.getTime() - nowIST.getTime()));
         const timingReason = `Quiet hours (${hourIST}:00 IST), rescheduled to 9 AM IST`;
         await supabase.from('agent_tasks').update({
+          status: 'pending',
           scheduled_at: scheduledUtc.toISOString(),
           metadata: { ...task.metadata, timing_reason: timingReason },
         }).eq('id', task.id);
@@ -1994,6 +2007,26 @@ async function executeTask(task) {
   if (!phone) throw new Error('No phone number');
 
   const waPhone = phone.length === 10 ? `91${phone}` : phone;
+
+  // ── Duplicate-send guard: skip if a template was already sent to this lead in the last 6h ──
+  // This prevents two different task types (e.g. follow_up_24h + nudge_waiting) sending the same template
+  const TEMPLATE_TASK_TYPES = ['follow_up_24h', 'nudge_waiting', 'push_to_book', 'follow_up_day1', 'follow_up_day3', 'follow_up_day5', 're_engage', 'first_outreach'];
+  if (TEMPLATE_TASK_TYPES.includes(task.task_type) && task.lead_id) {
+    const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
+    const { data: recentSent } = await supabase
+      .from('agent_tasks')
+      .select('id, task_type, completed_at')
+      .eq('lead_id', task.lead_id)
+      .eq('status', 'completed')
+      .in('task_type', TEMPLATE_TASK_TYPES)
+      .gte('completed_at', sixHoursAgo)
+      .neq('id', task.id)
+      .limit(1);
+    if (recentSent && recentSent.length > 0) {
+      console.log(`[executeTask] Duplicate guard: ${task.task_type} skipped for ${task.lead_name} — ${recentSent[0].task_type} already sent in last 6h`);
+      return { skipped: true, reason: `Duplicate guard — ${recentSent[0].task_type} already sent within 6h` };
+    }
+  }
 
   switch (task.task_type) {
     // ── Inbound lead outreach ──
