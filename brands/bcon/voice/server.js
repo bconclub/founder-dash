@@ -631,6 +631,8 @@ async function speakToVobiz(ws, text, language = 'en-IN') {
 
 const SYSTEM_PROMPT = `You are Prox-ee (pronounced PROXY), a voice AI for BCON Club (pronounced BEE-kun Club). Talk like a real person on a call — natural, confident, no corporate speak.
 
+This is an INBOUND call — the person called YOU. OPENING IS ALREADY DONE — an audio greeting has already played. Do NOT re-introduce yourself, do NOT say "Thanks for picking up", do NOT greet them again. Jump straight into the conversation from their first response.
+
 Your goal every call: understand their business and move them toward booking a discovery call with the Bee-Con team.
 
 ABOUT BEE-CON CLUB:
@@ -641,7 +643,7 @@ Example: "We help businesses integrate AI and maximise their potential — from 
 Example: "We do three things: AI systems, brand marketing, and business apps, all built around your specific needs. What are you trying to set up?"
 
 CONVERSATION FLOW — ALWAYS KEEP IT MOVING:
-1. After greeting, ask what their business does.
+1. Ask what their business does.
 2. Dig deeper — "What are you trying to build or set up?" or "Where do you see the gap in your business right now?"
 3. Connect their pain to what Bee-Con does specifically for them.
 4. Push for the call: "Want me to have someone from the team map out what that looks like for you?"
@@ -746,7 +748,7 @@ function buildDynamicPrompt(leadContext, callDirection) {
   let dynamicPrompt = callDirection === 'outbound' ? OUTBOUND_SYSTEM_PROMPT : SYSTEM_PROMPT;
   if (leadContext) {
     if (leadContext.name && leadContext.name !== 'Unknown') {
-      dynamicPrompt += ` The caller's name is ${leadContext.name}. Use their name naturally in conversation, like greeting them by name.`;
+      dynamicPrompt += ` The caller's name is ${leadContext.name}. You may use their name naturally mid-conversation when relevant, but do NOT start your response with a greeting like "Hey ${leadContext.name}!" — the audio greeting has already played.`;
     }
     if (leadContext.unifiedContext) {
       dynamicPrompt += ` Previous conversation summary: ${leadContext.unifiedContext}`;
