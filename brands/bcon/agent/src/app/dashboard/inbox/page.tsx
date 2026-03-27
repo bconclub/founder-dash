@@ -237,6 +237,18 @@ function getDeliveryTooltip(status: string | undefined, error?: string): string 
   }
 }
 
+/** Infer effective delivery status: if the lead replied after this message, it was at least delivered */
+function getEffectiveDeliveryStatus(msg: Message, allMessages: Message[]): string {
+  const stored = msg.metadata?.delivery_status as string | undefined
+  if (stored === 'read' || stored === 'failed') return stored
+  const msgTime = new Date(msg.created_at).getTime()
+  const hasReplyAfter = allMessages.some(
+    m => m.sender === 'customer' && m.channel === msg.channel && new Date(m.created_at).getTime() > msgTime
+  )
+  if (hasReplyAfter) return 'delivered'
+  return stored || 'sent'
+}
+
 function DeliveryStatusIcon({ status }: { status: string | undefined }) {
   if (!status || status === 'sent' || status === 'pending') {
     return <svg width="10" height="10" viewBox="0 0 16 16" fill="none"><path d="M3 8l3 3 7-7" stroke="#F59E0B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
@@ -1556,7 +1568,7 @@ export default function InboxPage() {
                             ? 'rgba(255,255,255,0.12)'
                             : 'rgba(99,102,241,0.30)',
                           borderWidth: '1px',
-                          ...(msg.metadata?.template_name ? { borderLeft: `3px solid ${getDeliveryStatusStyle(msg.metadata?.delivery_status).color}` } : {}),
+                          ...(msg.metadata?.template_name ? { borderLeft: `3px solid ${getDeliveryStatusStyle(getEffectiveDeliveryStatus(msg, filteredMessages)).color}` } : {}),
                         }}
                       >
                         <div className="flex items-center justify-between gap-3 mb-1">
@@ -1580,7 +1592,7 @@ export default function InboxPage() {
                           {renderMarkdown(msg.content)}
                         </div>
                         {msg.metadata?.template_name && (() => {
-                          const ds = msg.metadata?.delivery_status
+                          const ds = getEffectiveDeliveryStatus(msg, filteredMessages)
                           const statusStyle = getDeliveryStatusStyle(ds)
                           const tooltip = getDeliveryTooltip(ds, msg.metadata?.delivery_error)
                           return (
@@ -1594,9 +1606,6 @@ export default function InboxPage() {
                               </span>
                               <span className="text-[9px] font-medium" style={{ color: 'var(--text-secondary)' }}>
                                 {getTemplateLabel(msg.metadata.template_name)}
-                              </span>
-                              <span className="flex items-center" title={ds || 'pending'}>
-                                <DeliveryStatusIcon status={ds} />
                               </span>
                             </div>
                           )
@@ -1612,6 +1621,11 @@ export default function InboxPage() {
                                 {btn}
                               </span>
                             ))}
+                          </div>
+                        )}
+                        {!isCustomer && msg.channel === 'whatsapp' && (
+                          <div className="flex justify-end items-center gap-1 mt-1 -mb-0.5" title={getDeliveryTooltip(getEffectiveDeliveryStatus(msg, filteredMessages), msg.metadata?.delivery_error)}>
+                            <DeliveryStatusIcon status={getEffectiveDeliveryStatus(msg, filteredMessages)} />
                           </div>
                         )}
                       </div>
