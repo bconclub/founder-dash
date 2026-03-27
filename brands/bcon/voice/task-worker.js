@@ -55,6 +55,7 @@ function formatTimeTo12h(raw) {
 const TELEGRAM_OFFSET_FILE = path.join(__dirname, '.telegram_offset');
 const DAILY_REPORT_FILE = path.join(__dirname, '.last_daily_report');
 const WEEKLY_REPORT_FILE = path.join(__dirname, '.last_weekly_report');
+const TASK_SCHEDULE_FILE = path.join(__dirname, '.last_task_schedule');
 
 // ============================================
 // LEAD TEMPERATURE - Timing Multipliers
@@ -978,6 +979,84 @@ async function sendDailyReport() {
 }
 
 // ============================================
+// DAILY TASK SCHEDULE — 8:00 AM IST
+// ============================================
+
+/**
+ * Sends a grouped count of all pending tasks scheduled for today.
+ * Fires once per day at 8:00–8:05 AM IST. Deduplicates via TASK_SCHEDULE_FILE.
+ */
+async function sendDailyTaskSchedule() {
+  if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_ADMIN_CHAT_ID) return;
+
+  const nowIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+  const hourIST = nowIST.getHours();
+  const minIST = nowIST.getMinutes();
+
+  // Only run at 8:00–8:05 AM IST
+  if (hourIST !== 8 || minIST > 5) return;
+
+  // Dedup: only once per calendar day
+  const todayStr = nowIST.toISOString().split('T')[0];
+  try {
+    if (fs.existsSync(TASK_SCHEDULE_FILE)) {
+      const lastSent = fs.readFileSync(TASK_SCHEDULE_FILE, 'utf8').trim();
+      if (lastSent === todayStr) return;
+    }
+  } catch (_) {}
+
+  try {
+    // Today's window: now → midnight IST
+    const todayStart = new Date(nowIST);
+    todayStart.setHours(0, 0, 0, 0);
+    const tomorrowStart = new Date(todayStart);
+    tomorrowStart.setDate(tomorrowStart.getDate() + 1);
+
+    const { data: tasks, error } = await supabase
+      .from('agent_tasks')
+      .select('task_type, scheduled_at')
+      .eq('status', 'pending')
+      .gte('scheduled_at', new Date().toISOString()) // from now
+      .lt('scheduled_at', tomorrowStart.toISOString()); // until midnight IST
+
+    if (error) throw error;
+
+    if (!tasks || tasks.length === 0) {
+      console.log('[TaskSchedule] No pending tasks today — skipping Telegram message');
+      fs.writeFileSync(TASK_SCHEDULE_FILE, todayStr);
+      return;
+    }
+
+    // Group by task_type
+    const counts = {};
+    for (const t of tasks) {
+      counts[t.task_type] = (counts[t.task_type] || 0) + 1;
+    }
+
+    // Sort by count descending
+    const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+    const lines = sorted.map(([type, count]) => `  ${type}: ${count} task${count !== 1 ? 's' : ''}`).join('\n');
+
+    const timeStr = nowIST.toLocaleTimeString('en-IN', {
+      hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata',
+    });
+    const dateStr = nowIST.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+
+    const body =
+      `📋 <b>Today's Scheduled Tasks — ${dateStr}</b>\n` +
+      `🕐 Generated at: ${timeStr} IST\n\n` +
+      `${lines}\n\n` +
+      `<b>Total: ${tasks.length} task${tasks.length !== 1 ? 's' : ''} firing today</b>`;
+
+    await sendTelegram(TELEGRAM_ADMIN_CHAT_ID, body);
+    fs.writeFileSync(TASK_SCHEDULE_FILE, todayStr);
+    console.log(`[TaskSchedule] Sent — ${tasks.length} tasks across ${sorted.length} type(s)`);
+  } catch (err) {
+    console.error('[TaskSchedule] Failed:', err.message);
+  }
+}
+
+// ============================================
 // TELEGRAM COMMANDS
 // ============================================
 
@@ -1655,6 +1734,7 @@ async function main() {
   try {
     await pollTelegramCommands();
     await morningBriefing();
+    await sendDailyTaskSchedule();
     await sendDailyReport();
     await sendWeeklyReport();
     await checkUnansweredQuestions();
