@@ -300,7 +300,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   return (
     <div className="dashboard-layout min-h-screen" style={{ backgroundColor: 'var(--bg-primary)', minHeight: '100vh' }}>
       {/* Mobile overlay */}
-      {isMobile && mobileSidebarOpen && (
+      {mobileSidebarOpen && (
         <div
           className="dashboard-layout-mobile-overlay fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden"
           onClick={() => setMobileSidebarOpen(false)}
@@ -309,8 +309,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
       {/* Fixed Sidebar */}
       <div
-        className={`dashboard-layout-sidebar fixed inset-y-0 left-0 z-50 flex flex-col overflow-visible ${isMobile && !mobileSidebarOpen ? '-translate-x-full' : 'translate-x-0'
-          }`}
+        className={`dashboard-layout-sidebar fixed inset-y-0 left-0 z-50 flex flex-col overflow-visible ${mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}
         style={{
           width: sidebarWidth,
           backgroundColor: 'var(--bg-primary)',
@@ -663,36 +662,42 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         </div>
       </div>
 
-      {/* Mobile Menu Button */}
-      {isMobile && (
-        <button
-          onClick={() => setMobileSidebarOpen(true)}
-          className="dashboard-layout-mobile-menu-button fixed top-4 left-4 z-30 p-2 rounded-md transition-colors"
-          style={{
-            backgroundColor: 'var(--bg-secondary)',
-            border: '1px solid var(--border-primary)',
-            color: 'var(--text-primary)',
-          }}
-          aria-label="Open sidebar"
-        >
-          <MdMenu size={24} />
-        </button>
-      )}
-
       {/* Main Content */}
       <div
-        className="dashboard-layout-main-content flex flex-col"
+        className={`dashboard-layout-main-content flex flex-col ${isCollapsed ? 'md:ml-14' : 'md:ml-[220px]'}`}
         style={{
-          marginLeft: sidebarContentMargin,
           backgroundColor: 'var(--bg-primary)',
           height: '100vh',
-          width: isMobile ? '100%' : `calc(100% - ${contentMarginWidth})`,
           overflow: 'hidden',
-          transition: 'margin-left 200ms cubic-bezier(0.2,0,0,1), width 200ms cubic-bezier(0.2,0,0,1)',
+          transition: 'margin-left 200ms cubic-bezier(0.2,0,0,1)',
         }}
       >
         {/* Page Transition Loader */}
         <PageTransitionLoader />
+
+        {/* Mobile top bar — only visible on mobile */}
+        <div
+          className="md:hidden flex items-center gap-3 flex-shrink-0 border-b px-4"
+          style={{
+            height: '56px',
+            backgroundColor: 'var(--bg-primary)',
+            borderColor: 'var(--border-primary)',
+          }}
+        >
+          <button
+            onClick={() => setMobileSidebarOpen(true)}
+            className="p-2 rounded-md transition-colors"
+            style={{
+              backgroundColor: 'var(--bg-secondary)',
+              border: '1px solid var(--border-primary)',
+              color: 'var(--text-primary)',
+            }}
+            aria-label="Open sidebar"
+          >
+            <MdMenu size={20} />
+          </button>
+          <h1 className="text-xl font-black" style={{ color: 'var(--accent-primary)' }}>BCON</h1>
+        </div>
 
         {/* Page content */}
         {pathname === '/dashboard/inbox' ? (
@@ -701,7 +706,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           </main>
         ) : (
           <main className="dashboard-layout-main-content-wrapper flex-1 overflow-y-auto" style={{ backgroundColor: 'var(--bg-primary)', position: 'relative' }}>
-            <div className="dashboard-layout-main-content-container py-6" style={{ backgroundColor: 'var(--bg-primary)' }}>
+            <div className="dashboard-layout-main-content-container py-4 sm:py-6" style={{ backgroundColor: 'var(--bg-primary)' }}>
               <div className="dashboard-layout-main-content-inner px-4 sm:px-6 md:px-8">
                 {children}
               </div>

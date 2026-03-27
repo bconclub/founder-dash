@@ -365,43 +365,43 @@ export default function FounderDashboard() {
           }}
         >
           <h2 className="text-base sm:text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>At a Glance</h2>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
             <div className="flex flex-col items-center">
-              <RadialProgress value={metrics.radialMetrics.avgScore} label="" color={getMetricColor('avgScore', metrics.radialMetrics.avgScore)} size={120} />
-              <p className="text-xs font-medium mt-3" style={{ color: 'var(--text-secondary)' }}>Avg Lead Score</p>
+              <RadialProgress value={metrics.radialMetrics.avgScore} label="" color={getMetricColor('avgScore', metrics.radialMetrics.avgScore)} size={96} />
+              <p className="text-xs font-medium mt-2" style={{ color: 'var(--text-secondary)' }}>Avg Lead Score</p>
             </div>
             <div className="flex flex-col items-center">
-              <RadialProgress value={metrics.radialMetrics.responseRate} label="" color={getMetricColor('responseRate', metrics.radialMetrics.responseRate)} size={120} />
-              <p className="text-xs font-medium mt-3" style={{ color: 'var(--text-secondary)' }}>Response Rate</p>
+              <RadialProgress value={metrics.radialMetrics.responseRate} label="" color={getMetricColor('responseRate', metrics.radialMetrics.responseRate)} size={96} />
+              <p className="text-xs font-medium mt-2" style={{ color: 'var(--text-secondary)' }}>Response Rate</p>
             </div>
             <div className="flex flex-col items-center">
-              <RadialProgress value={metrics.radialMetrics.bookingRate} label="" color={getMetricColor('bookingRate', metrics.radialMetrics.bookingRate)} size={120} />
-              <p className="text-xs font-medium mt-3" style={{ color: 'var(--text-secondary)' }}>Key Event Rate</p>
+              <RadialProgress value={metrics.radialMetrics.bookingRate} label="" color={getMetricColor('bookingRate', metrics.radialMetrics.bookingRate)} size={96} />
+              <p className="text-xs font-medium mt-2" style={{ color: 'var(--text-secondary)' }}>Key Event Rate</p>
             </div>
             <div className="flex flex-col items-center">
-              <RadialProgress value={metrics.radialMetrics.avgResponseTime} max={10000} label="" color={getMetricColor('avgResponseTime', metrics.radialMetrics.avgResponseTime)} size={120} valueFormatter={(v) => `${Math.round(v)}ms`} showPercentage={false} />
-              <p className="text-xs font-medium mt-3" style={{ color: 'var(--text-secondary)' }}>Avg Response</p>
+              <RadialProgress value={metrics.radialMetrics.avgResponseTime} max={10000} label="" color={getMetricColor('avgResponseTime', metrics.radialMetrics.avgResponseTime)} size={96} valueFormatter={(v) => `${Math.round(v)}ms`} showPercentage={false} />
+              <p className="text-xs font-medium mt-2" style={{ color: 'var(--text-secondary)' }}>Avg Response</p>
             </div>
           </div>
         </div>
       )}
 
       {/* NUMBER CARDS ROW */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-4">
         {/* Card 1: Total Conversations */}
         <div
-          className="rounded-xl p-5 sm:p-6 border transition-all hover:shadow-lg aspect-[4/3] flex flex-col justify-between"
+          className="rounded-xl p-3 sm:p-5 lg:p-6 border transition-all hover:shadow-lg sm:aspect-[4/3] flex flex-col justify-between"
           style={{
             backgroundColor: 'rgba(59, 130, 246, 0.05)',
             borderColor: 'rgba(59, 130, 246, 0.2)',
           }}
         >
           <div>
-            <div className="flex items-center gap-2 mb-4">
-              <MdChatBubble className="text-blue-500" size={18} />
-              <h3 className="text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>Total Conversations</h3>
+            <div className="flex items-center gap-1.5 mb-2 sm:mb-4">
+              <MdChatBubble className="text-blue-500 flex-shrink-0" size={14} />
+              <h3 className="text-xs sm:text-sm font-semibold truncate" style={{ color: 'var(--text-secondary)' }}>Conversations</h3>
             </div>
-            <p className="text-4xl sm:text-5xl font-bold" style={{ color: 'var(--text-primary)' }}>
+            <p className="text-2xl sm:text-4xl lg:text-5xl font-bold" style={{ color: 'var(--text-primary)' }}>
               {conversationTimeFilter === '7D' && metrics.totalConversations.count7D}
               {conversationTimeFilter === '14D' && metrics.totalConversations.count14D}
               {conversationTimeFilter === '30D' && metrics.totalConversations.count30D}
@@ -411,15 +411,15 @@ export default function FounderDashboard() {
             </p>
           </div>
           {metrics.trends?.conversations && (
-            <div className="w-full my-3" style={{ height: '36px' }}>
+            <div className="hidden sm:block w-full my-3" style={{ height: '36px' }}>
               <Sparkline data={metrics.trends.conversations.data} color="#3B82F6" height={36} />
             </div>
           )}
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between mt-2 sm:mt-0">
             <button onClick={() => router.push('/dashboard/inbox')} className="text-xs font-medium flex items-center gap-1 hover:underline" style={{ color: '#3B82F6' }}>
-              View All <MdArrowForward size={14} />
+              View <MdArrowForward size={12} />
             </button>
-            <div className="flex gap-1">
+            <div className="hidden sm:flex gap-1">
               {(['7D', '14D', '30D'] as const).map((period) => (
                 <button key={period} onClick={() => setConversationTimeFilter(period)}
                   className={`px-2 py-0.5 text-[10px] rounded ${conversationTimeFilter === period ? 'text-[var(--text-button)]' : ''}`}
@@ -432,66 +432,66 @@ export default function FounderDashboard() {
 
         {/* Card 2: Engaged Leads */}
         <div
-          className="rounded-xl p-5 sm:p-6 border transition-all hover:shadow-lg aspect-[4/3] flex flex-col justify-between"
+          className="rounded-xl p-3 sm:p-5 lg:p-6 border transition-all hover:shadow-lg sm:aspect-[4/3] flex flex-col justify-between"
           style={{
             backgroundColor: 'rgba(34, 197, 94, 0.05)',
             borderColor: 'rgba(34, 197, 94, 0.2)',
           }}
         >
           <div>
-            <div className="flex items-center gap-2 mb-4">
-              <MdLocalFireDepartment className="text-green-500" size={18} />
-              <h3 className="text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>Engaged Leads</h3>
+            <div className="flex items-center gap-1.5 mb-2 sm:mb-4">
+              <MdLocalFireDepartment className="text-green-500 flex-shrink-0" size={14} />
+              <h3 className="text-xs sm:text-sm font-semibold truncate" style={{ color: 'var(--text-secondary)' }}>Engaged Leads</h3>
             </div>
-            <p className="text-4xl sm:text-5xl font-bold" style={{ color: 'var(--text-primary)' }}>
+            <p className="text-2xl sm:text-4xl lg:text-5xl font-bold" style={{ color: 'var(--text-primary)' }}>
               {metrics.engagedLeads?.count ?? 0}
             </p>
             <p className="text-xs mt-1" style={{ color: '#22C55E' }}>
-              {metrics.engagedLeads?.engagementRate?.toFixed(1) ?? '0.0'}% of {metrics.engagedLeads?.total ?? metrics.totalLeads.count} leads
+              {metrics.engagedLeads?.engagementRate?.toFixed(1) ?? '0.0'}%
             </p>
           </div>
           {metrics.trends?.leads && (
-            <div className="w-full my-3" style={{ height: '36px' }}>
+            <div className="hidden sm:block w-full my-3" style={{ height: '36px' }}>
               <Sparkline data={metrics.trends.leads.data} color="#22C55E" height={36} showGradient={true} />
             </div>
           )}
-          <button onClick={() => router.push('/dashboard/leads?filter=engaged')} className="text-xs font-medium flex items-center gap-1 hover:underline" style={{ color: '#22C55E' }}>
-            View All <MdArrowForward size={14} />
+          <button onClick={() => router.push('/dashboard/leads?filter=engaged')} className="text-xs font-medium flex items-center gap-1 hover:underline mt-2 sm:mt-0" style={{ color: '#22C55E' }}>
+            View <MdArrowForward size={12} />
           </button>
         </div>
 
         {/* Card 3: Warm Leads */}
         <div
-          className="rounded-xl p-5 sm:p-6 border transition-all hover:shadow-lg aspect-[4/3] flex flex-col justify-between"
+          className="rounded-xl p-3 sm:p-5 lg:p-6 border transition-all hover:shadow-lg sm:aspect-[4/3] flex flex-col justify-between"
           style={{
             backgroundColor: 'rgba(249, 115, 22, 0.05)',
             borderColor: 'rgba(249, 115, 22, 0.2)',
           }}
         >
           <div>
-            <div className="flex items-center gap-2 mb-4">
-              <MdLocalFireDepartment className="text-orange-500" size={18} />
-              <h3 className="text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>Warm Leads</h3>
+            <div className="flex items-center gap-1.5 mb-2 sm:mb-4">
+              <MdLocalFireDepartment className="text-orange-500 flex-shrink-0" size={14} />
+              <h3 className="text-xs sm:text-sm font-semibold truncate" style={{ color: 'var(--text-secondary)' }}>Warm Leads</h3>
             </div>
-            <p className="text-4xl sm:text-5xl font-bold" style={{ color: 'var(--text-primary)' }}>
+            <p className="text-2xl sm:text-4xl lg:text-5xl font-bold" style={{ color: 'var(--text-primary)' }}>
               {warmLeadsFilter === '7D' && (metrics.warmLeads?.count7D ?? 0)}
               {warmLeadsFilter === '14D' && (metrics.warmLeads?.count14D ?? 0)}
               {warmLeadsFilter === '30D' && (metrics.warmLeads?.count30D ?? 0)}
             </p>
             <p className="text-xs mt-1" style={{ color: '#F97316' }}>
-              Score 40-69 from {metrics.totalLeads.count} leads
+              Score 40–69
             </p>
           </div>
           {metrics.trends?.leads && (
-            <div className="w-full my-3" style={{ height: '36px' }}>
+            <div className="hidden sm:block w-full my-3" style={{ height: '36px' }}>
               <Sparkline data={metrics.trends.leads.data} color="#F97316" height={36} showGradient={true} />
             </div>
           )}
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between mt-2 sm:mt-0">
             <button onClick={() => router.push('/dashboard/leads?filter=warm')} className="text-xs font-medium flex items-center gap-1 hover:underline" style={{ color: '#F97316' }}>
-              View All <MdArrowForward size={14} />
+              View <MdArrowForward size={12} />
             </button>
-            <div className="flex gap-1">
+            <div className="hidden sm:flex gap-1">
               {(['7D', '14D', '30D'] as const).map((period) => (
                 <button key={period} onClick={() => setWarmLeadsFilter(period)}
                   className={`px-2 py-0.5 text-[10px] rounded ${warmLeadsFilter === period ? 'text-[var(--text-button)]' : ''}`}
@@ -504,18 +504,18 @@ export default function FounderDashboard() {
 
         {/* Card 4: Total Leads */}
         <div
-          className="rounded-xl p-5 sm:p-6 border transition-all hover:shadow-lg aspect-[4/3] flex flex-col justify-between"
+          className="rounded-xl p-3 sm:p-5 lg:p-6 border transition-all hover:shadow-lg sm:aspect-[4/3] flex flex-col justify-between"
           style={{
             backgroundColor: 'var(--accent-subtle)',
             borderColor: 'var(--accent-primary)',
           }}
         >
           <div>
-            <div className="flex items-center gap-2 mb-4">
-              <MdPeople style={{ color: 'var(--accent-primary)' }} size={18} />
-              <h3 className="text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>Total Leads</h3>
+            <div className="flex items-center gap-1.5 mb-2 sm:mb-4">
+              <MdPeople className="flex-shrink-0" style={{ color: 'var(--accent-primary)' }} size={14} />
+              <h3 className="text-xs sm:text-sm font-semibold truncate" style={{ color: 'var(--text-secondary)' }}>Total Leads</h3>
             </div>
-            <p className="text-4xl sm:text-5xl font-bold" style={{ color: 'var(--text-primary)' }}>
+            <p className="text-2xl sm:text-4xl lg:text-5xl font-bold" style={{ color: 'var(--text-primary)' }}>
               {leadsFilter === '7D' && (metrics.totalLeads.count7D ?? metrics.totalLeads.count)}
               {leadsFilter === '14D' && (metrics.totalLeads.count14D ?? metrics.totalLeads.count)}
               {leadsFilter === '30D' && (metrics.totalLeads.count30D ?? metrics.totalLeads.count)}
@@ -525,15 +525,15 @@ export default function FounderDashboard() {
             </p>
           </div>
           {metrics.trends?.leads && (
-            <div className="w-full my-3" style={{ height: '36px' }}>
+            <div className="hidden sm:block w-full my-3" style={{ height: '36px' }}>
               <Sparkline data={metrics.trends.leads.data} color="var(--accent-primary)" height={36} showGradient={true} />
             </div>
           )}
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between mt-2 sm:mt-0">
             <button onClick={() => router.push('/dashboard/leads')} className="text-xs font-medium flex items-center gap-1 hover:underline" style={{ color: 'var(--accent-primary)' }}>
-              View All <MdArrowForward size={14} />
+              View <MdArrowForward size={12} />
             </button>
-            <div className="flex gap-1">
+            <div className="hidden sm:flex gap-1">
               {(['7D', '14D', '30D'] as const).map((period) => (
                 <button key={period} onClick={() => setLeadsFilter(period)}
                   className={`px-2 py-0.5 text-[10px] rounded ${leadsFilter === period ? 'text-[var(--text-button)]' : ''}`}
@@ -548,7 +548,7 @@ export default function FounderDashboard() {
 
       {/* Upcoming Events - Full width below cards */}
       <div
-        className="rounded-lg p-4 sm:p-6 border transition-all hover:shadow-lg mb-6"
+        className="rounded-lg p-3 sm:p-6 border transition-all hover:shadow-lg mb-4 sm:mb-6"
         style={{
           backgroundColor: 'rgba(59, 130, 246, 0.05)',
           borderColor: 'rgba(59, 130, 246, 0.2)',
