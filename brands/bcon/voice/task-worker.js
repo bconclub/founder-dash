@@ -13,6 +13,16 @@ const path = require('path');
 require('dotenv').config();
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY || null;
+
+// Load soul + task reference docs at startup — these are the agent's identity and intent guide
+const SOUL_PATH = path.join(__dirname, 'soul.md');
+const TASKS_PATH = path.join(__dirname, 'tasks.md');
+const AGENT_SYSTEM_PROMPT = [
+  fs.existsSync(SOUL_PATH) ? fs.readFileSync(SOUL_PATH, 'utf8') : '',
+  fs.existsSync(TASKS_PATH) ? fs.readFileSync(TASKS_PATH, 'utf8') : '',
+].filter(Boolean).join('\n\n---\n\n');
+
 const WA_TOKEN = process.env.META_WHATSAPP_ACCESS_TOKEN;
 const WA_PHONE_ID = process.env.META_WHATSAPP_PHONE_NUMBER_ID;
 const WA_TEMPLATE_NAME = process.env.WA_TEMPLATE_NAME || 'bcon_followup';
@@ -860,6 +870,54 @@ async function executeVoiceCall(task, waPhone) {
   }
 
   console.log(`[VoiceCall] ${timingReason} for ${task.lead_name}`);
+  return null;
+}
+
+/**
+ * Cold intro call — dials a fresh lead using the cold_intro direction.
+ * PROXE introduces BCON Club for the first time. No prior contact assumed.
+ */
+async function executeColdIntroCall(task, waPhone) {
+  const phone10 = waPhone.replace(/\D/g, '').slice(-10);
+
+  if (!VOBIZ_AUTH_ID || !VOBIZ_AUTH_TOKEN) {
+    console.warn('[ColdIntroCall] Vobiz not configured — skipping');
+    return null;
+  }
+
+  const toPhone = `91${phone10}`;
+  const answerUrl = `${VOBIZ_ANSWER_URL}?direction=cold_intro&lead_name=${encodeURIComponent(task.lead_name || '')}`;
+
+  const res = await fetch(`https://api.vobiz.ai/api/v1/Account/${VOBIZ_AUTH_ID}/Call/`, {
+    method: 'POST',
+    headers: {
+      'X-Auth-ID': VOBIZ_AUTH_ID,
+      'X-Auth-Token': VOBIZ_AUTH_TOKEN,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      from: VOBIZ_FROM_NUMBER,
+      to: toPhone,
+      answer_url: answerUrl,
+      caller_name: 'BCON Club',
+    }),
+  });
+
+  if (!res.ok) {
+    const errBody = await res.text();
+    console.error(`[ColdIntroCall] Vobiz error ${res.status}: ${errBody}`);
+    return null;
+  }
+
+  const data = await res.json();
+  console.log(`[ColdIntroCall] Initiated to ${toPhone} for ${task.lead_name}, uuid: ${data.request_uuid}`);
+
+  if (TELEGRAM_BOT_TOKEN && TELEGRAM_ADMIN_CHAT_ID) {
+    await sendTelegram(TELEGRAM_ADMIN_CHAT_ID,
+      `<b>📞 COLD INTRO CALL</b>\n\nLead: ${task.lead_name} (${phone10})\nStatus: queued`
+    ).catch(() => {});
+  }
+
   return null;
 }
 
@@ -2145,6 +2203,9 @@ async function executeTask(task) {
     case 'try_voice_call':
       return await executeVoiceCall(task, waPhone);
 
+    case 'cold_intro_call':
+      return await executeColdIntroCall(task, waPhone);
+
     default:
       throw new Error(`Unknown task type: ${task.task_type}`);
   }
@@ -3083,16 +3144,106 @@ function getTemplatePreview(task, lead) {
 // ============================================
 
 /**
+ * Use Claude to generate a contextual, personalised WhatsApp message for this lead.
+ * Reads soul.md + tasks.md as the system prompt.
+ * Falls back to null if AI unavailable — caller uses hardcoded fallback.
+ */
+async function generateMessage(task) {
+  if (!ANTHROPIC_API_KEY || !task.lead_id) return null;
+
+  try {
+    // Fetch lead context
+    const { data: lead } = await supabase
+      .from('all_leads')
+      .select('customer_name, lead_score, unified_context, last_interaction_at')
+      .eq('id', task.lead_id)
+      .single();
+
+    // Fetch last 6 messages (3 from each side max) for context
+    const { data: history } = await supabase
+      .from('conversations')
+      .select('sender, content, created_at')
+      .eq('lead_id', task.lead_id)
+      .order('created_at', { ascending: false })
+      .limit(6);
+
+    const ctx = lead?.unified_context || {};
+    const temp = ctx.lead_temperature || 'warm';
+    const score = lead?.lead_score || 0;
+    const businessType =
+      ctx.form_data?.business_type ||
+      ctx.whatsapp?.profile?.business_type ||
+      ctx.web?.profile?.business_type ||
+      null;
+    const daysSince = task.metadata?.days_since_contact
+      || (lead?.last_interaction_at
+        ? Math.floor((Date.now() - new Date(lead.last_interaction_at).getTime()) / 86400000)
+        : null);
+
+    const historyText = (history || [])
+      .reverse()
+      .map(m => `${m.sender === 'customer' ? 'Lead' : 'PROXE'}: ${m.content}`)
+      .join('\n');
+
+    const userPrompt = [
+      `Lead name: ${task.lead_name}`,
+      businessType ? `Business: ${businessType}` : null,
+      `Lead score: ${score}/100`,
+      `Temperature: ${temp}`,
+      daysSince != null ? `Days since last contact: ${daysSince}` : null,
+      `Task type: ${task.task_type}`,
+      task.metadata?.timing_reason ? `Context: ${task.metadata.timing_reason}` : null,
+      '',
+      historyText ? `Recent conversation:\n${historyText}` : '(No prior conversation history)',
+      '',
+      'Write a single WhatsApp message for PROXE to send right now. Follow your soul and the task intent guide above. Plain text only — no markdown, no bullet points.',
+    ].filter(line => line !== null).join('\n');
+
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 200,
+        system: AGENT_SYSTEM_PROMPT,
+        messages: [{ role: 'user', content: userPrompt }],
+      }),
+    });
+
+    if (!res.ok) {
+      console.error('[generateMessage] Claude API error:', res.status);
+      return null;
+    }
+
+    const data = await res.json();
+    const generated = data.content?.[0]?.text?.trim() || null;
+    if (generated) console.log(`[generateMessage] Generated for ${task.lead_name} (${task.task_type}): ${generated}`);
+    return generated;
+  } catch (err) {
+    console.error('[generateMessage] Failed:', err.message);
+    return null;
+  }
+}
+
+/**
  * Send a message via WhatsApp. Checks 24h window first.
  * Falls back to template message if outside window.
  * Runs through Telegram approval gate before sending.
  */
-async function executeSendMessage(task, waPhone, message) {
+async function executeSendMessage(task, waPhone, fallbackMessage) {
   const within24h = task.lead_id ? await isWithin24hWindow(task.lead_id) : true;
 
   let waMessageId = null;
   let templateUsed = null;
+  let message = fallbackMessage;
   if (within24h) {
+    // Ask Claude to write the message — falls back to hardcoded if unavailable
+    const aiMessage = await generateMessage(task);
+    if (aiMessage) message = aiMessage;
     waMessageId = await sendWhatsApp(waPhone, message);
   } else {
     const { templateName, renderedText, wamid } = await sendWhatsAppTemplate(waPhone, task);

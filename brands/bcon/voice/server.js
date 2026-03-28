@@ -17,10 +17,17 @@ let greetingAudioChunks = null;
 
 async function preloadGreeting() {
   console.log('Pre-loading greeting audio...');
-  const raw = await elevenLabsTTS("Hi there! Thank you for calling Bee-Con Club. I'm Prox-ee How can I help you today?");
+  const greetingText = "Hi there! Thank you for calling Bee-Con Club. I'm Prox-ee. How can I help you today?";
+  let raw = await elevenLabsTTS(greetingText);
+  if (!raw) {
+    console.log('[Preload] ElevenLabs failed, trying Sarvam...');
+    raw = await sarvamTTS(greetingText, 'en-IN');
+  }
   if (raw) {
     greetingAudioChunks = preparePcmChunks(raw);
     console.log('Greeting audio ready, chunks:', greetingAudioChunks.length);
+  } else {
+    console.warn('[Preload] Both TTS providers failed — greeting will be generated live');
   }
 }
 
@@ -345,14 +352,27 @@ wss.on('connection', (ws, req) => {
           }
         }
 
-        // Send greeting — outbound uses a personalised opener, inbound uses cached audio
-        if (ws.callDirection === 'outbound') {
+        // Send greeting — direction-aware opener, then brief deaf period to prevent echo pickup
+        if (ws.callDirection === 'cold_intro') {
+          const name = ws.outboundLeadName && ws.outboundLeadName !== 'null' ? ws.outboundLeadName : null;
+          const greeting = name
+            ? `Hi ${name}, this is Prox-ee from Bee-Con Club. I wanted to introduce myself to you — would this be a good time?`
+            : `Hi, this is Prox-ee from Bee-Con Club. I wanted to introduce myself — would this be a good time?`;
+          isSpeaking = true;
+          await speakToVobiz(ws, greeting, 'en-IN');
+          // Brief deaf period: prevents STT from picking up echo/reverb of our own greeting
+          await new Promise(r => setTimeout(r, 600));
+          isSpeaking = false;
+          console.log('Cold intro greeting sent');
+        } else if (ws.callDirection === 'outbound') {
           const name = ws.outboundLeadName && ws.outboundLeadName !== 'null' ? ws.outboundLeadName : null;
           const greeting = name
             ? `Hey ${name}, this is Prox-ee calling from Bee-Con Club. You had reached out to us earlier — just wanted to follow up. Is this a good time to talk?`
             : `Hey, this is Prox-ee calling from Bee-Con Club. You had reached out to us earlier — just wanted to follow up. Is this a good time?`;
           isSpeaking = true;
           await speakToVobiz(ws, greeting, 'en-IN');
+          // Brief deaf period: prevents STT picking up echo of our greeting
+          await new Promise(r => setTimeout(r, 600));
           isSpeaking = false;
           console.log('Outbound greeting sent');
         } else if (greetingAudioChunks && ws.readyState === 1) {
@@ -458,7 +478,7 @@ wss.on('connection', (ws, req) => {
           pendingStartTime = null;
         }
 
-        // Update voice session with duration
+        // Update voice session with duration + auto-create follow-up task
         if (callUUID && ws.callStartTime) {
           try {
             const durationSecs = Math.floor((Date.now() - ws.callStartTime) / 1000);
@@ -467,6 +487,55 @@ wss.on('connection', (ws, req) => {
               .update({ call_status: 'completed', call_duration_seconds: durationSecs, updated_at: new Date().toISOString() })
               .eq('external_session_id', callUUID);
             console.log('Call ended, duration:', durationSecs, 'seconds');
+
+            // Auto-create follow-up task if call connected and we have a lead
+            if (ws.leadId && ws.normalizedPhone) {
+              const phone10 = ws.normalizedPhone.replace(/\D/g, '').slice(-10);
+              const leadName = ws.outboundLeadName || 'there';
+              const isBriefCall = durationSecs < 45;
+
+              if (isBriefCall) {
+                // Brief call (< 45s) — likely dropped or cut off, nudge quickly
+                await supabase.from('agent_tasks').insert({
+                  task_type: 'nudge_waiting',
+                  task_description: `Brief call (${durationSecs}s) — follow up via WhatsApp`,
+                  lead_id: ws.leadId,
+                  lead_phone: phone10,
+                  lead_name: leadName,
+                  status: 'pending',
+                  scheduled_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(), // 10 min later
+                  metadata: {
+                    source: 'post_call_auto',
+                    call_duration_seconds: durationSecs,
+                    call_direction: ws.callDirection,
+                    timing_reason: `Call lasted only ${durationSecs}s — checking in via WhatsApp`,
+                  },
+                  created_at: new Date().toISOString(),
+                });
+                console.log(`[PostCall] Brief call task created for ${leadName}`);
+              } else {
+                // Proper call — post_call_followup in 1 hour
+                await supabase.from('agent_tasks').insert({
+                  task_type: 'post_call_followup',
+                  task_description: `Post-call follow-up after ${durationSecs}s call`,
+                  lead_id: ws.leadId,
+                  lead_phone: phone10,
+                  lead_name: leadName,
+                  status: 'pending',
+                  scheduled_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(), // 1 hour
+                  metadata: {
+                    source: 'post_call_auto',
+                    call_duration_seconds: durationSecs,
+                    call_direction: ws.callDirection,
+                    sequence: 'post_call',
+                    step: 0,
+                    timing_reason: `${durationSecs}s call completed — following up in 1 hour`,
+                  },
+                  created_at: new Date().toISOString(),
+                });
+                console.log(`[PostCall] Follow-up task created for ${leadName} (${durationSecs}s call)`);
+              }
+            }
           } catch (dbErr) {
             console.error('Supabase stop error:', dbErr.message);
           }
@@ -602,6 +671,53 @@ async function elevenLabsTTS(text) {
   }
 }
 
+async function sarvamTTS(text, language = 'en-IN') {
+  const ttsStart = Date.now();
+  try {
+    if (!process.env.SARVAM_API_KEY) return null;
+    // bulbul:v2 speakers: anushka, abhilash, manisha, vidya, arya, karun, hitesh
+    // arya = English female, manisha = Hindi female
+    const model = 'bulbul:v2';
+    const speaker = language.startsWith('hi') ? 'manisha' : 'arya';
+
+    const res = await fetch('https://api.sarvam.ai/text-to-speech', {
+      method: 'POST',
+      headers: {
+        'api-subscription-key': process.env.SARVAM_API_KEY,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        inputs: [text],
+        target_language_code: language,
+        speaker,
+        model,
+        enable_preprocessing: true,
+        speech_sample_rate: 16000,
+      }),
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error(`[TTS ERROR] (${Date.now() - ttsStart}ms) Status: ${res.status}`);
+      console.error('Full Sarvam API error response:', errText);
+      return null;
+    }
+
+    const data = await res.json();
+    const audioB64 = data.audios?.[0];
+    if (!audioB64) return null;
+
+    // Sarvam returns base64 WAV — strip 44-byte header to get raw PCM
+    const wavBuffer = Buffer.from(audioB64, 'base64');
+    const pcmBuffer = wavBuffer.slice(44);
+    console.log(`[TIMING] Sarvam TTS: ${Date.now() - ttsStart}ms (bytes: ${pcmBuffer.length})`);
+    return pcmBuffer;
+  } catch (err) {
+    console.error(`[TTS ERROR] Sarvam (${Date.now() - ttsStart}ms): ${err.message}`);
+    return null;
+  }
+}
+
 async function speakToVobiz(ws, text, language = 'en-IN') {
   const ttsCallStart = Date.now();
   if (!text || !text.trim()) {
@@ -609,7 +725,12 @@ async function speakToVobiz(ws, text, language = 'en-IN') {
     return;
   }
 
-  const audio = await elevenLabsTTS(text);
+  // Try ElevenLabs first, fall back to Sarvam
+  let audio = await elevenLabsTTS(text);
+  if (!audio) {
+    console.log('[Speak] ElevenLabs failed, falling back to Sarvam TTS...');
+    audio = await sarvamTTS(text, language);
+  }
 
   if (audio && ws.readyState === 1) {
     const chunks = preparePcmChunks(audio);
@@ -670,13 +791,43 @@ CONVERSATION FLOW:
 4. Push for the booking: "Want me to set up a quick call with the team to map that out for you?"
 
 ABOUT BEE-CON CLUB:
-We help businesses integrate AI and maximise their potential. Three areas: AI in Business (custom AI agents, lead automation, workflow automation, analytics), Brand Marketing (strategy to execution, AI-powered), and Business Apps (web apps, mobile apps, custom SaaS).
+We are the AI hotline for business. Three areas:
+- AI in Business: custom AI agents, lead automation, workflow automation, analytics — we plug AI into how you actually run your business.
+- Brand Marketing: strategy to execution, AI-powered campaigns, content, positioning.
+- Business Apps: web apps, mobile apps, custom SaaS built for your operations.
 
 If not a good time: "No worries at all — when would be a better time to call back?"
 Pricing: "Depends on the scope — the team maps that out on a discovery call. Worth 15 minutes."
 Missed something: "Sorry, say that again?"
 
 Rules: Keep responses to 2-3 sentences. No markdown. No lists. No emojis. Always end with a question or a push forward.`;
+
+const COLD_INTRO_SYSTEM_PROMPT = `You are Prox-ee (pronounced PROXY), a voice AI for BCON Club (pronounced BEE-kun Club). You are making a COLD INTRO call — this person has not spoken to us before.
+
+Tone: Warm, confident, brief. Not a sales pitch. A genuine introduction. Like someone who knows something useful and wants to share it.
+
+Your goal: Introduce BCON Club in one line, figure out what they do and what's slowing them down, then offer a free AI Brand Audit call if there's a fit.
+
+OPENING IS ALREADY DONE — do not re-introduce yourself. Jump straight from their first response.
+
+CONVERSATION FLOW:
+1. If they say "yes, go ahead" — give a one-line intro of BCON Club, then ask: "What kind of business are you running?"
+2. Listen. Let them describe their business. Ask one follow-up about their biggest bottleneck.
+3. Connect what they said to what Bee-Con does. Be specific — don't give a generic pitch.
+4. Offer the audit: "We do a free AI Brand Audit — it's a 30-minute call where we map out exactly where AI fits in your business. No pitch. Just clarity. Want to set one up?"
+
+ABOUT BEE-CON CLUB:
+We are the AI hotline for business. Three areas:
+- AI in Business: custom AI agents, lead automation, workflow automation, analytics — we plug AI into how you actually run your business.
+- Brand Marketing: strategy to execution, AI-powered campaigns, content, positioning.
+- Business Apps: web apps, mobile apps, custom SaaS built for your operations.
+
+If not a good time: "No problem — when's better? I'll call back then."
+If not interested: "Totally fair. If that changes, just let me know." — then end politely.
+If they ask who gave them their number: "You came up as someone who might benefit from what we do. Happy to explain more."
+Missed something: "Sorry, didn't catch that — say again?"
+
+Rules: Keep responses to 2-3 sentences max. Sound human. No lists, no markdown, no emojis. Always end with a question. Never hard-sell. The audit is the only ask.`;
 
 async function loadLeadContext(leadId) {
   const ctx = { name: null, stage: null, score: null, previousMessages: [], channels: [], adminNotes: [], unifiedContext: null };
@@ -745,7 +896,11 @@ async function loadLeadContext(leadId) {
 }
 
 function buildDynamicPrompt(leadContext, callDirection) {
-  let dynamicPrompt = callDirection === 'outbound' ? OUTBOUND_SYSTEM_PROMPT : SYSTEM_PROMPT;
+  let dynamicPrompt = callDirection === 'cold_intro'
+    ? COLD_INTRO_SYSTEM_PROMPT
+    : callDirection === 'outbound'
+      ? OUTBOUND_SYSTEM_PROMPT
+      : SYSTEM_PROMPT;
   if (leadContext) {
     if (leadContext.name && leadContext.name !== 'Unknown') {
       dynamicPrompt += ` The caller's name is ${leadContext.name}. You may use their name naturally mid-conversation when relevant, but do NOT start your response with a greeting like "Hey ${leadContext.name}!" — the audio greeting has already played.`;
