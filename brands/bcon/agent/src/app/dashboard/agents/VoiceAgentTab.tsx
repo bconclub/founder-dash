@@ -10,20 +10,20 @@ export default function VoiceAgentTab() {
 
   const voiceNumber = '+918046733388';
 
-  async function triggerTestCall() {
-    if (!phone) return;
+  async function triggerCall() {
+    if (!phone.trim()) return;
     setCalling(true);
-    setStatus('Initiating call...');
+    setStatus('');
     try {
       const res = await fetch('/api/agent/voice/test-call', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone }),
+        body: JSON.stringify({ phone: phone.trim(), direction: 'cold_intro' }),
       });
       const data = await res.json();
-      setStatus(data.success ? `Call initiated to ${phone}` : `Failed: ${data.error}`);
+      setStatus(data.success ? `✓ Calling ${phone.trim()}...` : `Failed: ${data.error}`);
     } catch {
-      setStatus('Error initiating call');
+      setStatus('Error — check server logs');
     } finally {
       setCalling(false);
     }
@@ -97,7 +97,7 @@ export default function VoiceAgentTab() {
           </button>
         </div>
 
-        {/* Section 2 — Outbound (We Call You) */}
+        {/* Section 2 — Outbound call */}
         <div style={{
           flex: 1,
           backgroundColor: 'var(--bg-secondary)',
@@ -110,15 +110,17 @@ export default function VoiceAgentTab() {
           textAlign: 'center',
           gap: '16px',
         }}>
-          <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>Get a Call</h2>
+          <MdPhone size={32} style={{ color: 'var(--accent-primary)' }} />
+          <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>Call a Number</h2>
           <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-            Enter your number and the AI agent will call you
+            PROXE will call this number and introduce itself
           </p>
           <input
             type="text"
-            placeholder="Your number (with country code)"
+            placeholder="Enter phone number"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && triggerCall()}
             className="rounded-lg px-4 py-2.5 text-sm outline-none w-full"
             style={{
               backgroundColor: 'var(--bg-primary)',
@@ -129,18 +131,22 @@ export default function VoiceAgentTab() {
             }}
           />
           <button
-            onClick={triggerTestCall}
-            disabled={calling}
+            onClick={triggerCall}
+            disabled={calling || !phone.trim()}
             className="rounded-lg px-6 py-2.5 text-sm font-semibold transition-opacity hover:opacity-90 disabled:opacity-50"
             style={{
               backgroundColor: 'var(--button-bg)',
               color: 'var(--text-button)',
-              cursor: calling ? 'not-allowed' : 'pointer',
+              cursor: (calling || !phone.trim()) ? 'not-allowed' : 'pointer',
             }}
           >
-            {calling ? 'Calling...' : 'Call Me Now'}
+            {calling ? 'Calling...' : 'Call'}
           </button>
-          {status && <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>{status}</p>}
+          {status && (
+            <p className="text-sm" style={{ color: status.startsWith('✓') ? '#22c55e' : '#ef4444' }}>
+              {status}
+            </p>
+          )}
         </div>
       </div>
     </div>
